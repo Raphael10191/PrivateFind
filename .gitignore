@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Runtime files
+backend/logs/
+uploads/
+
+# macOS / editors
+.DS_Store
+.vscode/

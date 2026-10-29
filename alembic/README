@@ -1,0 +1,4 @@
+Database migrations (Alembic). Create a new one with:
+  alembic revision --autogenerate -m "short description"
+Apply all migrations with:
+  alembic upgrade head

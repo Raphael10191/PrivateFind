@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlalchemy>=2.0.36
+alembic>=1.13
+pymysql
+cryptography
+python-dotenv
