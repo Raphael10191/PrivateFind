@@ -61,7 +61,8 @@ def enum_column(enum_class: type[enum.Enum]) -> Enum:
 
 
 def created_at_column() -> Mapped[datetime]:
-    return mapped_column(DateTime, server_default=func.now())
+    # Python sets the time (same clock as datetime.now() in our code), MySQL is the fallback
+    return mapped_column(DateTime, default=datetime.now, server_default=func.now())
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +110,7 @@ class ClaimStatus(enum.Enum):
     PENDING = "pending"        # evidence submitted, not decided yet
     APPROVED = "approved"      # score >= 80, no critical conflict, or approved by admin
     IN_REVIEW = "in_review"    # score 50-79 or generic item, admin decides
-    REJECTED = "rejected"      # score < 50, critical mismatch or too many attempts
+    REJECTED = "rejected"      # score < 50 or critical mismatch (leads to a growing wait time)
 
 
 class EvidenceResult(enum.Enum):
@@ -232,7 +233,7 @@ class FoundItem(Base):
 
 
 class ItemPhoto(Base):
-    """1 to 3 photos per item. Only the path is stored, the file lies in a private folder."""
+    """Three photos per item (different sides). Only the path is stored, the file lies in a private folder."""
 
     __tablename__ = "item_photo"
 
@@ -301,7 +302,9 @@ class Claim(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), index=True)
     status: Mapped[ClaimStatus] = mapped_column(enum_column(ClaimStatus), default=ClaimStatus.PENDING)
     ownership_score: Mapped[float | None] = mapped_column(Float)
-    attempt_no: Mapped[int] = mapped_column(SmallInteger, default=1)  # max. 3 failed attempts
+    # Number of this user's claims on this item. No hard limit: failed claims lead to
+    # growing wait times per account and item (5, 10, 20 min, max. 1 h), see services/attempts.py
+    attempt_no: Mapped[int] = mapped_column(SmallInteger, default=1)
     reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("user.user_id"))  # admin
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = created_at_column()
@@ -358,7 +361,7 @@ class Compartment(Base):
 
     compartment_id: Mapped[int] = mapped_column(primary_key=True)
     locker_id: Mapped[int] = mapped_column(ForeignKey("locker.locker_id"))
-    number: Mapped[int] = mapped_column(SmallInteger)  # 1 or 2 in our prototype
+    number: Mapped[int] = mapped_column(SmallInteger)  # our prototype has only compartment 1
     state: Mapped[CompartmentState] = mapped_column(
         enum_column(CompartmentState), default=CompartmentState.FREE
     )

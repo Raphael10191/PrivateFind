@@ -6,3 +6,7 @@ alembic>=1.13
 pymysql
 cryptography
 python-dotenv
+python-multipart
+argon2-cffi
+pytest
+httpx
