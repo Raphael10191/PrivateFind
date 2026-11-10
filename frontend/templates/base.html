@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}PrivateFind{% endblock %}</title>
+
+    <style>
+        :root {
+            --background: #FAFAF8;
+            --text: #1A1A1F;
+            --purple: #6D5BD0;
+            --purple-light: #EFEBFA;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e8e8e8;
+            padding: 18px 6%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .navigation {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--purple);
+        }
+
+        .profile-menu {
+            position: relative;
+        }
+
+        .profile-menu summary {
+            cursor: pointer;
+            list-style: none;
+            background: var(--purple-light);
+            border-radius: 50%;
+            padding: 10px 13px;
+        }
+
+        .profile-menu summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .profile-options {
+            position: absolute;
+            top: 46px;
+            right: 0;
+            min-width: 150px;
+            padding: 14px;
+            background: white;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px #00000012;
+            z-index: 10;
+        }
+
+        .profile-options a {
+            display: block;
+            padding: 9px;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .mobile-navigation {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .navigation {
+                display: none;
+            }
+
+            main {
+                padding: 24px 16px 90px;
+            }
+
+            .mobile-navigation {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                justify-content: space-around;
+                padding: 16px;
+                background: white;
+                border-top: 1px solid #e8e8e8;
+            }
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <header class="header">
+        <a href="/owner" class="logo">PrivateFind</a>
+
+        <nav class="navigation" aria-label="Owner navigation">
+            <a href="/owner">Home</a>
+            <a href="/owner/reports">My Reports</a>
+
+            <details class="profile-menu">
+                <summary aria-label="Account menu">👤</summary>
+                <div class="profile-options">
+                    <a href="/owner/account">My Account</a>
+                    <a href="/logout">Sign out</a>
+                </div>
+            </details>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="mobile-navigation" aria-label="Mobile owner navigation">
+        <a href="/owner">Home</a>
+        <a href="/owner/reports">My Reports</a>
+        <a href="/owner/account">Account</a>
+    </nav>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+e
