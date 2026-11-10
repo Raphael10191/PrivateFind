@@ -1,18 +1,30 @@
-# Secrets
-.env
-
 # Python
+__pycache__/
+*.py[cod]
 .venv/
 venv/
-__pycache__/
-*.pyc
-
-# Runtime files
-backend/logs/
-uploads/
-*.db
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
-# macOS / editors
-.DS_Store
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Private photo storage (never commit uploads)
+backend/storage/
+uploads/
+
+# Arduino / PlatformIO
+.pio/
+build/
+
+# IDE / OS
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db
