@@ -1,0 +1,282 @@
+
+{% extends "base.html" %}
+
+{% block title %}My Reports | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .reports-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .reports-header h1 {
+        font-size: 30px;
+        margin: 0 0 8px;
+    }
+
+    .subtitle {
+        color: #666670;
+        margin: 0;
+    }
+
+    .new-report {
+        background: #6D5BD0;
+        color: white;
+        padding: 13px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .new-report:hover {
+        background: #5846bb;
+        color: white;
+    }
+
+    .filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+
+    .filter-button {
+        border: 1px solid #E4E2EB;
+        background: white;
+        color: #1A1A1F;
+        padding: 10px 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        font: inherit;
+    }
+
+    .filter-button.active {
+        background: #EFEBFA;
+        color: #6D5BD0;
+        border-color: #6D5BD0;
+        font-weight: 600;
+    }
+
+    .report-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 16px;
+    }
+
+    .report-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+    }
+
+    .report-top h2 {
+        font-size: 19px;
+        margin: 0;
+    }
+
+    .status {
+        font-size: 13px;
+        border-radius: 20px;
+        padding: 7px 12px;
+        font-weight: 600;
+    }
+
+    .searching {
+        color: #6D5BD0;
+        background: #EFEBFA;
+    }
+
+    .completed {
+        color: #3D6750;
+        background: #E8F4EC;
+    }
+
+    .report-location {
+        color: #666670;
+        font-size: 14px;
+        margin: 12px 0 20px;
+    }
+
+    .report-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 18px;
+        border-top: 1px solid #ECECF0;
+        gap: 12px;
+    }
+
+    .report-date {
+        color: #777780;
+        font-size: 13px;
+    }
+
+    .view-details {
+        color: #6D5BD0;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .empty-message {
+        padding: 48px 20px;
+        text-align: center;
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        color: #666670;
+    }
+
+    .demo-note {
+        font-size: 12px;
+        color: #777780;
+        margin-bottom: 18px;
+    }
+
+    @media (max-width: 600px) {
+        .reports-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .reports-header h1 {
+            font-size: 26px;
+        }
+
+        .new-report {
+            text-align: center;
+        }
+
+        .filters {
+            overflow-x: auto;
+        }
+
+        .report-card {
+            padding: 18px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="reports-header">
+    <div>
+        <h1>My Reports</h1>
+        <p class="subtitle">Track your lost-item reports.</p>
+    </div>
+
+    <a href="/owner/report/new" class="new-report">
+        + New Report
+    </a>
+</section>
+
+<div class="filters" role="group" aria-label="Filter reports">
+    <button type="button" class="filter-button active"
+            data-filter="all" aria-pressed="true">
+        All
+    </button>
+
+    <button type="button" class="filter-button"
+            data-filter="active" aria-pressed="false">
+        Active
+    </button>
+
+    <button type="button" class="filter-button"
+            data-filter="completed" aria-pressed="false">
+        Completed
+    </button>
+</div>
+
+<!-- Temporary sample data for frontend testing only -->
+<p class="demo-note">Sample reports — frontend preview</p>
+
+<div id="reports-list">
+
+    <article class="report-card" data-status="active">
+        <div class="report-top">
+            <h2>Black Wallet</h2>
+            <span class="status searching">Searching</span>
+        </div>
+
+        <p class="report-location">
+            Lost near the library
+        </p>
+
+        <div class="report-bottom">
+            <span class="report-date">Sample report</span>
+            <span class="view-details">Details coming soon</span>
+        </div>
+    </article>
+
+    <article class="report-card" data-status="completed">
+        <div class="report-top">
+            <h2>Blue Umbrella</h2>
+            <span class="status completed">Collected</span>
+        </div>
+
+        <p class="report-location">
+            Lost near the student center
+        </p>
+
+        <div class="report-bottom">
+            <span class="report-date">Sample report</span>
+            <span class="view-details">Details coming soon</span>
+        </div>
+    </article>
+
+</div>
+
+<div id="filter-empty" class="empty-message" hidden>
+    No reports in this category.
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const filterButtons = document.querySelectorAll(
+        ".filter-button"
+    );
+
+    const reportCards = document.querySelectorAll(
+        ".report-card"
+    );
+
+    const emptyMessage = document.getElementById(
+        "filter-empty"
+    );
+
+    filterButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            const selected = button.dataset.filter;
+            let visibleCount = 0;
+
+            filterButtons.forEach(item => {
+                const isActive = item === button;
+                item.classList.toggle("active", isActive);
+                item.setAttribute("aria-pressed", isActive);
+            });
+
+            reportCards.forEach(card => {
+                const visible =
+                    selected === "all" ||
+                    card.dataset.status === selected;
+
+                card.hidden = !visible;
+
+                if (visible) {
+                    visibleCount++;
+                }
+            });
+
+            emptyMessage.hidden = visibleCount !== 0;
+        });
+    });
+</script>
+{% endblock %}
