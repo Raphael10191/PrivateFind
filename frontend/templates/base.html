@@ -120,40 +120,79 @@
                 border-top: 1px solid #e8e8e8;
             }
         }
+
+            .navigation a.active-link {
+              color: #6D5BD0;
+             font-weight: 600;
+             border-bottom: 2px solid #6D5BD0;
+             padding-bottom: 6px;
+            }
+        
+
+              .mobile-navigation a[aria-current="page"] {
+               color: #6D5BD0;
+               font-weight: 700;
+            }
+
+
     </style>
+    
 
     {% block head %}{% endblock %}
 </head>
 
 <body>
-    <header class="header">
-        <a href="/owner" class="logo">PrivateFind</a>
+<header class="header">
+    <a href="/owner" class="logo">PrivateFind</a>
 
-        <nav class="navigation" aria-label="Owner navigation">
-            <a href="/owner">Home</a>
-            <a href="/owner/reports">My Reports</a>
+    <nav class="navigation" aria-label="Owner navigation">
+        <a href="/owner"
+           class="{% if active_page == 'home' %}active-link{% endif %}"
+           {% if active_page == 'home' %}aria-current="page"{% endif %}>
+            Home
+        </a>
 
-            <details class="profile-menu">
-                <summary aria-label="Account menu">👤</summary>
-                <div class="profile-options">
-                    <a href="/owner/account">My Account</a>
-                    <a href="/logout">Sign out</a>
-                </div>
-            </details>
-        </nav>
-    </header>
+        <a href="/owner/reports"
+           class="{% if active_page == 'reports' %}active-link{% endif %}"
+           {% if active_page == 'reports' %}aria-current="page"{% endif %}>
+            My Reports
+        </a>
+
+        <details class="profile-menu">
+            <summary aria-label="Account menu">👤</summary>
+            <div class="profile-options">
+                <a href="/owner/account">My Account</a>
+                <a href="/logout">Sign out</a>
+            </div>
+        </details>
+    </nav>
+</header>
 
     <main>
         {% block content %}{% endblock %}
     </main>
 
-    <nav class="mobile-navigation" aria-label="Mobile owner navigation">
-        <a href="/owner">Home</a>
-        <a href="/owner/reports">My Reports</a>
-        <a href="/owner/account">Account</a>
-    </nav>
+    
+     <nav class="mobile-navigation" 
+          aria-label="Mobile owner navigation">
+        <a href="/owner"
+       {% if active_page == 'home' %}aria-current="page"{% endif %}>
+        Home
+     </a>
+
+     <a href="/owner/reports"
+       {% if active_page == 'reports' %}aria-current="page"{% endif %}>
+        My Reports
+     </a>
+
+     <a href="/owner/account"
+       {% if active_page == 'account' %}aria-current="page"{% endif %}>
+        Account
+    </a>
+</nav>
+
 
     {% block scripts %}{% endblock %}
 </body>
 </html>
-e
+

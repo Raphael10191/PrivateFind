@@ -16,3 +16,6 @@ uploads/
 # macOS / editors
 .DS_Store
 .vscode/
+
+# Frontend local environment
+frontend/.venv/
