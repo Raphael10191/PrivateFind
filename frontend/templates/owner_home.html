@@ -1,0 +1,134 @@
+
+{% extends "base.html" %}
+
+{% block title %}Home | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .home-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 36px;
+    }
+
+    .home-header h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .home-header p {
+        margin: 0;
+        color: #666670;
+    }
+
+    .primary-button {
+        display: inline-block;
+        padding: 13px 20px;
+        background: #6D5BD0;
+        color: white;
+        border-radius: 10px;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .primary-button:hover {
+        background: #5846bb;
+        color: white;
+    }
+
+    .reports-heading {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+
+    .empty-state {
+        background: white;
+        border: 1px solid #ececf0;
+        border-radius: 18px;
+        padding: 60px 24px;
+        text-align: center;
+    }
+
+    .empty-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 20px;
+        background: #EFEBFA;
+        border-radius: 18px;
+        font-size: 28px;
+    }
+
+    .empty-state h2 {
+        font-size: 22px;
+        margin: 0 0 12px;
+    }
+
+    .empty-state p {
+        max-width: 360px;
+        margin: 0 auto;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 600px) {
+        .home-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .home-header h1 {
+            font-size: 26px;
+        }
+
+        .primary-button {
+            width: 100%;
+        }
+
+        .empty-state {
+            padding: 44px 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="home-header">
+    <div>
+        <h1>Welcome to PrivateFind</h1>
+        <p>Manage your lost-item reports in one place.</p>
+    </div>
+
+    <a href="/owner/report/new" class="primary-button">
+        + Report a Lost Item
+    </a>
+</section>
+
+<section aria-labelledby="reports-heading">
+    <h2 id="reports-heading" class="reports-heading">
+        Your Recent Reports
+    </h2>
+
+    {% if reports %}
+        <!-- Reports will be rendered here after
+             the frontend receives API data. -->
+        <p>Your reports will appear here.</p>
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-icon" aria-hidden="true">📋</div>
+
+            <h2>No reports yet</h2>
+
+            <p>
+                You haven't reported any lost items yet.
+            </p>
+        </div>
+    {% endif %}
+</section>
+
+{% endblock %}
