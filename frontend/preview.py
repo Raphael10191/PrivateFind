@@ -16,6 +16,7 @@ PAGES = {
     "/": "owner_home.html",
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
+    "/owner/account": "owner_account.html",
 }
 
 
@@ -31,8 +32,16 @@ class PreviewHandler(BaseHTTPRequestHandler):
         html = templates.get_template(template_name).render(
             reports=[],
             active_page=(
-                "reports" if path == "/owner/reports" else "home"
-            )
+                "account" if path == "/owner/account"
+                else "reports" if path == "/owner/reports"
+                else "home"
+            ),
+        
+            account={
+                "display_name": "Student",
+                "email": "student@example.edu",
+            }
+            
         )
 
         body = html.encode("utf-8")

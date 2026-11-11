@@ -1,0 +1,171 @@
+
+{% extends "base.html" %}
+
+{% block title %}My Account | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .account-page {
+        max-width: 480px;
+        margin: 30px auto;
+    }
+
+    .account-heading {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .account-heading h1 {
+        font-size: 30px;
+        margin: 0 0 8px;
+    }
+
+    .account-heading p {
+        color: #666670;
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .account-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 30px;
+    }
+
+    .account-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 26px;
+        margin: 0 auto 24px;
+    }
+
+    .account-field {
+        margin-bottom: 24px;
+    }
+
+    .account-field label {
+        display: block;
+        color: #666670;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .account-value {
+        background: #FAFAF8;
+        border: 1px solid #ECECF0;
+        border-radius: 10px;
+        padding: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .account-divider {
+        border: none;
+        border-top: 1px solid #ECECF0;
+        margin: 8px 0 24px;
+    }
+
+    .signout-button {
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #E4E2EB;
+        border-radius: 10px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .signout-button:hover {
+        background: #EFEBFA;
+        color: #6D5BD0;
+    }
+
+    .preview-message {
+        color: #666670;
+        font-size: 13px;
+        text-align: center;
+        margin-top: 14px;
+    }
+
+    @media (max-width: 600px) {
+        .account-page {
+            margin: 12px auto;
+        }
+
+        .account-heading h1 {
+            font-size: 26px;
+        }
+
+        .account-card {
+            padding: 22px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="account-page">
+    <div class="account-heading">
+        <h1>My Account</h1>
+        <p>Your PrivateFind account information</p>
+    </div>
+
+    <div class="account-card">
+        <div class="account-avatar" aria-hidden="true">
+            &#128100;
+        </div>
+
+        <div class="account-field">
+            <label>Display name</label>
+            <div class="account-value">
+                {{ account.display_name or "Not provided" }}
+            </div>
+        </div>
+
+        <div class="account-field">
+            <label>Email address</label>
+            <div class="account-value">
+                {{ account.email }}
+            </div>
+        </div>
+
+        <hr class="account-divider">
+
+        <button type="button"
+                class="signout-button"
+                id="signout-button">
+            Sign out
+        </button>
+
+        <p id="preview-message"
+           class="preview-message"
+           role="status"
+           hidden>
+            Sign out will be available when
+            authentication is connected.
+        </p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const signoutButton = document.getElementById(
+        "signout-button"
+    );
+
+    signoutButton.addEventListener("click", () => {
+        document.getElementById(
+            "preview-message"
+        ).hidden = false;
+    });
+</script>
+{% endblock %}
