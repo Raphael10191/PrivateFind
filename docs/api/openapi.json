@@ -1,0 +1,3039 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PrivateFind",
+    "version": "1.0.0",
+    "description": "PrivateFind frontend integration snapshot. Browser auth uses the session cookie; device keys are for firmware/test tools only. Custom auth/error annotations and the legacy device alias are added by scripts.export_api_docs; runtime routes are unchanged."
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/lockers/{locker_code}": {
+      "get": {
+        "tags": [
+          "locker"
+        ],
+        "summary": "Locker Info",
+        "description": "Public: shown on the finder's QR page before the deposit form.",
+        "operationId": "locker_info_api_lockers__locker_code__get",
+        "parameters": [
+          {
+            "name": "locker_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Locker Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LockerInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/api/device/codes/validate": {
+      "post": {
+        "tags": [
+          "locker",
+          "device"
+        ],
+        "summary": "Validate Code",
+        "operationId": "validate_code_api_device_codes_validate_post",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "DeviceKey": []
+          }
+        ],
+        "x-role": "device"
+      }
+    },
+    "/api/device/compartments/{number}/state": {
+      "post": {
+        "tags": [
+          "locker",
+          "device"
+        ],
+        "summary": "Report State",
+        "operationId": "report_state_api_device_compartments__number__state_post",
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "DeviceKey": []
+          }
+        ],
+        "x-role": "device"
+      }
+    },
+    "/api/device/heartbeat": {
+      "post": {
+        "tags": [
+          "locker",
+          "device"
+        ],
+        "summary": "Heartbeat",
+        "operationId": "heartbeat_api_device_heartbeat_post",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "server_time"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "DeviceKey": []
+          }
+        ],
+        "x-role": "device"
+      }
+    },
+    "/api/deposits": {
+      "post": {
+        "tags": [
+          "found items"
+        ],
+        "summary": "Deposit",
+        "description": "Public (finder, no account). AI extraction runs after the response is sent.",
+        "operationId": "deposit_api_deposits_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_deposit_api_deposits_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/api/admin/items": {
+      "get": {
+        "tags": [
+          "found items",
+          "admin"
+        ],
+        "summary": "List Items",
+        "operationId": "list_items_api_admin_items_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "ai_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ai Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminItemOut"
+                  },
+                  "title": "Response List Items Api Admin Items Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/items/{item_id}": {
+      "get": {
+        "tags": [
+          "found items",
+          "admin"
+        ],
+        "summary": "Get Item",
+        "operationId": "get_item_api_admin_items__item_id__get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/items/{item_id}/attributes": {
+      "put": {
+        "tags": [
+          "found items",
+          "admin"
+        ],
+        "summary": "Replace Attributes",
+        "operationId": "replace_attributes_api_admin_items__item_id__attributes_put",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttributesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/items/{item_id}/retry-ai": {
+      "post": {
+        "tags": [
+          "found items",
+          "admin"
+        ],
+        "summary": "Retry Ai",
+        "operationId": "retry_ai_api_admin_items__item_id__retry_ai_post",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/items/{item_id}/photos/{photo_id}": {
+      "get": {
+        "tags": [
+          "found items",
+          "admin"
+        ],
+        "summary": "Photo",
+        "operationId": "photo_api_admin_items__item_id__photos__photo_id__get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Photo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG image bytes",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/lost-reports": {
+      "get": {
+        "tags": [
+          "lost reports"
+        ],
+        "summary": "List Mine",
+        "operationId": "list_mine_api_lost_reports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LostReportOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Mine Api Lost Reports Get"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      },
+      "post": {
+        "tags": [
+          "lost reports"
+        ],
+        "summary": "Create",
+        "operationId": "create_api_lost_reports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LostReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LostReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/lost-reports/{report_id}": {
+      "get": {
+        "tags": [
+          "lost reports"
+        ],
+        "summary": "Get One",
+        "operationId": "get_one_api_lost_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LostReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/lost-reports/{report_id}/candidates": {
+      "get": {
+        "tags": [
+          "matching"
+        ],
+        "summary": "Candidates",
+        "operationId": "candidates_api_lost_reports__report_id__candidates_get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateOut"
+                  },
+                  "title": "Response Candidates Api Lost Reports  Report Id  Candidates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/claims": {
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "List Mine",
+        "operationId": "list_mine_api_claims_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Mine Api Claims Get"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      },
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Submit",
+        "operationId": "submit_api_claims_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/claims/{claim_id}": {
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Get One",
+        "operationId": "get_one_api_claims__claim_id__get",
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/claims/{claim_id}/pickup-code": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Pickup Code",
+        "operationId": "pickup_code_api_claims__claim_id__pickup_code_post",
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PickupCodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "account"
+      }
+    },
+    "/api/admin/claims": {
+      "get": {
+        "tags": [
+          "claims",
+          "admin"
+        ],
+        "summary": "Admin List",
+        "operationId": "admin_list_api_admin_claims_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "in_review",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminClaimOut"
+                  },
+                  "title": "Response Admin List Api Admin Claims Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/claims/{claim_id}": {
+      "get": {
+        "tags": [
+          "claims",
+          "admin"
+        ],
+        "summary": "Admin Get",
+        "operationId": "admin_get_api_admin_claims__claim_id__get",
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClaimOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/claims/{claim_id}/decision": {
+      "post": {
+        "tags": [
+          "claims",
+          "admin"
+        ],
+        "summary": "Admin Decide",
+        "operationId": "admin_decide_api_admin_claims__claim_id__decision_post",
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/admin/audit": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Audit Log",
+        "operationId": "audit_log_api_admin_audit_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditOut"
+                  },
+                  "title": "Response Audit Log Api Admin Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-role": "public"
+      }
+    },
+    "/locker/validate": {
+      "post": {
+        "tags": [
+          "locker",
+          "device"
+        ],
+        "summary": "Legacy alias of device code validation",
+        "operationId": "validate_code_legacy_locker_validate_post",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error; custom ApiError envelope with fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Handled business/auth/HTTP error. See the guide for endpoint-specific codes; unexpected 500/network failures may not be JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "DeviceKey": []
+          }
+        ],
+        "x-role": "device"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminClaimOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "found_item_id": {
+            "type": "integer",
+            "title": "Found Item Id"
+          },
+          "lost_report_id": {
+            "type": "integer",
+            "title": "Lost Report Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "ownership_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership Score"
+          },
+          "critical_conflict": {
+            "type": "boolean",
+            "title": "Critical Conflict"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceOut"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "item_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Summary"
+          },
+          "item_private_attributes": {
+            "items": {
+              "$ref": "#/components/schemas/AttributeIO"
+            },
+            "type": "array",
+            "title": "Item Private Attributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "found_item_id",
+          "lost_report_id",
+          "status",
+          "ownership_score",
+          "critical_conflict",
+          "created_at",
+          "decision_note",
+          "evidence",
+          "item_summary",
+          "item_private_attributes"
+        ],
+        "title": "AdminClaimOut"
+      },
+      "AdminItemOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "locker_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locker Id"
+          },
+          "compartment": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compartment"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "finder_contact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finder Contact"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "found_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Found At"
+          },
+          "ai_status": {
+            "type": "string",
+            "title": "Ai Status"
+          },
+          "ai_attempts": {
+            "type": "integer",
+            "title": "Ai Attempts"
+          },
+          "ai_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Error"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "public_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Summary"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/AttributeIO"
+            },
+            "type": "array",
+            "title": "Attributes"
+          },
+          "photo_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Photo Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "locker_id",
+          "location",
+          "note",
+          "finder_contact",
+          "status",
+          "found_at",
+          "ai_status",
+          "ai_attempts",
+          "ai_error",
+          "category",
+          "public_summary",
+          "description",
+          "attributes",
+          "photo_ids"
+        ],
+        "title": "AdminItemOut"
+      },
+      "AttributeIO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 30,
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Value"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "title": "Visibility"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "strong",
+                  "distinctive",
+                  "generic"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strength"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "visibility"
+        ],
+        "title": "AttributeIO"
+      },
+      "AttributesIn": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "wallet",
+              "keys",
+              "bag",
+              "laptop",
+              "tablet",
+              "headphones",
+              "bottle",
+              "umbrella",
+              "clothing",
+              "id_card",
+              "glasses",
+              "book",
+              "jewelry",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "public_summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Summary"
+          },
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/AttributeIO"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Attributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "attributes"
+        ],
+        "title": "AttributesIn"
+      },
+      "AuditOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor_type": {
+            "type": "string",
+            "title": "Actor Type"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "actor_type",
+          "actor_id",
+          "action",
+          "entity_type",
+          "entity_id",
+          "details"
+        ],
+        "title": "AuditOut"
+      },
+      "Body_deposit_api_deposits_post": {
+        "properties": {
+          "locker_code": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Locker Code"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Location"
+          },
+          "photos": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Photos"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Note",
+            "default": ""
+          },
+          "finder_contact": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finder Contact"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locker_code",
+          "location",
+          "photos"
+        ],
+        "title": "Body_deposit_api_deposits_post"
+      },
+      "Breakdown": {
+        "properties": {
+          "category": {
+            "type": "number",
+            "title": "Category"
+          },
+          "location": {
+            "type": "number",
+            "title": "Location"
+          },
+          "time": {
+            "type": "number",
+            "title": "Time"
+          },
+          "attributes": {
+            "type": "number",
+            "title": "Attributes"
+          },
+          "semantic": {
+            "type": "number",
+            "title": "Semantic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "location",
+          "time",
+          "attributes",
+          "semantic"
+        ],
+        "title": "Breakdown"
+      },
+      "CandidateOut": {
+        "properties": {
+          "found_item_id": {
+            "type": "integer",
+            "title": "Found Item Id"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "breakdown": {
+            "$ref": "#/components/schemas/Breakdown"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "found_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Found Date"
+          },
+          "public_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "found_item_id",
+          "score",
+          "breakdown",
+          "category",
+          "color",
+          "location",
+          "found_date",
+          "public_summary"
+        ],
+        "title": "CandidateOut",
+        "description": "Public data only: no photos, no private attributes, no finder details."
+      },
+      "ClaimIn": {
+        "properties": {
+          "lost_report_id": {
+            "type": "integer",
+            "title": "Lost Report Id"
+          },
+          "found_item_id": {
+            "type": "integer",
+            "title": "Found Item Id"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceIn"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lost_report_id",
+          "found_item_id",
+          "evidence"
+        ],
+        "title": "ClaimIn"
+      },
+      "ClaimOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "found_item_id": {
+            "type": "integer",
+            "title": "Found Item Id"
+          },
+          "lost_report_id": {
+            "type": "integer",
+            "title": "Lost Report Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "compartment": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compartment"
+          },
+          "pickup_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Code"
+          },
+          "pickup_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "found_item_id",
+          "lost_report_id",
+          "status",
+          "message",
+          "created_at"
+        ],
+        "title": "ClaimOut"
+      },
+      "CodeIn": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Device Id"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "code"
+        ],
+        "title": "CodeIn"
+      },
+      "CodeResult": {
+        "properties": {
+          "authorized": {
+            "type": "boolean",
+            "title": "Authorized"
+          },
+          "compartment": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compartment"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "deposit",
+                  "pickup"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authorized"
+        ],
+        "title": "CodeResult"
+      },
+      "DecisionIn": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionIn"
+      },
+      "DepositOut": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "compartment": {
+            "type": "integer",
+            "title": "Compartment"
+          },
+          "deposit_code": {
+            "type": "string",
+            "title": "Deposit Code"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "compartment",
+          "deposit_code",
+          "expires_at"
+        ],
+        "title": "DepositOut"
+      },
+      "EvidenceIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "serial_suffix",
+              "model",
+              "sticker_or_mark",
+              "damage",
+              "contents",
+              "accessory",
+              "engraving",
+              "other"
+            ],
+            "title": "Type"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "EvidenceIn"
+      },
+      "EvidenceOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "result": {
+            "type": "string",
+            "title": "Result"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similarity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "value",
+          "result",
+          "similarity"
+        ],
+        "title": "EvidenceOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HeartbeatIn": {
+        "properties": {
+          "firmware_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firmware Version"
+          }
+        },
+        "type": "object",
+        "title": "HeartbeatIn"
+      },
+      "LockerInfo": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "free_compartments": {
+            "type": "integer",
+            "title": "Free Compartments"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "location",
+          "free_compartments",
+          "locations"
+        ],
+        "title": "LockerInfo"
+      },
+      "LoginIn": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginIn"
+      },
+      "LostReportIn": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "wallet",
+              "keys",
+              "bag",
+              "laptop",
+              "tablet",
+              "headphones",
+              "bottle",
+              "umbrella",
+              "clothing",
+              "id_card",
+              "glasses",
+              "book",
+              "jewelry",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Location"
+          },
+          "lost_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lost At"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "black",
+                  "white",
+                  "gray",
+                  "silver",
+                  "gold",
+                  "red",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "brown",
+                  "beige",
+                  "multicolor"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "location",
+          "lost_at",
+          "description"
+        ],
+        "title": "LostReportIn"
+      },
+      "LostReportOut": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "wallet",
+              "keys",
+              "bag",
+              "laptop",
+              "tablet",
+              "headphones",
+              "bottle",
+              "umbrella",
+              "clothing",
+              "id_card",
+              "glasses",
+              "book",
+              "jewelry",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Location"
+          },
+          "lost_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lost At"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "black",
+                  "white",
+                  "gray",
+                  "silver",
+                  "gold",
+                  "red",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "brown",
+                  "beige",
+                  "multicolor"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Description"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "location",
+          "lost_at",
+          "description",
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "LostReportOut"
+      },
+      "PickupCodeOut": {
+        "properties": {
+          "compartment": {
+            "type": "integer",
+            "title": "Compartment"
+          },
+          "pickup_code": {
+            "type": "string",
+            "title": "Pickup Code"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compartment",
+          "pickup_code",
+          "expires_at"
+        ],
+        "title": "PickupCodeOut"
+      },
+      "RegisterIn": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "RegisterIn"
+      },
+      "StateIn": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Device Id"
+          },
+          "occupied": {
+            "type": "boolean",
+            "title": "Occupied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "occupied"
+        ],
+        "title": "StateIn"
+      },
+      "StateResult": {
+        "properties": {
+          "compartment": {
+            "type": "integer",
+            "title": "Compartment"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compartment",
+          "state"
+        ],
+        "title": "StateResult"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "role"
+        ],
+        "title": "UserOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ApiError": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "field",
+                    "message"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      },
+      "DeviceKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Device-Key"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local Docker API"
+    }
+  ]
+}

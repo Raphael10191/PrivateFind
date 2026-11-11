@@ -2,7 +2,44 @@
 
 FastAPI (async) · SQLAlchemy 2 · MySQL 8 · Python 3.13. Design: [architecture](../docs/design/architecture.md), [API contract](../docs/design/api-contract.md).
 
-## Run locally
+## Run everything with Docker
+
+Only Docker Desktop is needed on the host. From the repository root:
+
+```bash
+docker compose up --build
+```
+
+Compose waits for MySQL, then the backend applies migrations, seeds an admin and
+one-compartment locker, and starts on port 8000. Open http://localhost:8000/docs.
+The app currently provides an API interface; there is no merged frontend yet.
+
+Defaults: `AI_PROVIDER=mock`, admin `admin@example.com` / `changeme123`, locker `L1`,
+device `locker_01`. With mock AI, use a finder note such as
+`Black Samsung phone, cat sticker, serial ends 4821` for the test flow.
+
+The seed is safe to run repeatedly and keeps the existing device key. Save the key
+printed on the **first** startup for the ESP32. View logs with:
+
+```bash
+docker compose logs backend
+```
+
+Database data and photos are kept in `mysql-data` and `photo-data` volumes.
+`docker compose down` stops the app and retains both volumes. Start in the
+background with `docker compose up --build -d`; inspect health with `docker compose ps`.
+
+Optional environment variables can be set in a root `.env` file or the shell:
+`SECRET_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT` (host port), `AI_PROVIDER`,
+`ANTHROPIC_API_KEY`, and `CLAUDE_MODEL`. No `.env` file is required for the demo.
+Changing admin defaults after the database is seeded does not reset an existing
+account's password. Container database/storage paths are configured by Compose;
+the local `backend/.env` is excluded from the image.
+
+To connect the physical ESP32, use the laptop's LAN IP and published port in its
+backend URLs, and the saved device key. The firmware runs on the ESP32 itself.
+
+## Run the backend locally
 Requires [uv](https://docs.astral.sh/uv/) and Docker.
 
 ```bash
@@ -16,6 +53,10 @@ uv run uvicorn app.main:app --reload
 ```
 
 The interactive API docs are at http://localhost:8000/docs.
+
+For frontend integration, see the [complete API guide](../docs/api/frontend-integration.md),
+[OpenAPI snapshot](../docs/api/openapi.json), and [Postman collection](../docs/api/postman-collection.json).
+Regenerate the JSON exports from this directory with `uv run python -m scripts.export_api_docs`.
 
 ## Tests and lint
 ```bash

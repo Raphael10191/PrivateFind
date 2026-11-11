@@ -1,5 +1,7 @@
 # PrivateFind — REST API Contract (v1 draft)
 
+For frontend implementation, use the complete [frontend integration guide](../api/frontend-integration.md), [OpenAPI snapshot](../api/openapi.json), and [Postman collection](../api/postman-collection.json). This page remains the short contract summary.
+
 WBS 4.2 · Updated 2026-11-10: Simon database + Raphael device contract. The running backend is the live reference: open `http://localhost:8000/docs`.
 
 ## Conventions
