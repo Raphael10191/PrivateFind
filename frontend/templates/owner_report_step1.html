@@ -1,0 +1,307 @@
+
+{% extends "base.html" %}
+
+{% block title %}Report a Lost Item | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .report-form-page {
+        max-width: 680px;
+        margin: 12px auto;
+    }
+
+    .step-indicator {
+        color: #6D5BD0;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .form-heading h1 {
+        margin: 0 0 10px;
+        font-size: 30px;
+    }
+
+    .form-heading p {
+        color: #666670;
+        line-height: 1.5;
+        margin: 0 0 26px;
+    }
+
+    .form-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 32px;
+    }
+
+    .form-field {
+        margin-bottom: 24px;
+    }
+
+    .form-field label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 9px;
+    }
+
+    .form-field input,
+    .form-field select {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .field-hint {
+        color: #666670;
+        font-size: 12px;
+        line-height: 1.5;
+        margin: 7px 0 0;
+    }
+
+    .time-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid #ECECF0;
+        padding-top: 24px;
+        margin-top: 8px;
+    }
+
+    .back-button,
+    .next-button {
+        padding: 13px 22px;
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .back-button {
+        background: white;
+        border: 1px solid #DCDCE4;
+        color: #1A1A1F;
+    }
+
+    .next-button {
+        background: #6D5BD0;
+        border: 1px solid #6D5BD0;
+        color: white;
+    }
+
+    .next-button:hover {
+        background: #5846B8;
+    }
+
+    .preview-note {
+        color: #6D5BD0;
+        font-size: 13px;
+        margin-top: 15px;
+    }
+
+    @media (max-width: 600px) {
+        .form-heading h1 {
+            font-size: 25px;
+        }
+
+        .form-card {
+            padding: 22px 18px;
+        }
+
+        .time-row {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .back-button,
+        .next-button {
+            flex: 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="report-form-page">
+    <div class="form-heading">
+        <div class="step-indicator">STEP 1 OF 2</div>
+        <h1>Report a Lost Item</h1>
+        <p>Tell us what you lost, and where and when you last saw it.</p>
+    </div>
+
+    <form id="lost-item-form" class="form-card">
+        <div class="form-field">
+            <label for="category">Item category *</label>
+            <select id="category" name="category" required>
+                <option value="">Select a category</option>
+                <option value="phone">Phone</option>
+                <option value="wallet">Wallet</option>
+                <option value="keys">Keys</option>
+                <option value="bag">Bag</option>
+                <option value="laptop">Laptop</option>
+                <option value="tablet">Tablet</option>
+                <option value="headphones">Headphones</option>
+                <option value="bottle">Bottle</option>
+                <option value="umbrella">Umbrella</option>
+                <option value="clothing">Clothing</option>
+                <option value="id_card">ID Card</option>
+                <option value="glasses">Glasses</option>
+                <option value="book">Book</option>
+                <option value="jewelry">Jewelry</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <div class="form-field">
+            <label for="location">Where did you lose it? *</label>
+            <input
+                type="text"
+                id="location"
+                name="location"
+                placeholder="e.g., Near room B201"
+                maxlength="120"
+                required
+            >
+            <p class="field-hint">
+                Enter the building, room, or nearby landmark.
+            </p>
+        </div>
+
+        <div class="time-row">
+            <div class="form-field">
+                <label for="lost-date">Date lost *</label>
+                <input
+                    type="date"
+                    id="lost-date"
+                    name="lost_date"
+                    required
+                >
+            </div>
+
+            <div class="form-field">
+                <label for="lost-time">Approximate time</label>
+                <input
+                    type="time"
+                    id="lost-time"
+                    name="lost_time"
+                >
+                <p class="field-hint">
+                    Optional, if you remember.
+                </p>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button"
+                    class="back-button"
+                    id="back-button">
+                Back
+            </button>
+
+            <button type="submit" class="next-button">
+                Next: Item Details
+            </button>
+        </div>
+
+        <p id="preview-note"
+           class="preview-note"
+           role="status"
+           hidden>
+            Step 1 saved in this browser.
+            We'll connect Step 2 next.
+        </p>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById("lost-item-form");
+    const dateInput = document.getElementById("lost-date");
+    const storageKey = "privatefind_lost_report_draft";
+
+    // Prevent choosing a future date.
+    const localToday = new Date();
+    const offset = localToday.getTimezoneOffset() * 60000;
+    dateInput.max = new Date(
+        localToday.getTime() - offset
+    ).toISOString().slice(0, 10);
+
+    // Restore any unfinished draft.
+    try {
+        const saved = JSON.parse(
+            sessionStorage.getItem(storageKey) || "null"
+        );
+
+        if (saved) {
+            form.elements.category.value = saved.category || "";
+            form.elements.location.value = saved.location || "";
+            form.elements.lost_date.value = saved.lost_date || "";
+            form.elements.lost_time.value = saved.lost_time || "";
+        }
+    } catch (error) {
+        sessionStorage.removeItem(storageKey);
+    }
+
+    document.getElementById("back-button").addEventListener(
+        "click",
+        () => {
+            window.location.href = "/owner";
+        }
+    );
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        if (!form.reportValidity()) {
+            return;
+        }
+
+        const draft = {
+            category: form.elements.category.value,
+            location: form.elements.location.value.trim(),
+            lost_date: form.elements.lost_date.value,
+            lost_time: form.elements.lost_time.value
+        };
+
+        if (!draft.location) {
+            form.elements.location.setCustomValidity(
+                "Please enter a location."
+            );
+            form.reportValidity();
+            form.elements.location.setCustomValidity("");
+            return;
+        }
+
+        sessionStorage.setItem(
+            storageKey,
+            JSON.stringify(draft)
+            
+        );
+        
+        window.location.href = "/owner/report/details";
+
+        document.getElementById(
+            "preview-note"
+        ).hidden = false;
+    });
+</script>
+{% endblock %}

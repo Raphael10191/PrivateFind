@@ -17,6 +17,8 @@ PAGES = {
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
     "/owner/account": "owner_account.html",
+    "/owner/report/new": "owner_report_step1.html",
+    "/owner/report/details": "owner_report_step2.html",
 }
 
 
@@ -59,6 +61,8 @@ if __name__ == "__main__":
     print("PrivateFind frontend preview")
     print("Home: http://127.0.0.1:8001/owner")
     print("Reports: http://127.0.0.1:8001/owner/reports")
+    print("New Report: http://127.0.0.1:8001/owner/report/new")
+    print("New Report: http://127.0.0.1:8001/owner/report/details")
 
     try:
         server.serve_forever()

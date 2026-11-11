@@ -1,0 +1,354 @@
+
+{% extends "base.html" %}
+
+{% block title %}Item Details | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .details-page {
+        max-width: 680px;
+        margin: 12px auto;
+    }
+
+    .step-label {
+        color: #6D5BD0;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .details-heading h1 {
+        font-size: 30px;
+        margin: 0 0 10px;
+    }
+
+    .details-heading p {
+        color: #666670;
+        line-height: 1.5;
+        margin: 0 0 26px;
+    }
+
+    .details-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 32px;
+    }
+
+    .details-field {
+        margin-bottom: 24px;
+    }
+
+    .details-field label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 9px;
+    }
+
+    .details-field input,
+    .details-field select,
+    .details-field textarea {
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .details-field textarea {
+        min-height: 125px;
+        resize: vertical;
+    }
+
+    .details-field input:focus,
+    .details-field select:focus,
+    .details-field textarea:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .field-help {
+        margin: 7px 0 0;
+        color: #666670;
+        font-size: 12px;
+    }
+
+    .details-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 24px;
+        border-top: 1px solid #ECECF0;
+    }
+
+    .back-action,
+    .submit-action {
+        padding: 13px 20px;
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .back-action {
+        background: white;
+        border: 1px solid #DCDCE4;
+        color: #1A1A1F;
+    }
+
+    .submit-action {
+        background: #6D5BD0;
+        border: 1px solid #6D5BD0;
+        color: white;
+    }
+
+    .submit-action:hover {
+        background: #5846B8;
+    }
+
+    .preview-result {
+        margin-top: 20px;
+        border: 1px solid #DCDCE4;
+        border-radius: 12px;
+        padding: 18px;
+        background: #EFEBFA;
+        overflow-wrap: anywhere;
+    }
+
+    .preview-result h2 {
+        font-size: 18px;
+        margin: 0 0 10px;
+    }
+
+    .preview-result p {
+        margin: 6px 0;
+        line-height: 1.5;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .details-heading h1 {
+            font-size: 25px;
+        }
+
+        .details-card {
+            padding: 22px 18px;
+        }
+
+        .back-action,
+        .submit-action {
+            flex: 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="details-page">
+    <div class="details-heading">
+        <div class="step-label">STEP 2 OF 2</div>
+        <h1>Tell Us More About Your Item</h1>
+        <p>
+            Describe the item to help us identify
+            possible matches.
+        </p>
+    </div>
+
+    <form id="details-form" class="details-card">
+        <div class="details-field">
+            <label for="color">Item color</label>
+            <select id="color" name="color">
+                <option value="">Select a color</option>
+                <option value="black">Black</option>
+                <option value="white">White</option>
+                <option value="gray">Gray</option>
+                <option value="silver">Silver</option>
+                <option value="gold">Gold</option>
+                <option value="red">Red</option>
+                <option value="orange">Orange</option>
+                <option value="yellow">Yellow</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+                <option value="purple">Purple</option>
+                <option value="pink">Pink</option>
+                <option value="brown">Brown</option>
+                <option value="beige">Beige</option>
+                <option value="multicolor">Multicolor</option>
+            </select>
+        </div>
+
+        <div class="details-field">
+            <label for="brand">Brand</label>
+            <input type="text" id="brand" name="brand"
+                   maxlength="100"
+                   placeholder="e.g., Samsung">
+        </div>
+
+        <div class="details-field">
+            <label for="model">Model</label>
+            <input type="text" id="model" name="model"
+                   maxlength="100"
+                   placeholder="e.g., Galaxy S24">
+        </div>
+
+        <div class="details-field">
+            <label for="description">
+                Item description *
+            </label>
+            <textarea id="description"
+                      name="description"
+                      maxlength="1000"
+                      required
+                      placeholder="Describe the item's appearance and any unique marks, damage, accessories, or other identifying details."></textarea>
+            <p class="field-help">
+                Include anything distinctive you remember.
+            </p>
+        </div>
+
+        <div class="details-actions">
+            <button type="button"
+                    class="back-action"
+                    id="back-step">
+                Back
+            </button>
+
+            <button type="submit" class="submit-action">
+                Preview Report
+            </button>
+        </div>
+
+        <div id="preview-result"
+             class="preview-result"
+             role="status"
+             hidden>
+            <h2>Report Preview</h2>
+            <p>
+                Your information has been saved locally.
+                No report has been submitted.
+            </p>
+            <div id="preview-summary"></div>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById("details-form");
+    const storageKey = "privatefind_lost_report_draft";
+
+    function readDraft() {
+        try {
+            return JSON.parse(
+                sessionStorage.getItem(storageKey) || "null"
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    const draft = readDraft();
+
+    // Step 2 requires a completed Step 1.
+    if (!draft || !draft.category ||
+        !draft.location || !draft.lost_date) {
+        window.location.replace("/owner/report/new");
+    } else {
+        form.elements.color.value = draft.color || "";
+        form.elements.brand.value = draft.brand || "";
+        form.elements.model.value = draft.model || "";
+        form.elements.description.value =
+            draft.description || "";
+    }
+
+    function saveDetails() {
+        const current = readDraft();
+
+        if (!current) return null;
+
+        const updated = {
+            ...current,
+            color: form.elements.color.value,
+            brand: form.elements.brand.value.trim(),
+            model: form.elements.model.value.trim(),
+            description:
+                form.elements.description.value.trim()
+        };
+
+        sessionStorage.setItem(
+            storageKey,
+            JSON.stringify(updated)
+        );
+
+        return updated;
+    }
+
+    document.getElementById("back-step").addEventListener(
+        "click",
+        () => {
+            saveDetails();
+            window.location.href = "/owner/report/new";
+        }
+    );
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const description = form.elements.description;
+        description.value = description.value.trim();
+
+        if (!form.reportValidity()) return;
+
+        if (!description.value) {
+            description.setCustomValidity(
+                "Please describe your item."
+            );
+            form.reportValidity();
+            description.setCustomValidity("");
+            return;
+        }
+
+        const report = saveDetails();
+        if (!report) return;
+
+        const summary = document.getElementById(
+            "preview-summary"
+        );
+
+        summary.replaceChildren();
+
+        const fields = [
+            ["Category", report.category],
+            ["Location", report.location],
+            ["Date lost", report.lost_date],
+            ["Time", report.lost_time || "Not specified"],
+            ["Color", report.color || "Not specified"],
+            ["Brand", report.brand || "Not specified"],
+            ["Model", report.model || "Not specified"],
+            ["Description", report.description]
+        ];
+
+        fields.forEach(([label, value]) => {
+            const paragraph = document.createElement("p");
+            const strong = document.createElement("strong");
+
+            strong.textContent = label + ": ";
+            paragraph.appendChild(strong);
+            paragraph.appendChild(
+                document.createTextNode(value)
+            );
+            summary.appendChild(paragraph);
+        });
+
+        document.getElementById(
+            "preview-result"
+        ).hidden = false;
+    });
+</script>
+{% endblock %}
