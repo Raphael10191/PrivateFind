@@ -1,0 +1,963 @@
+{
+  "info": {
+    "name": "PrivateFind API",
+    "description": "Manual integration collection. Select a photo before deposit; set device_key manually. Change email/password and login as the seeded admin for admin requests. Device validation defaults to deposit_code; substitute pickup_code for pickup. State defaults to occupied=true; send false after pickup. This is not an unattended collection-runner scenario.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "email",
+      "value": "owner@example.com"
+    },
+    {
+      "key": "password",
+      "value": "secret123"
+    },
+    {
+      "key": "locker_code",
+      "value": "L1"
+    },
+    {
+      "key": "item_id",
+      "value": "1"
+    },
+    {
+      "key": "report_id",
+      "value": "1"
+    },
+    {
+      "key": "claim_id",
+      "value": "1"
+    },
+    {
+      "key": "photo_id",
+      "value": "1"
+    },
+    {
+      "key": "compartment",
+      "value": "1"
+    },
+    {
+      "key": "device_key",
+      "value": ""
+    },
+    {
+      "key": "deposit_code",
+      "value": ""
+    },
+    {
+      "key": "pickup_code",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "POST /api/auth/register",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/register",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Test owner\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/login",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/logout",
+            "header": [],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/auth/me",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "locker",
+      "item": [
+        {
+          "name": "GET /api/lockers/{locker_code}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lockers/{{locker_code}}",
+            "header": [],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Device (not browser code)",
+      "item": [
+        {
+          "name": "POST /api/device/codes/validate",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/device/codes/validate",
+            "header": [
+              {
+                "key": "X-Device-Key",
+                "value": "{{device_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: device. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"locker_01\",\n  \"code\": \"{{deposit_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/device/compartments/{number}/state",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/device/compartments/{{compartment}}/state",
+            "header": [
+              {
+                "key": "X-Device-Key",
+                "value": "{{device_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: device. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"locker_01\",\n  \"occupied\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/device/heartbeat",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/device/heartbeat",
+            "header": [
+              {
+                "key": "X-Device-Key",
+                "value": "{{device_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: device. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firmware_version\": \"test-1.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /locker/validate",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/locker/validate",
+            "header": [
+              {
+                "key": "X-Device-Key",
+                "value": "{{device_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: device. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"locker_01\",\n  \"code\": \"{{deposit_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "found items",
+      "item": [
+        {
+          "name": "POST /api/deposits",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/deposits",
+            "header": [],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "locker_code",
+                  "value": "{{locker_code}}",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "library",
+                  "type": "text"
+                },
+                {
+                  "key": "note",
+                  "value": "Black Samsung phone, cat sticker, serial ends 4821",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  pm.collectionVariables.set('item_id', b.item_id);",
+                  "  pm.collectionVariables.set('deposit_code', b.deposit_code);",
+                  "  pm.collectionVariables.set('compartment', b.compartment);",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/items",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/items",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/items/{item_id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/items/{{item_id}}",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/admin/items/{item_id}/attributes",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/admin/items/{{item_id}}/attributes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"phone\",\n  \"public_summary\": \"Black Samsung phone\",\n  \"attributes\": [\n    {\n      \"name\": \"color\",\n      \"value\": \"black\",\n      \"visibility\": \"public\"\n    },\n    {\n      \"name\": \"serial_suffix\",\n      \"value\": \"4821\",\n      \"visibility\": \"private\",\n      \"strength\": \"strong\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/admin/items/{item_id}/retry-ai",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/admin/items/{{item_id}}/retry-ai",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/items/{item_id}/photos/{photo_id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/items/{{item_id}}/photos/{{photo_id}}",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lost reports",
+      "item": [
+        {
+          "name": "GET /api/lost-reports",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lost-reports",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/lost-reports",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/lost-reports",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"phone\",\n  \"location\": \"library\",\n  \"lost_at\": \"{{$isoTimestamp}}\",\n  \"color\": \"black\",\n  \"brand\": \"Samsung\",\n  \"description\": \"Black Samsung phone with a cat sticker\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  pm.collectionVariables.set('report_id', b.id);",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/lost-reports/{report_id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lost-reports/{{report_id}}",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "matching",
+      "item": [
+        {
+          "name": "GET /api/lost-reports/{report_id}/candidates",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lost-reports/{{report_id}}/candidates",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.length) pm.collectionVariables.set('item_id', b[0].found_item_id);",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "claims",
+      "item": [
+        {
+          "name": "GET /api/claims",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/claims",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/claims",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/claims",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lost_report_id\": {{report_id}},\n  \"found_item_id\": {{item_id}},\n  \"evidence\": [\n    {\n      \"type\": \"serial_suffix\",\n      \"value\": \"4821\"\n    },\n    {\n      \"type\": \"sticker_or_mark\",\n      \"value\": \"cat sticker on the back\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  pm.collectionVariables.set('claim_id', b.id);",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/claims/{claim_id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/claims/{{claim_id}}",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/claims/{claim_id}/pickup-code",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/claims/{{claim_id}}/pickup-code",
+            "header": [],
+            "description": "Role: account. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/claims",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/claims",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/claims/{claim_id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/claims/{{claim_id}}",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/admin/claims/{claim_id}/decision",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/admin/claims/{{claim_id}}/decision",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"note\": \"Reviewed ownership evidence.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "admin",
+      "item": [
+        {
+          "name": "GET /api/admin/audit",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/audit",
+            "header": [],
+            "description": "Role: admin. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "health",
+      "item": [
+        {
+          "name": "GET /api/health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/health",
+            "header": [],
+            "description": "Role: public. See frontend-integration.md. Cookies are managed by Postman after login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isJson = pm.response.headers.get('Content-Type')?.includes('application/json');",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && isJson) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.pickup_code) pm.collectionVariables.set('pickup_code', b.pickup_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

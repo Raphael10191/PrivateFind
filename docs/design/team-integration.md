@@ -107,4 +107,6 @@ The backend also accepts `/locker/validate` as an alias of code validation, so t
 
 This adopts Simon's database, not a second copy of his synchronous services or mock embedding implementation. The existing async matching/AI policies remain in place. Browser payload names remain the same; statuses now use lowercase values and the finder note may be omitted.
 
-Tests exercise deposit-to-pickup with foreign keys enabled, firmware's exact JSON fragments, one-compartment allocation, candidate refresh with existing claims, pickup-code replacement, and upgrading/downgrading a populated Simon database. MySQL execution, live AI and physical hardware still require a team integration run.
+Tests exercise deposit-to-pickup with foreign keys enabled, firmware's exact JSON fragments, one-compartment allocation, candidate refresh with existing claims, pickup-code replacement, and upgrading/downgrading a populated Simon database.
+
+On 2026-11-11, the Docker image was built and tested over SSH on a Windows host with Docker's WSL2 engine. MySQL 8.4 and the backend both became healthy. The real HTTP test passed registration/login, image upload, background mock-AI extraction, deposit, matching, ownership approval, pickup, and freeing the compartment. Restarting the backend reran migrations/seed safely and preserved accounts, item data, photos and the device key. The host ran Docker with `-with-frontend=false` in Windows session 0; no Docker Desktop frontend process was running. Live AI and physical hardware remain unverified.
