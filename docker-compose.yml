@@ -1,4 +1,24 @@
 services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: mysql+asyncmy://privatefind:privatefind@mysql:3306/privatefind
+      SECRET_KEY: ${SECRET_KEY:-privatefind-local-demo-change-me}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5-5}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
+      STORAGE_DIR: /app/storage/photos
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - photo-data:/app/storage/photos
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   mysql:
     image: mysql:8.4
     environment:
@@ -11,9 +31,12 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysql", "--protocol=TCP", "-h", "127.0.0.1", "-uprivatefind", "-pprivatefind", "privatefind", "-e", "SELECT 1"]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      start_period: 30s
+      retries: 20
 
 volumes:
   mysql-data:
+  photo-data:
