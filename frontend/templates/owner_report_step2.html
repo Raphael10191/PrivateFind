@@ -49,6 +49,7 @@
     .details-field input,
     .details-field select,
     .details-field textarea {
+        display: block;
         width: 100%;
         padding: 14px;
         border: 1px solid #DCDCE4;
@@ -74,6 +75,7 @@
         margin: 7px 0 0;
         color: #666670;
         font-size: 12px;
+        line-height: 1.5;
     }
 
     .details-actions {
@@ -109,23 +111,46 @@
         background: #5846B8;
     }
 
-    .preview-result {
+    .submit-action:disabled,
+    .back-action:disabled {
+        opacity: 0.65;
+        cursor: wait;
+    }
+
+    .form-error {
+        margin-top: 20px;
+        padding: 14px;
+        border-radius: 10px;
+        background: #FFF1F1;
+        color: #A32727;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .form-success {
         margin-top: 20px;
         border: 1px solid #DCDCE4;
         border-radius: 12px;
-        padding: 18px;
+        padding: 20px;
         background: #EFEBFA;
         overflow-wrap: anywhere;
     }
 
-    .preview-result h2 {
-        font-size: 18px;
+    .form-success h2 {
         margin: 0 0 10px;
+        font-size: 20px;
     }
 
-    .preview-result p {
-        margin: 6px 0;
+    .form-success p {
+        margin: 8px 0;
         line-height: 1.5;
+    }
+
+    .home-link {
+        display: inline-block;
+        margin-top: 12px;
+        color: #6D5BD0;
+        font-weight: 600;
     }
 
     [hidden] {
@@ -153,7 +178,9 @@
 <section class="details-page">
     <div class="details-heading">
         <div class="step-label">STEP 2 OF 2</div>
+
         <h1>Tell Us More About Your Item</h1>
+
         <p>
             Describe the item to help us identify
             possible matches.
@@ -161,8 +188,10 @@
     </div>
 
     <form id="details-form" class="details-card">
+
         <div class="details-field">
             <label for="color">Item color</label>
+
             <select id="color" name="color">
                 <option value="">Select a color</option>
                 <option value="black">Black</option>
@@ -185,63 +214,127 @@
 
         <div class="details-field">
             <label for="brand">Brand</label>
-            <input type="text" id="brand" name="brand"
-                   maxlength="100"
-                   placeholder="e.g., Samsung">
+
+            <input
+                type="text"
+                id="brand"
+                name="brand"
+                maxlength="50"
+                placeholder="e.g., Apple"
+            >
         </div>
 
         <div class="details-field">
             <label for="model">Model</label>
-            <input type="text" id="model" name="model"
-                   maxlength="100"
-                   placeholder="e.g., Galaxy S24">
+
+            <input
+                type="text"
+                id="model"
+                name="model"
+                maxlength="100"
+                placeholder="e.g., iPhone 14 Pro Max"
+            >
         </div>
 
         <div class="details-field">
             <label for="description">
                 Item description *
             </label>
-            <textarea id="description"
-                      name="description"
-                      maxlength="1000"
-                      required
-                      placeholder="Describe the item's appearance and any unique marks, damage, accessories, or other identifying details."></textarea>
+
+            <textarea
+                id="description"
+                name="description"
+                maxlength="1000"
+                minlength="3"
+                required
+                placeholder="Describe the item's appearance and any unique marks, damage, accessories, or other identifying details."
+            ></textarea>
+
             <p class="field-help">
                 Include anything distinctive you remember.
             </p>
         </div>
 
         <div class="details-actions">
-            <button type="button"
-                    class="back-action"
-                    id="back-step">
+            <button
+                type="button"
+                class="back-action"
+                id="back-step"
+            >
                 Back
             </button>
 
-            <button type="submit" class="submit-action">
-                Preview Report
+            <button
+                type="submit"
+                class="submit-action"
+                id="submit-report"
+            >
+                Submit Report
             </button>
         </div>
 
-        <div id="preview-result"
-             class="preview-result"
-             role="status"
-             hidden>
-            <h2>Report Preview</h2>
+        <p
+            id="form-error"
+            class="form-error"
+            role="alert"
+            hidden
+        ></p>
+
+        <div
+            id="form-success"
+            class="form-success"
+            role="status"
+            hidden
+        >
+            <h2>Report submitted successfully</h2>
+
             <p>
-                Your information has been saved locally.
-                No report has been submitted.
+                Your lost-item report was saved.
+                Possible matches will be available
+                when matching items are found.
             </p>
-            <div id="preview-summary"></div>
+
+            <p>
+                Report ID:
+                <strong id="saved-report-id"></strong>
+            </p>
+
+            <a href="/owner" class="home-link">
+                Back to Home
+            </a>
         </div>
+
     </form>
 </section>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const form = document.getElementById("details-form");
-    const storageKey = "privatefind_lost_report_draft";
+    const form = document.getElementById(
+        "details-form"
+    );
+
+    const submitButton = document.getElementById(
+        "submit-report"
+    );
+
+    const backButton = document.getElementById(
+        "back-step"
+    );
+
+    const errorBox = document.getElementById(
+        "form-error"
+    );
+
+    const successBox = document.getElementById(
+        "form-success"
+    );
+
+    const storageKey =
+        "privatefind_lost_report_draft";
+
+    let submitting = false;
+    let submitted = false;
 
     function readDraft() {
         try {
@@ -255,14 +348,26 @@
 
     const draft = readDraft();
 
-    // Step 2 requires a completed Step 1.
-    if (!draft || !draft.category ||
-        !draft.location || !draft.lost_date) {
-        window.location.replace("/owner/report/new");
+    // Step 2 requires valid Step 1 information.
+    if (
+        !draft ||
+        !draft.category ||
+        !draft.location ||
+        !draft.lost_date
+    ) {
+        window.location.replace(
+            "/owner/report/new"
+        );
     } else {
-        form.elements.color.value = draft.color || "";
-        form.elements.brand.value = draft.brand || "";
-        form.elements.model.value = draft.model || "";
+        form.elements.color.value =
+            draft.color || "";
+
+        form.elements.brand.value =
+            draft.brand || "";
+
+        form.elements.model.value =
+            draft.model || "";
+
         form.elements.description.value =
             draft.description || "";
     }
@@ -270,13 +375,22 @@
     function saveDetails() {
         const current = readDraft();
 
-        if (!current) return null;
+        if (!current) {
+            return null;
+        }
 
         const updated = {
             ...current,
-            color: form.elements.color.value,
-            brand: form.elements.brand.value.trim(),
-            model: form.elements.model.value.trim(),
+
+            color:
+                form.elements.color.value,
+
+            brand:
+                form.elements.brand.value.trim(),
+
+            model:
+                form.elements.model.value.trim(),
+
             description:
                 form.elements.description.value.trim()
         };
@@ -289,66 +403,241 @@
         return updated;
     }
 
-    document.getElementById("back-step").addEventListener(
+    function buildPayload(report) {
+        // The time input is optional in our UI.
+        // When absent, midnight is a date-only
+        // fallback until the backend supports
+        // an unknown-time value.
+        const time = report.lost_time || "00:00";
+
+        const localDateTime = new Date(
+            `${report.lost_date}T${time}:00`
+        );
+
+        if (
+            Number.isNaN(localDateTime.getTime()) ||
+            localDateTime > new Date()
+        ) {
+            throw new Error(
+                "Please enter a valid past date and time."
+            );
+        }
+
+        let description = report.description.trim();
+
+        if (report.location_detail) {
+            description +=
+                "\nLast seen near: " +
+                report.location_detail.trim();
+        }
+
+        if (
+            description.length < 3 ||
+            description.length > 1000
+        ) {
+            throw new Error(
+                "The complete description must contain " +
+                "between 3 and 1000 characters, " +
+                "including the specific location."
+            );
+        }
+
+        return {
+            category: report.category,
+
+            location: report.location,
+
+            lost_at:
+                localDateTime.toISOString(),
+
+            color: report.color || null,
+
+            brand: report.brand || null,
+
+            model: report.model || null,
+
+            description: description
+        };
+    }
+
+    // Return to Step 1 without losing
+    // the identifying details.
+    backButton.addEventListener(
         "click",
         () => {
+            if (submitting || submitted) {
+                return;
+            }
+
             saveDetails();
-            window.location.href = "/owner/report/new";
+
+            window.location.href =
+                "/owner/report/new";
         }
     );
 
-    form.addEventListener("submit", (event) => {
-        event.preventDefault();
+    form.addEventListener(
+        "submit",
+        async (event) => {
+            event.preventDefault();
 
-        const description = form.elements.description;
-        description.value = description.value.trim();
+            if (submitting || submitted) {
+                return;
+            }
 
-        if (!form.reportValidity()) return;
+            errorBox.hidden = true;
 
-        if (!description.value) {
-            description.setCustomValidity(
-                "Please describe your item."
-            );
-            form.reportValidity();
-            description.setCustomValidity("");
-            return;
+            const description =
+                form.elements.description;
+
+            description.value =
+                description.value.trim();
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            if (description.value.length < 3) {
+                errorBox.textContent =
+                    "Please provide at least " +
+                    "3 characters describing the item.";
+
+                errorBox.hidden = false;
+                return;
+            }
+
+            const report = saveDetails();
+
+            if (!report) {
+                window.location.replace(
+                    "/owner/report/new"
+                );
+                return;
+            }
+
+            let payload;
+
+            try {
+                payload = buildPayload(report);
+            } catch (error) {
+                errorBox.textContent = error.message;
+                errorBox.hidden = false;
+                return;
+            }
+
+            submitting = true;
+            submitButton.disabled = true;
+            backButton.disabled = true;
+            submitButton.textContent = "Submitting...";
+
+            try {
+                const response = await fetch(
+                    "/api/lost-reports",
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.replace("/login");
+                        return;
+                    }
+
+                    let message =
+                        "Could not submit the report.";
+
+                    try {
+                        const data =
+                            await response.json();
+
+                        message =
+                            data.error?.message || message;
+
+                        if (data.error?.fields?.length) {
+                            message += " " +
+                                data.error.fields
+                                    .map(field => field.message)
+                                    .join(" ");
+                        }
+                    } catch {
+                        // Keep the default error message.
+                    }
+
+                    throw new Error(message);
+                }
+
+                if (response.status !== 201) {
+                    throw new Error(
+                        "The server returned an unexpected " +
+                        "response. Check your reports before retrying."
+                    );
+                }
+
+                const savedReport =
+                    await response.json();
+
+                if (
+                    savedReport.id === undefined ||
+                    savedReport.id === null
+                ) {
+                    throw new Error(
+                        "Could not confirm the saved report. " +
+                        "Check your reports before retrying."
+                    );
+                }
+
+                // The backend has confirmed creation.
+                submitted = true;
+
+                sessionStorage.removeItem(
+                    storageKey
+                );
+
+                document.getElementById(
+                    "saved-report-id"
+                ).textContent =
+                    String(savedReport.id);
+
+                successBox.hidden = false;
+
+                submitButton.textContent =
+                    "Report Submitted";
+
+                successBox.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest"
+                });
+
+            } catch (error) {
+                errorBox.textContent =
+                    error.message ||
+                    "Connection failed. Please check " +
+                    "whether the report was saved " +
+                    "before trying again.";
+
+                errorBox.hidden = false;
+
+            } finally {
+                submitting = false;
+
+                if (!submitted) {
+                    submitButton.disabled = false;
+                    backButton.disabled = false;
+
+                    submitButton.textContent =
+                        "Submit Report";
+                }
+            }
         }
-
-        const report = saveDetails();
-        if (!report) return;
-
-        const summary = document.getElementById(
-            "preview-summary"
-        );
-
-        summary.replaceChildren();
-
-        const fields = [
-            ["Category", report.category],
-            ["Location", report.location],
-            ["Date lost", report.lost_date],
-            ["Time", report.lost_time || "Not specified"],
-            ["Color", report.color || "Not specified"],
-            ["Brand", report.brand || "Not specified"],
-            ["Model", report.model || "Not specified"],
-            ["Description", report.description]
-        ];
-
-        fields.forEach(([label, value]) => {
-            const paragraph = document.createElement("p");
-            const strong = document.createElement("strong");
-
-            strong.textContent = label + ": ";
-            paragraph.appendChild(strong);
-            paragraph.appendChild(
-                document.createTextNode(value)
-            );
-            summary.appendChild(paragraph);
-        });
-
-        document.getElementById(
-            "preview-result"
-        ).hidden = false;
-    });
+    );
 </script>
 {% endblock %}

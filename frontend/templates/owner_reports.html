@@ -33,7 +33,7 @@
     }
 
     .new-report:hover {
-        background: #5846bb;
+        background: #5846BB;
         color: white;
     }
 
@@ -68,6 +68,11 @@
         margin-bottom: 16px;
     }
 
+    .report-card[hidden],
+    .empty-message[hidden] {
+        display: none;
+    }
+
     .report-top {
         display: flex;
         align-items: center;
@@ -85,6 +90,7 @@
         border-radius: 20px;
         padding: 7px 12px;
         font-weight: 600;
+        white-space: nowrap;
     }
 
     .searching {
@@ -117,10 +123,9 @@
         font-size: 13px;
     }
 
-    .view-details {
-        color: #6D5BD0;
-        font-weight: 600;
-        font-size: 14px;
+    .report-id {
+        color: #777780;
+        font-size: 13px;
     }
 
     .empty-message {
@@ -130,12 +135,6 @@
         border: 1px solid #ECECF0;
         border-radius: 16px;
         color: #666670;
-    }
-
-    .demo-note {
-        font-size: 12px;
-        color: #777780;
-        margin-bottom: 18px;
     }
 
     @media (max-width: 600px) {
@@ -159,6 +158,10 @@
         .report-card {
             padding: 18px;
         }
+
+        .report-top {
+            align-items: flex-start;
+        }
     }
 </style>
 {% endblock %}
@@ -168,7 +171,9 @@
 <section class="reports-header">
     <div>
         <h1>My Reports</h1>
-        <p class="subtitle">Track your lost-item reports.</p>
+        <p class="subtitle">
+            Track your lost-item reports.
+        </p>
     </div>
 
     <a href="/owner/report/new" class="new-report">
@@ -176,64 +181,98 @@
     </a>
 </section>
 
-<div class="filters" role="group" aria-label="Filter reports">
-    <button type="button" class="filter-button active"
-            data-filter="all" aria-pressed="true">
+<div class="filters"
+     role="group"
+     aria-label="Filter reports">
+
+    <button
+        type="button"
+        class="filter-button active"
+        data-filter="all"
+        aria-pressed="true">
         All
     </button>
 
-    <button type="button" class="filter-button"
-            data-filter="active" aria-pressed="false">
+    <button
+        type="button"
+        class="filter-button"
+        data-filter="active"
+        aria-pressed="false">
         Active
     </button>
 
-    <button type="button" class="filter-button"
-            data-filter="completed" aria-pressed="false">
+    <button
+        type="button"
+        class="filter-button"
+        data-filter="completed"
+        aria-pressed="false">
         Completed
     </button>
 </div>
 
-<!-- Temporary sample data for frontend testing only -->
-<p class="demo-note">Sample reports — frontend preview</p>
-
 <div id="reports-list">
 
-    <article class="report-card" data-status="active">
+    {% for report in reports %}
+
+    {% set is_completed = report.status in ['resolved', 'closed'] %}
+
+    <article
+        class="report-card"
+        data-status="{{ 'completed' if is_completed else 'active' }}"
+    >
         <div class="report-top">
-            <h2>Black Wallet</h2>
-            <span class="status searching">Searching</span>
+            <h2>
+                {% if report.brand %}
+                    {{ report.brand }}
+                    {{ report.model or report.category | replace('_', ' ') | title }}
+                {% else %}
+                    {% if report.color %}
+                        {{ report.color | title }}
+                    {% endif %}
+                    {{ report.category | replace('_', ' ') | title }}
+                {% endif %}
+            </h2>
+
+            {% if is_completed %}
+                <span class="status completed">
+                    {{ report.status | title }}
+                </span>
+            {% else %}
+                <span class="status searching">
+                    Searching
+                </span>
+            {% endif %}
         </div>
 
         <p class="report-location">
-            Lost near the library
+            Lost at
+            {{ report.location | replace('_', ' ') | title }}
         </p>
 
         <div class="report-bottom">
-            <span class="report-date">Sample report</span>
-            <span class="view-details">Details coming soon</span>
+            <span class="report-date">
+                Lost date:
+                {{ report.lost_at[:10] }}
+            </span>
+
+            <span class="report-id">
+                Report #{{ report.id }}
+            </span>
         </div>
     </article>
 
-    <article class="report-card" data-status="completed">
-        <div class="report-top">
-            <h2>Blue Umbrella</h2>
-            <span class="status completed">Collected</span>
-        </div>
-
-        <p class="report-location">
-            Lost near the student center
-        </p>
-
-        <div class="report-bottom">
-            <span class="report-date">Sample report</span>
-            <span class="view-details">Details coming soon</span>
-        </div>
-    </article>
+    {% endfor %}
 
 </div>
 
-<div id="filter-empty" class="empty-message" hidden>
-    No reports in this category.
+<div id="filter-empty"
+     class="empty-message"
+     {% if reports %}hidden{% endif %}>
+    {% if reports %}
+        No reports in this category.
+    {% else %}
+        No reports yet. Create your first lost-item report.
+    {% endif %}
 </div>
 
 {% endblock %}
@@ -252,6 +291,8 @@
         "filter-empty"
     );
 
+    const hasReports = reportCards.length > 0;
+
     filterButtons.forEach(button => {
         button.addEventListener("click", () => {
             const selected = button.dataset.filter;
@@ -259,6 +300,7 @@
 
             filterButtons.forEach(item => {
                 const isActive = item === button;
+
                 item.classList.toggle("active", isActive);
                 item.setAttribute("aria-pressed", isActive);
             });
@@ -276,6 +318,14 @@
             });
 
             emptyMessage.hidden = visibleCount !== 0;
+
+            if (!hasReports) {
+                emptyMessage.textContent =
+                    "No reports yet. Create your first lost-item report.";
+            } else {
+                emptyMessage.textContent =
+                    "No reports in this category.";
+            }
         });
     });
 </script>

@@ -7,11 +7,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-from jinja2 import (
-    Environment,
-    FileSystemLoader,
-    select_autoescape,
-)
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent
@@ -145,6 +141,27 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 ):
                     pass
 
+    def get_owner_reports(self):
+        headers = {}
+
+        cookie = self.headers.get("Cookie")
+        if cookie:
+            headers["Cookie"] = cookie
+
+        request = Request(
+            BACKEND_URL + "/api/lost-reports",
+            headers=headers,
+            method="GET",
+        )
+
+        with urlopen(request, timeout=10) as response:
+            reports = json.load(response)
+
+        if not isinstance(reports, list):
+            raise ValueError("Invalid reports response")
+
+        return reports
+
     def do_GET(self):
         path = urlsplit(self.path).path
 
@@ -153,7 +170,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.proxy_api()
             return
 
-        # Redirect the root URL to Owner Home.
+        # Redirect root to Owner Home.
         if path == "/":
             self.redirect("/owner")
             return
@@ -164,10 +181,10 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Page not built yet")
             return
 
-        # Always initialize user, including on public pages.
+        # Public pages do not require authentication.
         user = None
 
-        # Protect Owner pages using the backend session.
+        # Protect Owner pages.
         if path.startswith("/owner"):
             try:
                 user = self.get_current_user()
@@ -190,18 +207,14 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 return
 
             if user.get("role") != "owner":
-                self.send_error(
-                    403,
-                    "Owner access required"
-                )
+                self.send_error(403, "Owner access required")
                 return
 
-        # Use real account information for logged-in Owners.
+        # Real account information.
         if user is not None:
             account = {
                 "display_name": (
-                    user.get("display_name")
-                    or "Not provided"
+                    user.get("display_name") or "Not provided"
                 ),
                 "email": user.get("email", ""),
             }
@@ -211,10 +224,31 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 "email": "",
             }
 
+        # Retrieve reports only on the My Reports page.
+        reports = []
+
+        if path in ("/owner","/owner/reports"):
+            try:
+                reports = self.get_owner_reports()
+
+            except (
+                HTTPError,
+                URLError,
+                TimeoutError,
+                OSError,
+                ValueError,
+            ):
+                self.send_error(
+                    502,
+                    "Could not load reports from the backend"
+                )
+                return
+
+        # Render the requested HTML page.
         html = templates.get_template(
             template_name
         ).render(
-            reports=[],
+            reports=reports,
             active_page=(
                 "account" if path == "/owner/account"
                 else "reports" if path == "/owner/reports"

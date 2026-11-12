@@ -111,12 +111,6 @@
         background: #5846B8;
     }
 
-    .preview-note {
-        color: #6D5BD0;
-        font-size: 13px;
-        margin-top: 15px;
-    }
-
     @media (max-width: 600px) {
         .form-heading h1 {
             font-size: 25px;
@@ -144,12 +138,17 @@
     <div class="form-heading">
         <div class="step-indicator">STEP 1 OF 2</div>
         <h1>Report a Lost Item</h1>
-        <p>Tell us what you lost, and where and when you last saw it.</p>
+        <p>
+            Tell us what you lost, and where and when
+            you last saw it.
+        </p>
     </div>
 
     <form id="lost-item-form" class="form-card">
+
         <div class="form-field">
             <label for="category">Item category *</label>
+
             <select id="category" name="category" required>
                 <option value="">Select a category</option>
                 <option value="phone">Phone</option>
@@ -171,23 +170,72 @@
         </div>
 
         <div class="form-field">
-            <label for="location">Where did you lose it? *</label>
+            <label for="location">
+                Where did you lose it? *
+            </label>
+
+            <select id="location"
+                    name="location"
+                    required>
+                <option value="">
+                    Select a campus location
+                </option>
+                <option value="library">
+                    Library
+                </option>
+                <option value="student_center">
+                    Student Center
+                </option>
+                <option value="engineering_building">
+                    Engineering Building
+                </option>
+                <option value="lecture_hall">
+                    Lecture Hall
+                </option>
+                <option value="cafeteria">
+                    Cafeteria
+                </option>
+                <option value="gym">
+                    Gym
+                </option>
+                <option value="dormitory">
+                    Dormitory
+                </option>
+                <option value="outdoor">
+                    Outdoor Area
+                </option>
+                <option value="other">
+                    Other
+                </option>
+            </select>
+
+            <p class="field-hint">
+                Choose the closest campus area.
+            </p>
+        </div>
+
+        <div class="form-field">
+            <label for="location-detail">
+                More specific location (optional)
+            </label>
+
             <input
                 type="text"
-                id="location"
-                name="location"
+                id="location-detail"
+                name="location_detail"
                 placeholder="e.g., Near room B201"
                 maxlength="120"
-                required
             >
+
             <p class="field-hint">
-                Enter the building, room, or nearby landmark.
+                Add a room, entrance, or nearby landmark.
             </p>
         </div>
 
         <div class="time-row">
             <div class="form-field">
                 <label for="lost-date">Date lost *</label>
+
                 <input
                     type="date"
                     id="lost-date"
@@ -197,12 +245,16 @@
             </div>
 
             <div class="form-field">
-                <label for="lost-time">Approximate time</label>
+                <label for="lost-time">
+                    Approximate time
+                </label>
+
                 <input
                     type="time"
                     id="lost-time"
                     name="lost_time"
                 >
+
                 <p class="field-hint">
                     Optional, if you remember.
                 </p>
@@ -216,58 +268,75 @@
                 Back
             </button>
 
-            <button type="submit" class="next-button">
+            <button type="submit"
+                    class="next-button">
                 Next: Item Details
             </button>
         </div>
 
-        <p id="preview-note"
-           class="preview-note"
-           role="status"
-           hidden>
-            Step 1 saved in this browser.
-            We'll connect Step 2 next.
-        </p>
     </form>
 </section>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const form = document.getElementById("lost-item-form");
-    const dateInput = document.getElementById("lost-date");
-    const storageKey = "privatefind_lost_report_draft";
+    const form = document.getElementById(
+        "lost-item-form"
+    );
 
-    // Prevent choosing a future date.
-    const localToday = new Date();
-    const offset = localToday.getTimezoneOffset() * 60000;
+    const dateInput = document.getElementById(
+        "lost-date"
+    );
+
+    const storageKey =
+        "privatefind_lost_report_draft";
+
+    // Prevent future dates.
+    const today = new Date();
+
+    const offset =
+        today.getTimezoneOffset() * 60000;
+
     dateInput.max = new Date(
-        localToday.getTime() - offset
+        today.getTime() - offset
     ).toISOString().slice(0, 10);
 
-    // Restore any unfinished draft.
+    // Restore an unfinished report.
+    let savedDraft = null;
+
     try {
-        const saved = JSON.parse(
+        savedDraft = JSON.parse(
             sessionStorage.getItem(storageKey) || "null"
         );
-
-        if (saved) {
-            form.elements.category.value = saved.category || "";
-            form.elements.location.value = saved.location || "";
-            form.elements.lost_date.value = saved.lost_date || "";
-            form.elements.lost_time.value = saved.lost_time || "";
-        }
-    } catch (error) {
+    } catch {
         sessionStorage.removeItem(storageKey);
     }
 
-    document.getElementById("back-button").addEventListener(
-        "click",
-        () => {
-            window.location.href = "/owner";
-        }
-    );
+    if (savedDraft) {
+        form.elements.category.value =
+            savedDraft.category || "";
 
+        form.elements.location.value =
+            savedDraft.location || "";
+
+        form.elements.location_detail.value =
+            savedDraft.location_detail || "";
+
+        form.elements.lost_date.value =
+            savedDraft.lost_date || "";
+
+        form.elements.lost_time.value =
+            savedDraft.lost_time || "";
+    }
+
+    // Return to Owner Home.
+    document.getElementById(
+        "back-button"
+    ).addEventListener("click", () => {
+        window.location.href = "/owner";
+    });
+
+    // Save Step 1 without losing Step 2 details.
     form.addEventListener("submit", (event) => {
         event.preventDefault();
 
@@ -275,33 +344,52 @@
             return;
         }
 
-        const draft = {
-            category: form.elements.category.value,
-            location: form.elements.location.value.trim(),
-            lost_date: form.elements.lost_date.value,
-            lost_time: form.elements.lost_time.value
-        };
+        const date = form.elements.lost_date.value;
+        const time = form.elements.lost_time.value;
 
-        if (!draft.location) {
-            form.elements.location.setCustomValidity(
-                "Please enter a location."
-            );
-            form.reportValidity();
-            form.elements.location.setCustomValidity("");
-            return;
+        // Validate an entered time on today's date.
+        if (date === dateInput.max && time) {
+            const now = new Date();
+            const currentTime =
+                String(now.getHours()).padStart(2, "0")
+                + ":"
+                + String(now.getMinutes()).padStart(2, "0");
+
+            if (time > currentTime) {
+                const timeField = form.elements.lost_time;
+
+                timeField.setCustomValidity(
+                    "The lost time cannot be in the future."
+                );
+                timeField.reportValidity();
+                timeField.setCustomValidity("");
+                return;
+            }
         }
+
+        const draft = {
+            ...(savedDraft || {}),
+
+            category:
+                form.elements.category.value,
+
+            location:
+                form.elements.location.value,
+
+            location_detail:
+                form.elements.location_detail.value.trim(),
+
+            lost_date: date,
+            lost_time: time
+        };
 
         sessionStorage.setItem(
             storageKey,
             JSON.stringify(draft)
-            
         );
-        
-        window.location.href = "/owner/report/details";
 
-        document.getElementById(
-            "preview-note"
-        ).hidden = false;
+        window.location.href =
+            "/owner/report/details";
     });
 </script>
 {% endblock %}
