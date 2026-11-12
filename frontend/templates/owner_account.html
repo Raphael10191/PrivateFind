@@ -71,7 +71,8 @@
         margin: 8px 0 24px;
     }
 
-    .signout-button {
+    .account-signout-button {
+        display: block;
         width: 100%;
         padding: 14px;
         border: 1px solid #E4E2EB;
@@ -80,19 +81,18 @@
         color: #1A1A1F;
         font: inherit;
         font-weight: 600;
+        text-align: left;
         cursor: pointer;
     }
 
-    .signout-button:hover {
+    .account-signout-button:hover {
         background: #EFEBFA;
         color: #6D5BD0;
     }
 
-    .preview-message {
-        color: #666670;
-        font-size: 13px;
-        text-align: center;
-        margin-top: 14px;
+    .account-signout-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
     }
 
     @media (max-width: 600px) {
@@ -139,33 +139,13 @@
 
         <hr class="account-divider">
 
-        <button type="button"
-                class="signout-button"
-                id="signout-button">
+        <button
+            type="button"
+            class="account-signout-button"
+            data-signout
+        >
             Sign out
         </button>
-
-        <p id="preview-message"
-           class="preview-message"
-           role="status"
-           hidden>
-            Sign out will be available when
-            authentication is connected.
-        </p>
     </div>
 </section>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    const signoutButton = document.getElementById(
-        "signout-button"
-    );
-
-    signoutButton.addEventListener("click", () => {
-        document.getElementById(
-            "preview-message"
-        ).hidden = false;
-    });
-</script>
 {% endblock %}

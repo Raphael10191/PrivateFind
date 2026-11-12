@@ -1,0 +1,258 @@
+
+{% extends "base.html" %}
+
+{% block title %}Sign In | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .login-page {
+        max-width: 440px;
+        margin: 60px auto;
+        padding: 0 16px;
+    }
+
+    .login-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 32px;
+    }
+
+    .login-card h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        color: #1A1A1F;
+    }
+
+    .login-subtitle {
+        color: #666670;
+        font-size: 14px;
+        margin-bottom: 28px;
+        line-height: 1.5;
+    }
+
+    .login-field {
+        margin-bottom: 20px;
+    }
+
+    .login-field label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .login-field input {
+        display: block;
+        width: 100%;
+        padding: 13px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .login-field input:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .login-button {
+        display: block;
+        width: 100%;
+        border: none;
+        border-radius: 10px;
+        padding: 14px;
+        background: #6D5BD0;
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .login-button:hover {
+        background: #5846B8;
+    }
+
+    .login-button:disabled {
+        opacity: 0.65;
+        cursor: wait;
+    }
+
+    .login-error {
+        margin: 0 0 16px;
+        padding: 12px;
+        background: #FFF1F1;
+        color: #A32727;
+        border-radius: 10px;
+        font-size: 14px;
+    }
+
+    .login-error[hidden] {
+        display: none;
+    }
+
+    .register-link {
+        margin: 24px 0 0;
+        text-align: center;
+        font-size: 14px;
+        color: #666670;
+    }
+
+    .register-link a {
+        color: #6D5BD0;
+        font-weight: 600;
+    }
+
+    .register-link a:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+        .login-page {
+            margin: 24px auto;
+        }
+
+        .login-card {
+            padding: 24px 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="login-page">
+    <div class="login-card">
+        <h1>Welcome back</h1>
+
+        <p class="login-subtitle">
+            Sign in to your PrivateFind account.
+        </p>
+
+        <form id="login-form">
+            <div class="login-field">
+                <label for="email">
+                    Email address
+                </label>
+
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+
+            <div class="login-field">
+                <label for="password">
+                    Password
+                </label>
+
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <p
+                id="login-error"
+                class="login-error"
+                role="alert"
+                hidden
+            ></p>
+
+            <button
+                id="login-button"
+                class="login-button"
+                type="submit"
+            >
+                Sign In
+            </button>
+        </form>
+
+        <p class="register-link">
+            Don't have an account?
+            <a href="/register">
+                Create an account
+            </a>
+        </p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById("login-form");
+    const button = document.getElementById("login-button");
+    const errorBox = document.getElementById("login-error");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        errorBox.hidden = true;
+        button.disabled = true;
+        button.textContent = "Signing in...";
+
+        const email = form.elements.email.value.trim();
+        const password = form.elements.password.value;
+
+        try {
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!response.ok) {
+                let message = "Unable to sign in.";
+
+                try {
+                    const data = await response.json();
+                    message = data.error?.message || message;
+                } catch {
+                    // Keep the default error message.
+                }
+
+                throw new Error(message);
+            }
+
+            const user = await response.json();
+
+            if (user.role === "owner") {
+                window.location.replace("/owner");
+                return;
+            }
+
+            if (user.role === "admin") {
+                errorBox.textContent =
+                    "Admin dashboard is not available yet.";
+                errorBox.hidden = false;
+                return;
+            }
+
+            throw new Error("Unsupported account role.");
+
+        } catch (error) {
+            errorBox.textContent =
+                error.message ||
+                "Connection failed. Please try again.";
+
+            errorBox.hidden = false;
+
+        } finally {
+            button.disabled = false;
+            button.textContent = "Sign In";
+        }
+    });
+</script>
+{% endblock %}

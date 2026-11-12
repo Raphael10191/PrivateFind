@@ -3,7 +3,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <title>{% block title %}PrivateFind{% endblock %}</title>
 
@@ -26,6 +27,17 @@
             color: var(--text);
         }
 
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--purple);
+        }
+
+        /* Header */
+
         .header {
             background: white;
             border-bottom: 1px solid #e8e8e8;
@@ -46,14 +58,14 @@
             gap: 28px;
         }
 
-        a {
-            color: inherit;
-            text-decoration: none;
+        .navigation a.active-link {
+            color: var(--purple);
+            font-weight: 600;
+            border-bottom: 2px solid var(--purple);
+            padding-bottom: 6px;
         }
 
-        a:hover {
-            color: var(--purple);
-        }
+        /* Account dropdown */
 
         .profile-menu {
             position: relative;
@@ -89,14 +101,59 @@
             padding: 9px;
         }
 
+        .signout-button {
+            display: block;
+            width: 100%;
+            padding: 9px;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .signout-button:hover {
+            color: var(--purple);
+        }
+
+        /* Page content */
+
         main {
             max-width: 1100px;
             margin: 0 auto;
             padding: 40px 24px;
         }
 
+        /* Authentication visibility */
+
+        .auth-required,
+        .guest-only {
+            display: none;
+        }
+
+        body.auth-owner .navigation .auth-required {
+            display: inline-block;
+        }
+
+        body.auth-owner .navigation .profile-menu {
+            display: block;
+        }
+
+        body.auth-guest .navigation .guest-only,
+        body.auth-admin .navigation .guest-only {
+            display: inline-block;
+        }
+
+        /* Mobile navigation */
+
         .mobile-navigation {
             display: none;
+        }
+
+        .mobile-navigation a[aria-current="page"] {
+            color: var(--purple);
+            font-weight: 700;
         }
 
         @media (max-width: 600px) {
@@ -108,7 +165,7 @@
                 padding: 24px 16px 90px;
             }
 
-            .mobile-navigation {
+            body.auth-owner .mobile-navigation {
                 display: flex;
                 position: fixed;
                 bottom: 0;
@@ -118,81 +175,207 @@
                 padding: 16px;
                 background: white;
                 border-top: 1px solid #e8e8e8;
+                z-index: 20;
+            }
+
+            body.auth-guest main,
+            body.auth-admin main {
+                padding-bottom: 24px;
+            }
+
+            body.auth-guest .navigation,
+            body.auth-admin .navigation {
+                display: flex;
             }
         }
-
-            .navigation a.active-link {
-              color: #6D5BD0;
-             font-weight: 600;
-             border-bottom: 2px solid #6D5BD0;
-             padding-bottom: 6px;
-            }
-        
-
-              .mobile-navigation a[aria-current="page"] {
-               color: #6D5BD0;
-               font-weight: 700;
-            }
-
-
     </style>
-    
 
     {% block head %}{% endblock %}
 </head>
 
 <body>
-<header class="header">
-    <a href="/owner" class="logo">PrivateFind</a>
 
-    <nav class="navigation" aria-label="Owner navigation">
-        <a href="/owner"
-           class="{% if active_page == 'home' %}active-link{% endif %}"
-           {% if active_page == 'home' %}aria-current="page"{% endif %}>
-            Home
-        </a>
+    <header class="header">
+        <a href="/" class="logo">PrivateFind</a>
 
-        <a href="/owner/reports"
-           class="{% if active_page == 'reports' %}active-link{% endif %}"
-           {% if active_page == 'reports' %}aria-current="page"{% endif %}>
-            My Reports
-        </a>
+        <nav class="navigation"
+             aria-label="Main navigation">
 
-        <details class="profile-menu">
-            <summary aria-label="Account menu">👤</summary>
-            <div class="profile-options">
-                <a href="/owner/account">My Account</a>
-                <a href="/logout">Sign out</a>
-            </div>
-        </details>
-    </nav>
-</header>
+            <!-- Shown before login -->
+            <a href="/login" class="guest-only">
+                Sign In
+            </a>
+
+            <!-- Shown after Owner login -->
+            <a href="/owner"
+               class="auth-required
+               {% if active_page == 'home' %}
+                   active-link
+               {% endif %}"
+               {% if active_page == 'home' %}
+                   aria-current="page"
+               {% endif %}>
+                Home
+            </a>
+
+            <a href="/owner/reports"
+               class="auth-required
+               {% if active_page == 'reports' %}
+                   active-link
+               {% endif %}"
+               {% if active_page == 'reports' %}
+                   aria-current="page"
+               {% endif %}>
+                My Reports
+            </a>
+
+            <details class="profile-menu auth-required">
+                <summary aria-label="Account menu">
+                    👤
+                </summary>
+
+                <div class="profile-options">
+                    <a href="/owner/account">
+                        My Account
+                    </a>
+
+                    <button
+                        type="button"
+                        class="signout-button"
+                        data-signout>
+                        Sign out
+                    </button>
+                </div>
+            </details>
+
+        </nav>
+    </header>
 
     <main>
         {% block content %}{% endblock %}
     </main>
 
-    
-     <nav class="mobile-navigation" 
-          aria-label="Mobile owner navigation">
+    <!-- Mobile Owner navigation -->
+
+    <nav class="mobile-navigation auth-required"
+         aria-label="Mobile owner navigation">
+
         <a href="/owner"
-       {% if active_page == 'home' %}aria-current="page"{% endif %}>
-        Home
-     </a>
+           {% if active_page == 'home' %}
+               aria-current="page"
+           {% endif %}>
+            Home
+        </a>
 
-     <a href="/owner/reports"
-       {% if active_page == 'reports' %}aria-current="page"{% endif %}>
-        My Reports
-     </a>
+        <a href="/owner/reports"
+           {% if active_page == 'reports' %}
+               aria-current="page"
+           {% endif %}>
+            My Reports
+        </a>
 
-     <a href="/owner/account"
-       {% if active_page == 'account' %}aria-current="page"{% endif %}>
-        Account
-    </a>
-</nav>
+        <a href="/owner/account"
+           {% if active_page == 'account' %}
+               aria-current="page"
+           {% endif %}>
+            Account
+        </a>
 
+    </nav>
+
+    <!-- Authentication check -->
+
+    <script>
+        document.addEventListener(
+            "DOMContentLoaded",
+            async () => {
+
+                let user = null;
+                let authChecked = false;
+
+                try {
+                    const response = await fetch(
+                        "/api/auth/me",
+                        {
+                            credentials: "same-origin",
+                            cache: "no-store"
+                        }
+                    );
+
+                    if (response.ok) {
+                        user = await response.json();
+                    }
+
+                    authChecked = true;
+
+                } catch (error) {
+                    console.error(
+                        "Authentication check failed:",
+                        error
+                    );
+                }
+
+                if (authChecked) {
+                    if (user && user.role === "owner") {
+                        document.body.classList.add(
+                            "auth-owner"
+                        );
+                    } else if (user && user.role === "admin") {
+                        document.body.classList.add(
+                            "auth-admin"
+                        );
+                    } else {
+                        document.body.classList.add(
+                            "auth-guest"
+                        );
+                    }
+                }
+
+                // Sign out using the real backend API.
+                document.querySelectorAll(
+                    "[data-signout]"
+                ).forEach(button => {
+
+                    button.addEventListener(
+                        "click",
+                        async () => {
+
+                            button.disabled = true;
+
+                            try {
+                                const response = await fetch(
+                                    "/api/auth/logout",
+                                    {
+                                        method: "POST",
+                                        credentials: "same-origin"
+                                    }
+                                );
+
+                                if (!response.ok) {
+                                    throw new Error(
+                                        "Sign out failed"
+                                    );
+                                }
+
+                                window.location.replace(
+                                    "/login"
+                                );
+
+                            } catch (error) {
+                                alert(
+                                    "Could not sign out. Please try again."
+                                );
+
+                                button.disabled = false;
+                            }
+                        }
+                    );
+                });
+            }
+        );
+    </script>
 
     {% block scripts %}{% endblock %}
+
 </body>
 </html>
-
