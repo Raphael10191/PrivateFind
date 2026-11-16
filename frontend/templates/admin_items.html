@@ -1,0 +1,886 @@
+
+{% extends "base.html" %}
+
+{% block title %}Found Items | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .items-page {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .items-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 26px;
+    }
+
+    .items-heading h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .items-heading p,
+    .muted {
+        margin: 0;
+        color: #666670;
+        line-height: 1.5;
+    }
+
+    .items-button {
+        padding: 11px 16px;
+        border: 1px solid #E4E2EB;
+        border-radius: 10px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .items-button:hover {
+        background: #EFEBFA;
+        color: #6D5BD0;
+    }
+
+    .items-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .items-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .items-filters label {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        color: #666670;
+        font-size: 13px;
+    }
+
+    .items-filters select {
+        min-width: 165px;
+        padding: 11px;
+        border: 1px solid #E4E2EB;
+        border-radius: 10px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-size: 14px;
+    }
+
+    .items-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+    }
+
+    .items-panel {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 24px;
+        min-width: 0;
+    }
+
+    .items-panel h2 {
+        margin: 0 0 18px;
+        font-size: 19px;
+    }
+
+    .item-option {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 15px;
+        margin-bottom: 10px;
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 12px;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .item-option:hover,
+    .item-option.selected {
+        background: #EFEBFA;
+        border-color: #6D5BD0;
+    }
+
+    .item-option strong,
+    .item-option span {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+
+    .item-option strong {
+        margin-bottom: 7px;
+    }
+
+    .item-option span {
+        color: #666670;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .item-field {
+        margin-bottom: 18px;
+    }
+
+    .item-label {
+        display: block;
+        color: #666670;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+
+    .item-value {
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    .item-divider {
+        border: 0;
+        border-top: 1px solid #ECECF0;
+        margin: 22px 0;
+    }
+
+    .item-status {
+        display: inline-block;
+        padding: 7px 12px;
+        border-radius: 20px;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+
+    .item-attribute {
+        padding: 12px;
+        margin-bottom: 9px;
+        background: #FAFAF8;
+        border: 1px solid #ECECF0;
+        border-radius: 10px;
+    }
+
+    .item-attribute strong {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .item-attribute p {
+        margin: 4px 0;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .item-photo {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        border: 1px solid #ECECF0;
+        border-radius: 10px;
+        background: #FAFAF8;
+    }
+
+    .item-message {
+        padding: 14px;
+        border-radius: 10px;
+        margin-bottom: 18px;
+        line-height: 1.5;
+    }
+
+    .item-error {
+        background: #FFF1F1;
+        color: #A32727;
+    }
+
+    .item-success {
+        background: #EFEBFA;
+        color: #42338C;
+    }
+
+    .item-empty {
+        padding: 20px 0;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .item-warning {
+        padding: 13px;
+        margin: 16px 0;
+        border: 1px solid #E4E2EB;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #666670;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 700px) {
+        .items-heading {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .items-heading h1 {
+            font-size: 26px;
+        }
+
+        .items-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .items-panel {
+            padding: 20px;
+        }
+
+        .items-filters {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .items-filters select {
+            min-width: 0;
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="items-page">
+
+    <div class="items-heading">
+        <div>
+            <h1>Found Items</h1>
+            <p>Monitor deposits and review found-item details.</p>
+        </div>
+
+        <button
+            id="refresh-items"
+            type="button"
+            class="items-button">
+            Refresh
+        </button>
+    </div>
+
+    <p id="items-error"
+       class="item-message item-error"
+       role="alert"
+       hidden></p>
+
+    <p id="items-success"
+       class="item-message item-success"
+       role="status"
+       hidden></p>
+
+    <div class="items-filters">
+        <label for="status-filter">
+            Item status
+            <select id="status-filter">
+                <option value="">All items</option>
+                <option value="awaiting_deposit">Awaiting Deposit</option>
+                <option value="open">Open</option>
+                <option value="reserved">Reserved</option>
+                <option value="returned">Returned</option>
+                <option value="expired">Expired</option>
+            </select>
+        </label>
+
+        <label for="ai-filter">
+            AI processing
+            <select id="ai-filter">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="done">Done</option>
+                <option value="failed">Failed</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="items-grid">
+
+        <section class="items-panel">
+            <h2>Items</h2>
+
+            <div id="items-list" aria-live="polite">
+                <p class="item-empty">Loading items...</p>
+            </div>
+        </section>
+
+        <section class="items-panel">
+            <h2>Item Details</h2>
+
+            <p id="item-placeholder" class="item-empty">
+                Select a found item to view its details.
+            </p>
+
+            <div id="item-details" hidden>
+
+                <span id="detail-status"
+                      class="item-status"></span>
+
+                <div class="item-field">
+                    <span class="item-label">Item</span>
+                    <strong id="detail-id" class="item-value"></strong>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Category</span>
+                    <div id="detail-category" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Public summary</span>
+                    <div id="detail-summary" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Campus location</span>
+                    <div id="detail-location" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Locker</span>
+                    <div id="detail-locker" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Compartment</span>
+                    <div id="detail-compartment" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">Finder note (private)</span>
+                    <div id="detail-note" class="item-value"></div>
+                </div>
+
+                <div class="item-field">
+                    <span class="item-label">AI processing</span>
+                    <div id="detail-ai" class="item-value"></div>
+                </div>
+
+                <div class="item-field" id="ai-error-field" hidden>
+                    <span class="item-label">AI error</span>
+                    <div id="detail-ai-error" class="item-value"></div>
+                </div>
+
+                <button
+                    id="retry-ai"
+                    type="button"
+                    class="items-button"
+                    hidden>
+                    Retry AI Processing
+                </button>
+
+                <p id="deposit-warning"
+                   class="item-warning"
+                   hidden>
+                    This item is awaiting physical deposit.
+                    A generated deposit code does not confirm
+                    that the item is inside the locker.
+                </p>
+
+                <hr class="item-divider">
+
+                <h3>Uploaded Photos</h3>
+                <div id="detail-photos" class="photo-grid"></div>
+
+                <hr class="item-divider">
+
+                <h3>Item Attributes</h3>
+                <div id="detail-attributes"></div>
+
+            </div>
+        </section>
+
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const itemsList = document.getElementById("items-list");
+    const detailsBox = document.getElementById("item-details");
+    const placeholder = document.getElementById("item-placeholder");
+    const errorBox = document.getElementById("items-error");
+    const successBox = document.getElementById("items-success");
+
+    const refreshButton = document.getElementById("refresh-items");
+    const retryButton = document.getElementById("retry-ai");
+    const statusFilter = document.getElementById("status-filter");
+    const aiFilter = document.getElementById("ai-filter");
+
+    let selectedItemId = null;
+    let selectedItemStatus = null;
+    let retrying = false;
+    let requestVersion = 0;
+
+    function humanize(value) {
+        return String(value ?? "Unknown")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, letter => letter.toUpperCase());
+    }
+
+    function setText(id, value) {
+        document.getElementById(id).textContent =
+            String(value ?? "Not available");
+    }
+
+    function createText(tag, value, className = "") {
+        const element = document.createElement(tag);
+        element.textContent = String(value ?? "");
+
+        if (className) {
+            element.className = className;
+        }
+
+        return element;
+    }
+
+    function clearMessages() {
+        errorBox.hidden = true;
+        successBox.hidden = true;
+    }
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+    }
+
+    function getApiError(data, fallback) {
+        if (typeof data?.error?.message === "string") {
+            return data.error.message;
+        }
+
+        if (typeof data?.detail === "string") {
+            return data.detail;
+        }
+
+        return fallback;
+    }
+
+    async function apiRequest(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            ...options
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Please sign in again.");
+        }
+
+        if (response.status === 403) {
+            throw new Error("Admin access required.");
+        }
+
+        let data = null;
+
+        try {
+            data = await response.json();
+        } catch {
+            // Non-JSON server response.
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                getApiError(
+                    data,
+                    "Request failed (HTTP " + response.status + ")."
+                )
+            );
+        }
+
+        return data;
+    }
+
+    function resetDetails() {
+        requestVersion += 1;
+        selectedItemId = null;
+        selectedItemStatus = null;
+        detailsBox.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent =
+            "Select a found item to view its details.";
+        retryButton.hidden = true;
+        retryButton.disabled = false;
+    }
+
+    function renderAttributes(attributes) {
+        const container = document.getElementById(
+            "detail-attributes"
+        );
+
+        container.replaceChildren();
+
+        if (!Array.isArray(attributes) ||
+            attributes.length === 0) {
+            container.appendChild(
+                createText(
+                    "p",
+                    "No item attributes available.",
+                    "item-empty"
+                )
+            );
+            return;
+        }
+
+        attributes.forEach(attribute => {
+            const row = document.createElement("div");
+            row.className = "item-attribute";
+
+            row.appendChild(
+                createText("strong", humanize(attribute.name))
+            );
+
+            row.appendChild(
+                createText("p", attribute.value)
+            );
+
+            row.appendChild(
+                createText(
+                    "p",
+                    "Visibility: " +
+                    humanize(attribute.visibility)
+                )
+            );
+
+            row.appendChild(
+                createText(
+                    "p",
+                    "Strength: " +
+                    humanize(attribute.strength || "generic")
+                )
+            );
+
+            container.appendChild(row);
+        });
+    }
+
+    function renderPhotos(item) {
+        const container = document.getElementById(
+            "detail-photos"
+        );
+
+        container.replaceChildren();
+
+        if (!Array.isArray(item.photo_ids) ||
+            item.photo_ids.length === 0) {
+            container.appendChild(
+                createText(
+                    "p",
+                    "No photos available.",
+                    "item-empty"
+                )
+            );
+            return;
+        }
+
+        item.photo_ids.forEach((photoId, index) => {
+            const image = document.createElement("img");
+
+            image.className = "item-photo";
+            image.alt = "Found item photo " + (index + 1);
+            image.loading = "lazy";
+
+            image.src =
+                "/api/admin/items/" +
+                encodeURIComponent(item.id) +
+                "/photos/" +
+                encodeURIComponent(photoId);
+
+            image.addEventListener("error", () => {
+                image.replaceWith(
+                    createText(
+                        "p",
+                        "Photo could not be loaded.",
+                        "item-empty"
+                    )
+                );
+            });
+
+            container.appendChild(image);
+        });
+    }
+
+    function renderItemDetails(item) {
+        setText("detail-status", humanize(item.status));
+        setText("detail-id", "Found Item #" + item.id);
+        setText("detail-category", humanize(item.category));
+        setText(
+            "detail-summary",
+            item.public_summary || "No public summary available."
+        );
+        setText("detail-location", humanize(item.location));
+
+        setText(
+            "detail-locker",
+            item.locker_id == null
+                ? "Not assigned"
+                : "Locker #" + item.locker_id
+        );
+
+        setText(
+            "detail-compartment",
+            item.compartment == null
+                ? "Not assigned"
+                : "Compartment " + item.compartment
+        );
+
+        setText(
+            "detail-note",
+            item.note || "No finder note provided."
+        );
+
+        setText("detail-ai", humanize(item.ai_status));
+
+        const aiErrorField = document.getElementById(
+            "ai-error-field"
+        );
+
+        aiErrorField.hidden = !item.ai_error;
+
+        setText(
+            "detail-ai-error",
+            item.ai_error || ""
+        );
+
+        document.getElementById(
+            "deposit-warning"
+        ).hidden = item.status !== "awaiting_deposit";
+
+        retryButton.hidden = item.ai_status !== "failed";
+
+        renderPhotos(item);
+        renderAttributes(item.attributes);
+
+        placeholder.hidden = true;
+        detailsBox.hidden = false;
+    }
+
+    async function selectItem(itemId) {
+        if (retrying) return;
+
+        clearMessages();
+
+        const version = ++requestVersion;
+
+        selectedItemId = null;
+        selectedItemStatus = null;
+
+        detailsBox.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent = "Loading item details...";
+
+        try {
+            const item = await apiRequest(
+                "/api/admin/items/" +
+                encodeURIComponent(itemId)
+            );
+
+            if (version !== requestVersion) return;
+
+            selectedItemId = item.id;
+            selectedItemStatus = item.status;
+
+            renderItemDetails(item);
+
+            itemsList.querySelectorAll(
+                ".item-option"
+            ).forEach(button => {
+                button.classList.toggle(
+                    "selected",
+                    button.dataset.itemId === String(item.id)
+                );
+            });
+
+        } catch (error) {
+            if (version !== requestVersion) return;
+
+            resetDetails();
+            showError(error.message);
+        }
+    }
+
+    async function loadItems() {
+        if (retrying) return;
+
+        clearMessages();
+        resetDetails();
+
+        const version = requestVersion;
+
+        refreshButton.disabled = true;
+
+        itemsList.replaceChildren(
+            createText("p", "Loading items...", "item-empty")
+        );
+
+        const params = new URLSearchParams();
+
+        if (statusFilter.value) {
+            params.set("status", statusFilter.value);
+        }
+
+        if (aiFilter.value) {
+            params.set("ai_status", aiFilter.value);
+        }
+
+        const url = "/api/admin/items" +
+            (params.toString() ? "?" + params.toString() : "");
+
+        try {
+            const items = await apiRequest(url);
+
+            if (version !== requestVersion) return;
+
+            if (!Array.isArray(items)) {
+                throw new Error("Unexpected items response.");
+            }
+
+            itemsList.replaceChildren();
+
+            if (items.length === 0) {
+                itemsList.appendChild(
+                    createText(
+                        "p",
+                        "No found items match these filters.",
+                        "item-empty"
+                    )
+                );
+                return;
+            }
+
+            items.forEach(item => {
+                const button = document.createElement("button");
+
+                button.type = "button";
+                button.className = "item-option";
+                button.dataset.itemId = String(item.id);
+
+                button.appendChild(
+                    createText(
+                        "strong",
+                        item.public_summary ||
+                        "Found Item #" + item.id
+                    )
+                );
+
+                button.appendChild(
+                    createText(
+                        "span",
+                        "Item #" + item.id +
+                        " · " + humanize(item.location)
+                    )
+                );
+
+                button.appendChild(
+                    createText(
+                        "span",
+                        "Status: " + humanize(item.status)
+                    )
+                );
+
+                button.appendChild(
+                    createText(
+                        "span",
+                        "AI: " + humanize(item.ai_status)
+                    )
+                );
+
+                button.addEventListener(
+                    "click",
+                    () => selectItem(item.id)
+                );
+
+                itemsList.appendChild(button);
+            });
+
+        } catch (error) {
+            if (version === requestVersion) {
+                itemsList.replaceChildren();
+                showError(error.message);
+            }
+        } finally {
+            refreshButton.disabled = false;
+        }
+    }
+
+    async function retryAI() {
+        if (retrying || selectedItemId === null) return;
+
+        const itemId = selectedItemId;
+
+        if (!window.confirm(
+            "Retry AI processing for Found Item #" +
+            itemId + "?"
+        )) {
+            return;
+        }
+
+        retrying = true;
+        clearMessages();
+        retryButton.disabled = true;
+        refreshButton.disabled = true;
+
+        try {
+            await apiRequest(
+                "/api/admin/items/" +
+                encodeURIComponent(itemId) +
+                "/retry-ai",
+                {
+                    method: "POST"
+                }
+            );
+
+            successBox.textContent =
+                "AI processing has been queued. " +
+                "Refresh the item to check its new status.";
+
+            successBox.hidden = false;
+
+            retryButton.hidden = true;
+
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            retrying = false;
+            retryButton.disabled = false;
+            refreshButton.disabled = false;
+        }
+    }
+
+    refreshButton.addEventListener("click", loadItems);
+    statusFilter.addEventListener("change", loadItems);
+    aiFilter.addEventListener("change", loadItems);
+    retryButton.addEventListener("click", retryAI);
+
+    loadItems();
+</script>
+{% endblock %}

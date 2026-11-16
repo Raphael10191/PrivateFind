@@ -45,11 +45,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 16px;
         }
 
         .logo {
             font-size: 20px;
             font-weight: bold;
+            white-space: nowrap;
         }
 
         .navigation {
@@ -65,7 +67,7 @@
             padding-bottom: 6px;
         }
 
-        /* Account dropdown */
+        /* Owner account dropdown */
 
         .profile-menu {
             position: relative;
@@ -93,7 +95,7 @@
             border: 1px solid #e8e8e8;
             border-radius: 10px;
             box-shadow: 0 8px 24px #00000012;
-            z-index: 10;
+            z-index: 30;
         }
 
         .profile-options a,
@@ -120,9 +122,38 @@
             cursor: pointer;
         }
 
+        .signout-button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
         .profile-options .current-link {
             color: var(--purple);
             font-weight: 600;
+        }
+
+        /* Admin sign-out */
+
+        .admin-signout {
+            border: 1px solid #E4E2EB;
+            border-radius: 10px;
+            padding: 10px 15px;
+            background: white;
+            color: var(--text);
+            font: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-signout:hover {
+            background: var(--purple-light);
+            color: var(--purple);
+        }
+
+        .admin-signout:disabled {
+            opacity: 0.6;
+            cursor: wait;
         }
 
         /* Page content */
@@ -133,10 +164,11 @@
             padding: 40px 24px;
         }
 
-        /* Authentication visibility */
+        /* Role-aware navigation */
 
         .auth-required,
-        .guest-only {
+        .guest-only,
+        .admin-only {
             display: none;
         }
 
@@ -148,12 +180,15 @@
             display: block;
         }
 
-        body.auth-guest .navigation .guest-only,
-        body.auth-admin .navigation .guest-only {
+        body.auth-guest .navigation .guest-only {
             display: inline-block;
         }
 
-        /* Mobile navigation */
+        body.auth-admin .navigation .admin-only {
+            display: inline-block;
+        }
+
+        /* Mobile Owner navigation */
 
         .mobile-navigation {
             display: none;
@@ -164,7 +199,24 @@
             font-weight: 700;
         }
 
+        /* Keyboard accessibility */
+
+        a:focus-visible,
+        button:focus-visible,
+        summary:focus-visible {
+            outline: 2px solid var(--purple);
+            outline-offset: 3px;
+        }
+
         @media (max-width: 600px) {
+            .header {
+                padding: 16px 6%;
+            }
+
+            .logo {
+                font-size: 18px;
+            }
+
             .navigation {
                 display: none;
             }
@@ -194,6 +246,30 @@
             body.auth-guest .navigation,
             body.auth-admin .navigation {
                 display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .admin-signout {
+                padding: 9px 12px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                flex-wrap: wrap;
+            }
+
+            body.auth-admin .navigation {
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                gap: 12px 18px;
+            }
+
+            .navigation a {
+                font-size: 13px;
             }
         }
     </style>
@@ -210,7 +286,8 @@
              aria-label="Main navigation">
 
             <!-- Guest navigation -->
-            <a href="/login" class="guest-only">
+            <a href="/login"
+               class="guest-only">
                 Sign In
             </a>
 
@@ -237,7 +314,7 @@
                 My Reports
             </a>
 
-            <!-- Account menu -->
+            <!-- Owner account menu -->
             <details class="profile-menu auth-required">
                 <summary aria-label="Account menu">
                     👤
@@ -270,6 +347,47 @@
 
                 </div>
             </details>
+
+            <!-- Admin navigation -->
+            <a href="/admin"
+               class="admin-only
+               {% if active_page == 'admin' %}
+                   active-link
+               {% endif %}"
+               {% if active_page == 'admin' %}
+                   aria-current="page"
+               {% endif %}>
+                Dashboard
+            </a>
+
+            <a href="/admin/items"
+               class="admin-only
+               {% if active_page == 'admin_items' %}
+                   active-link
+               {% endif %}"
+               {% if active_page == 'admin_items' %}
+                   aria-current="page"
+               {% endif %}>
+                Found Items
+            </a>
+
+            <a href="/admin/claims"
+               class="admin-only
+               {% if active_page == 'admin_claims' %}
+                   active-link
+               {% endif %}"
+               {% if active_page == 'admin_claims' %}
+                   aria-current="page"
+               {% endif %}>
+                Claim Reviews
+            </a>
+
+            <button
+                type="button"
+                class="admin-signout admin-only"
+                data-signout>
+                Sign out
+            </button>
 
         </nav>
     </header>
@@ -382,7 +500,7 @@
                                     );
                                 }
 
-                                // Remove unfinished private report drafts.
+                                // Clear unfinished Owner drafts.
                                 sessionStorage.removeItem(
                                     "privatefind_lost_report_draft"
                                 );

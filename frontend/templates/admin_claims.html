@@ -1,0 +1,838 @@
+
+{% extends "base.html" %}
+
+{% block title %}Claim Reviews | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .reviews-page {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .reviews-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 26px;
+    }
+
+    .reviews-heading h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .reviews-heading p {
+        margin: 0;
+        color: #666670;
+        line-height: 1.5;
+    }
+
+    .reviews-refresh,
+    .review-button {
+        border: 1px solid #E4E2EB;
+        border-radius: 10px;
+        padding: 12px 16px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .reviews-refresh:hover,
+    .review-button:hover {
+        background: #EFEBFA;
+    }
+
+    button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .reviews-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+    }
+
+    .reviews-panel {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 24px;
+        min-width: 0;
+    }
+
+    .reviews-panel h2 {
+        font-size: 19px;
+        margin: 0 0 18px;
+    }
+
+    .claim-list-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 10px;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .claim-list-item:hover,
+    .claim-list-item.selected {
+        background: #EFEBFA;
+        border-color: #6D5BD0;
+    }
+
+    .claim-list-item strong {
+        display: block;
+        margin-bottom: 7px;
+    }
+
+    .claim-list-item span {
+        display: block;
+        font-size: 13px;
+        color: #666670;
+        line-height: 1.5;
+    }
+
+    .review-status {
+        display: inline-block;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        border-radius: 20px;
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 18px;
+    }
+
+    .review-field {
+        margin-bottom: 18px;
+    }
+
+    .review-field-label {
+        display: block;
+        color: #666670;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+
+    .review-field-value {
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .review-divider {
+        border: 0;
+        border-top: 1px solid #ECECF0;
+        margin: 22px 0;
+    }
+
+    .evidence-row {
+        padding: 14px;
+        background: #FAFAF8;
+        border: 1px solid #ECECF0;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    .evidence-row strong {
+        display: block;
+        margin-bottom: 7px;
+    }
+
+    .evidence-row p {
+        margin: 5px 0;
+        line-height: 1.5;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .review-note-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 9px;
+    }
+
+    .review-note {
+        width: 100%;
+        min-height: 90px;
+        padding: 13px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        font: inherit;
+        resize: vertical;
+        margin-bottom: 18px;
+    }
+
+    .review-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .approve-button {
+        background: #6D5BD0;
+        border-color: #6D5BD0;
+        color: white;
+    }
+
+    .approve-button:hover {
+        background: #5846B8;
+        color: white;
+    }
+
+    .review-message {
+        padding: 14px;
+        border-radius: 10px;
+        margin-bottom: 18px;
+        line-height: 1.5;
+    }
+
+    .review-error {
+        background: #FFF1F1;
+        color: #A32727;
+    }
+
+    .review-success {
+        background: #EFEBFA;
+        color: #42338C;
+    }
+
+    .review-empty {
+        color: #666670;
+        line-height: 1.6;
+        padding: 18px 0;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 700px) {
+        .reviews-heading {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .reviews-heading h1 {
+            font-size: 26px;
+        }
+
+        .reviews-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .reviews-panel {
+            padding: 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="reviews-page">
+
+    <div class="reviews-heading">
+        <div>
+            <h1>Claim Reviews</h1>
+            <p>Review ownership evidence before making a decision.</p>
+        </div>
+
+        <button
+            id="refresh-claims"
+            type="button"
+            class="reviews-refresh">
+            Refresh
+        </button>
+    </div>
+
+    <p id="reviews-error"
+       class="review-message review-error"
+       role="alert"
+       hidden></p>
+
+    <p id="reviews-success"
+       class="review-message review-success"
+       role="status"
+       hidden></p>
+
+    <div class="reviews-grid">
+
+        <section class="reviews-panel">
+            <h2>Awaiting Review</h2>
+
+            <div id="reviews-list"
+                 aria-live="polite">
+                <p class="review-empty">Loading claims...</p>
+            </div>
+        </section>
+
+        <section class="reviews-panel">
+            <h2>Review Details</h2>
+
+            <p id="review-placeholder"
+               class="review-empty">
+                Select a claim to view its ownership evidence.
+            </p>
+
+            <div id="review-details" hidden>
+
+                <span class="review-status">
+                    In Review
+                </span>
+
+                <div class="review-field">
+                    <span class="review-field-label">
+                        Claim
+                    </span>
+                    <strong id="detail-claim-id"
+                            class="review-field-value"></strong>
+                </div>
+
+                <div class="review-field">
+                    <span class="review-field-label">
+                        Found Item
+                    </span>
+                    <div id="detail-item"
+                         class="review-field-value"></div>
+                </div>
+
+                <div class="review-field">
+                    <span class="review-field-label">
+                        Lost Report
+                    </span>
+                    <div id="detail-report"
+                         class="review-field-value"></div>
+                </div>
+
+                <div class="review-field">
+                    <span class="review-field-label">
+                        Ownership Score
+                    </span>
+                    <div id="detail-score"
+                         class="review-field-value"></div>
+                </div>
+
+                <div class="review-field">
+                    <span class="review-field-label">
+                        Critical Conflict
+                    </span>
+                    <div id="detail-conflict"
+                         class="review-field-value"></div>
+                </div>
+
+                <hr class="review-divider">
+
+                <h3>Submitted Evidence</h3>
+                <div id="detail-evidence"></div>
+
+                <h3>Private Item Attributes</h3>
+                <div id="detail-attributes"></div>
+
+                <hr class="review-divider">
+
+                <label for="decision-note"
+                       class="review-note-label">
+                    Decision note (optional)
+                </label>
+
+                <textarea
+                    id="decision-note"
+                    class="review-note"
+                    maxlength="500"
+                    placeholder="Explain the review decision..."></textarea>
+
+                <div class="review-actions">
+                    <button
+                        id="reject-claim"
+                        type="button"
+                        class="review-button">
+                        Reject
+                    </button>
+
+                    <button
+                        id="approve-claim"
+                        type="button"
+                        class="review-button approve-button">
+                        Approve
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const reviewsList = document.getElementById("reviews-list");
+    const reviewDetails = document.getElementById("review-details");
+    const placeholder = document.getElementById("review-placeholder");
+    const errorBox = document.getElementById("reviews-error");
+    const successBox = document.getElementById("reviews-success");
+
+    const refreshButton = document.getElementById("refresh-claims");
+    const approveButton = document.getElementById("approve-claim");
+    const rejectButton = document.getElementById("reject-claim");
+    const noteInput = document.getElementById("decision-note");
+
+    let selectedClaimId = null;
+    let submitting = false;
+    let requestVersion = 0;
+
+    function humanize(value) {
+        return String(value ?? "Unknown")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, letter => letter.toUpperCase());
+    }
+
+    function createText(tag, value, className = "") {
+        const element = document.createElement(tag);
+        element.textContent = String(value ?? "");
+        if (className) {
+            element.className = className;
+        }
+        return element;
+    }
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+    }
+
+    function clearMessages() {
+        errorBox.hidden = true;
+        successBox.hidden = true;
+    }
+
+    function getApiError(data, fallback) {
+        const error = data?.error;
+
+        if (typeof error === "string") {
+            return error;
+        }
+
+        if (typeof error?.message === "string") {
+            return error.message;
+        }
+
+        if (typeof data?.detail === "string") {
+            return data.detail;
+        }
+
+        return fallback;
+    }
+
+    async function apiRequest(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            ...options
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Your session has expired.");
+        }
+
+        if (response.status === 403) {
+            throw new Error("Admin access required.");
+        }
+
+        let data = null;
+
+        try {
+            data = await response.json();
+        } catch {
+            // Some server errors return non-JSON responses.
+        }
+
+        if (!response.ok) {
+            const message = response.status === 409
+                ? "This claim can no longer be decided. Refresh the review list."
+                : getApiError(data, "Request failed. Please try again.");
+
+            throw new Error(message);
+        }
+
+        return data;
+    }
+
+    function resetDetails() {
+        selectedClaimId = null;
+        requestVersion += 1;
+        reviewDetails.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent =
+            "Select a claim to view its ownership evidence.";
+        noteInput.value = "";
+    }
+
+    function setDecisionButtons(disabled) {
+        approveButton.disabled = disabled;
+        rejectButton.disabled = disabled;
+    }
+
+    function renderEvidence(container, values, isAttribute = false) {
+        container.replaceChildren();
+
+        if (!Array.isArray(values) || values.length === 0) {
+            container.appendChild(
+                createText(
+                    "p",
+                    "No details available.",
+                    "review-empty"
+                )
+            );
+            return;
+        }
+
+        values.forEach(value => {
+            const row = document.createElement("div");
+            row.className = "evidence-row";
+
+            row.appendChild(
+                createText(
+                    "strong",
+                    humanize(
+                        isAttribute ? value.name : value.type
+                    )
+                )
+            );
+
+            row.appendChild(
+                createText("p", value.value ?? "Not provided")
+            );
+
+            if (isAttribute) {
+                row.appendChild(
+                    createText(
+                        "p",
+                        "Visibility: " + humanize(value.visibility)
+                    )
+                );
+            } else {
+                row.appendChild(
+                    createText(
+                        "p",
+                        "Result: " + humanize(value.result)
+                    )
+                );
+            }
+
+            container.appendChild(row);
+        });
+    }
+
+    async function selectClaim(claimId) {
+        if (submitting) return;
+
+        clearMessages();
+
+        const version = ++requestVersion;
+        selectedClaimId = null;
+        reviewDetails.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent = "Loading review details...";
+        setDecisionButtons(true);
+
+        try {
+            const claim = await apiRequest(
+                "/api/admin/claims/" + encodeURIComponent(claimId)
+            );
+
+            if (version !== requestVersion) return;
+
+            if (claim.status !== "in_review") {
+                throw new Error(
+                    "This claim is no longer awaiting review."
+                );
+            }
+
+            selectedClaimId = claim.id;
+
+            document.getElementById(
+                "detail-claim-id"
+            ).textContent = "Claim #" + claim.id;
+
+            document.getElementById(
+                "detail-item"
+            ).textContent =
+                (claim.item_summary || "Item #" + claim.found_item_id) +
+                " (ID: " + claim.found_item_id + ")";
+
+            document.getElementById(
+                "detail-report"
+            ).textContent = "Report #" + claim.lost_report_id;
+
+            document.getElementById(
+                "detail-score"
+            ).textContent = claim.ownership_score == null
+                ? "Not available"
+                : claim.ownership_score + " / 100";
+
+            document.getElementById(
+                "detail-conflict"
+            ).textContent = claim.critical_conflict
+                ? "Yes — review carefully"
+                : "No critical conflict reported";
+
+            renderEvidence(
+                document.getElementById("detail-evidence"),
+                claim.evidence
+            );
+
+            renderEvidence(
+                document.getElementById("detail-attributes"),
+                claim.item_private_attributes,
+                true
+            );
+
+            noteInput.value = "";
+            placeholder.hidden = true;
+            reviewDetails.hidden = false;
+
+            reviewsList.querySelectorAll(
+                ".claim-list-item"
+            ).forEach(button => {
+                button.classList.toggle(
+                    "selected",
+                    button.dataset.claimId === String(claim.id)
+                );
+            });
+
+        } catch (error) {
+            if (version !== requestVersion) return;
+            resetDetails();
+            showError(error.message);
+        } finally {
+            if (version === requestVersion) {
+                setDecisionButtons(false);
+            }
+        }
+    }
+
+    async function loadClaims() {
+        if (submitting) return;
+
+        clearMessages();
+        resetDetails();
+
+        const version = requestVersion;
+        refreshButton.disabled = true;
+
+        reviewsList.replaceChildren(
+            createText("p", "Loading claims...", "review-empty")
+        );
+
+        try {
+            const claims = await apiRequest(
+                "/api/admin/claims?status=in_review"
+            );
+
+            if (version !== requestVersion) return;
+
+            if (!Array.isArray(claims)) {
+                throw new Error("Unexpected claims response.");
+            }
+
+            reviewsList.replaceChildren();
+
+            if (claims.length === 0) {
+                reviewsList.appendChild(
+                    createText(
+                        "p",
+                        "No claims require review right now.",
+                        "review-empty"
+                    )
+                );
+                return;
+            }
+
+            claims.forEach(claim => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "claim-list-item";
+                button.dataset.claimId = String(claim.id);
+
+                button.appendChild(
+                    createText("strong", "Claim #" + claim.id)
+                );
+
+                button.appendChild(
+                    createText(
+                        "span",
+                        claim.item_summary ||
+                        "Found Item #" + claim.found_item_id
+                    )
+                );
+
+                button.appendChild(
+                    createText(
+                        "span",
+                        "Lost Report #" + claim.lost_report_id
+                    )
+                );
+
+                button.addEventListener(
+                    "click",
+                    () => selectClaim(claim.id)
+                );
+
+                reviewsList.appendChild(button);
+            });
+
+        } catch (error) {
+            if (version === requestVersion) {
+                reviewsList.replaceChildren();
+                showError(error.message);
+            }
+        } finally {
+            refreshButton.disabled = false;
+        }
+    }
+
+    async function submitDecision(decision) {
+        if (submitting || selectedClaimId === null) return;
+
+        const claimId = selectedClaimId;
+
+        const action = decision === "approve"
+            ? "approve"
+            : "reject";
+
+        const confirmed = window.confirm(
+            "Are you sure you want to " +
+            action +
+            " Claim #" +
+            claimId +
+            "?\n\nThis decision may affect item collection."
+        );
+
+        if (!confirmed) return;
+
+        submitting = true;
+        clearMessages();
+        setDecisionButtons(true);
+        refreshButton.disabled = true;
+        noteInput.disabled = true;
+
+        try {
+            await apiRequest(
+                "/api/admin/claims/" +
+                encodeURIComponent(claimId) +
+                "/decision",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        decision: decision,
+                        note: noteInput.value.trim() || null
+                    })
+                }
+            );
+
+            await loadClaimsAfterDecision();
+
+            successBox.textContent =
+                "Claim #" + claimId + " " +
+                (decision === "approve" ? "approved" : "rejected") +
+                " successfully.";
+
+            successBox.hidden = false;
+
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            submitting = false;
+            setDecisionButtons(false);
+            refreshButton.disabled = false;
+            noteInput.disabled = false;
+        }
+    }
+
+    async function loadClaimsAfterDecision() {
+        resetDetails();
+
+        const claims = await apiRequest(
+            "/api/admin/claims?status=in_review"
+        );
+
+        if (!Array.isArray(claims)) {
+            throw new Error("Unexpected claims response.");
+        }
+
+        reviewsList.replaceChildren();
+
+        if (claims.length === 0) {
+            reviewsList.appendChild(
+                createText(
+                    "p",
+                    "No claims require review right now.",
+                    "review-empty"
+                )
+            );
+            return;
+        }
+
+        claims.forEach(claim => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "claim-list-item";
+            button.dataset.claimId = String(claim.id);
+
+            button.appendChild(
+                createText("strong", "Claim #" + claim.id)
+            );
+
+            button.appendChild(
+                createText(
+                    "span",
+                    claim.item_summary ||
+                    "Found Item #" + claim.found_item_id
+                )
+            );
+
+            button.appendChild(
+                createText(
+                    "span",
+                    "Lost Report #" + claim.lost_report_id
+                )
+            );
+
+            button.addEventListener(
+                "click",
+                () => selectClaim(claim.id)
+            );
+
+            reviewsList.appendChild(button);
+        });
+    }
+
+    refreshButton.addEventListener("click", loadClaims);
+
+    approveButton.addEventListener(
+        "click",
+        () => submitDecision("approve")
+    );
+
+    rejectButton.addEventListener(
+        "click",
+        () => submitDecision("reject")
+    );
+
+    loadClaims();
+</script>
+{% endblock %}

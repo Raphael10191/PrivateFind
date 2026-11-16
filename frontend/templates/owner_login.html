@@ -21,7 +21,6 @@
     .login-card h1 {
         margin: 0 0 8px;
         font-size: 28px;
-        color: #1A1A1F;
     }
 
     .login-subtitle {
@@ -61,9 +60,9 @@
     .login-button {
         display: block;
         width: 100%;
-        border: none;
-        border-radius: 10px;
         padding: 14px;
+        border: 0;
+        border-radius: 10px;
         background: #6D5BD0;
         color: white;
         font: inherit;
@@ -83,9 +82,9 @@
     .login-error {
         margin: 0 0 16px;
         padding: 12px;
+        border-radius: 10px;
         background: #FFF1F1;
         color: #A32727;
-        border-radius: 10px;
         font-size: 14px;
     }
 
@@ -103,10 +102,6 @@
     .register-link a {
         color: #6D5BD0;
         font-weight: 600;
-    }
-
-    .register-link a:hover {
-        text-decoration: underline;
     }
 
     @media (max-width: 600px) {
@@ -132,56 +127,44 @@
 
         <form id="login-form">
             <div class="login-field">
-                <label for="email">
-                    Email address
-                </label>
-
+                <label for="email">Email address</label>
                 <input
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="you@example.com"
                     autocomplete="username"
+                    placeholder="you@example.com"
                     required
                 >
             </div>
 
             <div class="login-field">
-                <label for="password">
-                    Password
-                </label>
-
+                <label for="password">Password</label>
                 <input
                     id="password"
                     name="password"
                     type="password"
-                    placeholder="Enter your password"
                     autocomplete="current-password"
+                    placeholder="Enter your password"
                     required
                 >
             </div>
 
-            <p
-                id="login-error"
-                class="login-error"
-                role="alert"
-                hidden
-            ></p>
+            <p id="login-error"
+               class="login-error"
+               role="alert"
+               hidden></p>
 
-            <button
-                id="login-button"
-                class="login-button"
-                type="submit"
-            >
+            <button id="login-button"
+                    class="login-button"
+                    type="submit">
                 Sign In
             </button>
         </form>
 
         <p class="register-link">
             Don't have an account?
-            <a href="/register">
-                Create an account
-            </a>
+            <a href="/register">Create an account</a>
         </p>
     </div>
 </section>
@@ -200,9 +183,6 @@
         button.disabled = true;
         button.textContent = "Signing in...";
 
-        const email = form.elements.email.value.trim();
-        const password = form.elements.password.value;
-
         try {
             const response = await fetch("/api/auth/login", {
                 method: "POST",
@@ -210,7 +190,10 @@
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({
+                    email: form.elements.email.value.trim(),
+                    password: form.elements.password.value
+                })
             });
 
             if (!response.ok) {
@@ -220,7 +203,7 @@
                     const data = await response.json();
                     message = data.error?.message || message;
                 } catch {
-                    // Keep the default error message.
+                    // Keep the default message.
                 }
 
                 throw new Error(message);
@@ -228,15 +211,13 @@
 
             const user = await response.json();
 
-            if (user.role === "owner") {
-                window.location.replace("/owner");
+            if (user.role === "admin") {
+                window.location.replace("/admin");
                 return;
             }
 
-            if (user.role === "admin") {
-                errorBox.textContent =
-                    "Admin dashboard is not available yet.";
-                errorBox.hidden = false;
+            if (user.role === "owner") {
+                window.location.replace("/owner");
                 return;
             }
 

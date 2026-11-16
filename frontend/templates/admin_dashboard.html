@@ -1,0 +1,488 @@
+
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .admin-page {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .admin-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .admin-heading h1 {
+        font-size: 30px;
+        margin: 0 0 8px;
+    }
+
+    .admin-heading p {
+        margin: 0;
+        color: #666670;
+        line-height: 1.5;
+    }
+
+    .refresh-button {
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        padding: 11px 18px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .refresh-button:hover {
+        color: #6D5BD0;
+        border-color: #6D5BD0;
+    }
+
+    .refresh-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .stat-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        padding: 24px;
+    }
+
+    .stat-card p {
+        margin: 0 0 12px;
+        color: #666670;
+        font-size: 14px;
+    }
+
+    .stat-card strong {
+        display: block;
+        font-size: 34px;
+        color: #1A1A1F;
+    }
+
+    .admin-section {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 26px;
+        margin-bottom: 22px;
+    }
+
+    .admin-section h2 {
+        margin: 0 0 20px;
+        font-size: 21px;
+    }
+
+    .data-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 17px 0;
+        border-bottom: 1px solid #ECECF0;
+    }
+
+    .data-row:last-child {
+        border-bottom: 0;
+    }
+
+    .data-row h3 {
+        margin: 0 0 7px;
+        font-size: 16px;
+        overflow-wrap: anywhere;
+    }
+
+    .data-row p {
+        margin: 4px 0;
+        color: #666670;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .status-label {
+        display: inline-block;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        border-radius: 20px;
+        padding: 7px 11px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 28px 12px;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .error-message {
+        background: #FFF1F1;
+        color: #A32727;
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    .loading-message {
+        color: #666670;
+        padding: 14px 0;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .admin-heading {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .admin-heading h1 {
+            font-size: 26px;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stat-card,
+        .admin-section {
+            padding: 20px;
+        }
+
+        .data-row {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+
+    <div class="admin-heading">
+        <div>
+            <h1>Admin Dashboard</h1>
+            <p>
+                Monitor found items and ownership
+                claims requiring attention.
+            </p>
+        </div>
+
+        <button
+            type="button"
+            id="refresh-dashboard"
+            class="refresh-button">
+            Refresh
+        </button>
+    </div>
+
+    <p id="dashboard-error"
+       class="error-message"
+       role="alert"
+       hidden></p>
+
+    <p id="dashboard-loading"
+       class="loading-message"
+       role="status">
+        Loading dashboard...
+    </p>
+
+    <div id="dashboard-content" hidden>
+
+        <div class="stats-grid">
+
+            <div class="stat-card">
+                <p>Total Found Items</p>
+                <strong id="total-items">0</strong>
+            </div>
+
+            <div class="stat-card">
+                <p>Items Awaiting AI Processing</p>
+                <strong id="pending-ai">0</strong>
+            </div>
+
+            <div class="stat-card">
+                <p>Claims Awaiting Review</p>
+                <strong id="pending-claims">0</strong>
+            </div>
+
+        </div>
+
+        <section class="admin-section">
+            <h2>Claims Awaiting Review</h2>
+            <div id="claims-list"></div>
+        </section>
+
+        <section class="admin-section">
+            <h2>Recent Found Items</h2>
+            <div id="items-list"></div>
+        </section>
+
+    </div>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const refreshButton = document.getElementById(
+        "refresh-dashboard"
+    );
+
+    const loadingBox = document.getElementById(
+        "dashboard-loading"
+    );
+
+    const errorBox = document.getElementById(
+        "dashboard-error"
+    );
+
+    const dashboardContent = document.getElementById(
+        "dashboard-content"
+    );
+
+    const claimsList = document.getElementById(
+        "claims-list"
+    );
+
+    const itemsList = document.getElementById(
+        "items-list"
+    );
+
+    function humanize(value) {
+        return String(value || "Unknown")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, character =>
+                character.toUpperCase()
+            );
+    }
+
+    async function getJson(url) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Please sign in.");
+        }
+
+        if (response.status === 403) {
+            throw new Error(
+                "This dashboard requires an Admin account."
+            );
+        }
+
+        if (!response.ok) {
+            let message = "Could not load dashboard data.";
+
+            try {
+                const data = await response.json();
+                message = data.error?.message || message;
+            } catch {
+                // Keep the default error.
+            }
+
+            throw new Error(message);
+        }
+
+        return response.json();
+    }
+
+    function addText(parent, tag, value) {
+        const element = document.createElement(tag);
+        element.textContent = String(value);
+        parent.appendChild(element);
+        return element;
+    }
+
+    function renderClaims(claims) {
+        claimsList.replaceChildren();
+
+        if (claims.length === 0) {
+            addText(
+                claimsList,
+                "p",
+                "No claims require review right now."
+            ).className = "empty-state";
+
+            return;
+        }
+
+        claims.slice(0, 5).forEach(claim => {
+            const row = document.createElement("article");
+            row.className = "data-row";
+
+            const info = document.createElement("div");
+
+            addText(
+                info,
+                "h3",
+                "Claim #" + claim.id
+            );
+
+            addText(
+                info,
+                "p",
+                "Lost Report #" + claim.lost_report_id +
+                " · Found Item #" + claim.found_item_id
+            );
+
+            if (claim.item_summary) {
+                addText(
+                    info,
+                    "p",
+                    claim.item_summary
+                );
+            }
+
+            const status = addText(
+                row,
+                "span",
+                humanize(claim.status)
+            );
+
+            status.className = "status-label";
+
+            row.prepend(info);
+            claimsList.appendChild(row);
+        });
+    }
+
+    function renderItems(items) {
+        itemsList.replaceChildren();
+
+        if (items.length === 0) {
+            addText(
+                itemsList,
+                "p",
+                "No found items have been recorded yet."
+            ).className = "empty-state";
+
+            return;
+        }
+
+        items.slice(0, 5).forEach(item => {
+            const row = document.createElement("article");
+            row.className = "data-row";
+
+            const info = document.createElement("div");
+
+            addText(
+                info,
+                "h3",
+                item.public_summary ||
+                "Found Item #" + item.id
+            );
+
+            addText(
+                info,
+                "p",
+                "Item #" + item.id +
+                " · " + humanize(item.location)
+            );
+
+            addText(
+                info,
+                "p",
+                "AI: " + humanize(item.ai_status)
+            );
+
+            const status = addText(
+                row,
+                "span",
+                humanize(item.status)
+            );
+
+            status.className = "status-label";
+
+            row.prepend(info);
+            itemsList.appendChild(row);
+        });
+    }
+
+    async function loadDashboard() {
+        refreshButton.disabled = true;
+        errorBox.hidden = true;
+        dashboardContent.hidden = true;
+        loadingBox.hidden = false;
+
+        try {
+            const [items, claims] = await Promise.all([
+                getJson("/api/admin/items"),
+                getJson(
+                    "/api/admin/claims?status=in_review"
+                )
+            ]);
+
+            if (
+                !Array.isArray(items) ||
+                !Array.isArray(claims)
+            ) {
+                throw new Error(
+                    "Unexpected dashboard response."
+                );
+            }
+
+            document.getElementById(
+                "total-items"
+            ).textContent = items.length;
+
+            document.getElementById(
+                "pending-ai"
+            ).textContent = items.filter(
+                item => item.ai_status === "pending"
+            ).length;
+
+            document.getElementById(
+                "pending-claims"
+            ).textContent = claims.length;
+
+            renderClaims(claims);
+            renderItems(items);
+
+            dashboardContent.hidden = false;
+
+        } catch (error) {
+            errorBox.textContent =
+                error.message ||
+                "Could not load dashboard.";
+
+            errorBox.hidden = false;
+
+        } finally {
+            loadingBox.hidden = true;
+            refreshButton.disabled = false;
+        }
+    }
+
+    refreshButton.addEventListener(
+        "click",
+        loadDashboard
+    );
+
+    loadDashboard();
+</script>
+{% endblock %}

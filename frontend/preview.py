@@ -20,21 +20,20 @@ templates = Environment(
 )
 
 PAGES = {
-    "/": "owner_home.html",
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
     "/owner/account": "owner_account.html",
     "/owner/report/new": "owner_report_step1.html",
     "/owner/report/details": "owner_report_step2.html",
-    "/login": "owner_login.html",
-    "/register": "owner_register.html",
     "/owner/report/view": "owner_report_detail.html",
-    "/found/new": "finder_deposit.html",
     "/owner/claim": "owner_claim.html",
     "/owner/claims": "owner_claims.html",
-    
-
-
+    "/found/new": "finder_deposit.html",
+    "/login": "owner_login.html",
+    "/register": "owner_register.html",
+    "/admin": "admin_dashboard.html",
+    "/admin/claims": "admin_claims.html",
+    "/admin/items": "admin_items.html",
 }
 
 
@@ -172,14 +171,14 @@ class PreviewHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
 
-        # Forward API requests to FastAPI.
+        # Forward backend API calls unchanged.
         if path.startswith("/api/"):
             self.proxy_api()
             return
 
-        # Redirect root to Owner Home.
+        # Root sends visitors to the login page.
         if path == "/":
-            self.redirect("/owner")
+            self.redirect("/login")
             return
 
         template_name = PAGES.get(path)
@@ -188,11 +187,15 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Page not built yet")
             return
 
-        # Public pages do not require authentication.
         user = None
 
-        # Protect Owner pages.
-        if path.startswith("/owner"):
+        # Owner and Admin pages require a real session.
+        protected_page = (
+            path.startswith("/owner")
+            or path.startswith("/admin")
+        )
+
+        if protected_page:
             try:
                 user = self.get_current_user()
 
@@ -213,8 +216,21 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 self.redirect("/login")
                 return
 
-            if user.get("role") != "owner":
-                self.send_error(403, "Owner access required")
+            # Admin-only routes.
+            if path.startswith("/admin"):
+                if user.get("role") != "admin":
+                    self.send_error(
+                        403,
+                        "Admin access required"
+                    )
+                    return
+
+            # Owner-only routes.
+            elif user.get("role") != "owner":
+                self.send_error(
+                    403,
+                    "Owner access required"
+                )
                 return
 
         # Real account information.
@@ -231,10 +247,11 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 "email": "",
             }
 
-        # Retrieve reports only on the My Reports page.
+        # Retrieve real reports for Owner Home
+        # and My Reports.
         reports = []
 
-        if path in ("/owner","/owner/reports"):
+        if path in ("/owner", "/owner/reports"):
             try:
                 reports = self.get_owner_reports()
 
@@ -251,16 +268,28 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 )
                 return
 
+        # Determine which navigation item is active.
+        if path == "/admin":
+            active_page = "admin"
+        elif path == "/admin/items":
+            active_page = "admin_items"
+        elif path == "/admin/claims":
+            active_page = "admin_claims"
+        elif path == "/owner/claims":
+            active_page = "claims"
+        elif path == "/owner/account":
+            active_page = "account"
+        elif path == "/owner/reports":
+            active_page = "reports"
+        else:
+            active_page = "home"
+
         # Render the requested HTML page.
         html = templates.get_template(
             template_name
         ).render(
             reports=reports,
-            active_page=(
-                "account" if path == "/owner/account"
-                else "reports" if path == "/owner/reports"
-                else "home"
-            ),
+            active_page=active_page,
             account=account,
         )
 
@@ -269,11 +298,15 @@ class PreviewHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header(
             "Content-Type",
-            "text/html; charset=utf-8",
+            "text/html; charset=utf-8"
+        )
+        self.send_header(
+            "Cache-Control",
+            "no-store"
         )
         self.send_header(
             "Content-Length",
-            str(len(body)),
+            str(len(body))
         )
         self.end_headers()
 
@@ -307,11 +340,20 @@ if __name__ == "__main__":
 
     print("PrivateFind frontend preview")
     print("Login: http://127.0.0.1:8001/login")
-    print("Register: http://127.0.0.1:8001/register")
-    print("Home: http://127.0.0.1:8001/owner")
-    print("Reports: http://127.0.0.1:8001/owner/reports")
-    print("Account: http://127.0.0.1:8001/owner/account")
-    print("API: http://127.0.0.1:8001/api/health")
+    print("Owner: http://127.0.0.1:8001/owner")
+    print("Admin: http://127.0.0.1:8001/admin")
+    print(
+        "Found Items: "
+        "http://127.0.0.1:8001/admin/items"
+    )
+    print(
+        "Claim Reviews: "
+        "http://127.0.0.1:8001/admin/claims"
+    )
+    print(
+        "Finder: "
+        "http://127.0.0.1:8001/found/new?locker=L1"
+    )
 
     try:
         server.serve_forever()
