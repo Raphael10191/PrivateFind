@@ -28,6 +28,13 @@ PAGES = {
     "/owner/report/details": "owner_report_step2.html",
     "/login": "owner_login.html",
     "/register": "owner_register.html",
+    "/owner/report/view": "owner_report_detail.html",
+    "/found/new": "finder_deposit.html",
+    "/owner/claim": "owner_claim.html",
+    "/owner/claims": "owner_claims.html",
+    
+
+
 }
 
 

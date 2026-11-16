@@ -1,0 +1,782 @@
+
+{% extends "base.html" %}
+
+{% block title %}Verify Ownership | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .claim-page {
+        max-width: 680px;
+        margin: 12px auto;
+    }
+
+    .claim-back {
+        display: inline-block;
+        color: #6D5BD0;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+
+    .claim-heading h1 {
+        margin: 0 0 10px;
+        font-size: 30px;
+    }
+
+    .claim-heading p {
+        color: #666670;
+        line-height: 1.6;
+        margin: 0 0 26px;
+    }
+
+    .claim-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .claim-card h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+    }
+
+    .claim-hint {
+        color: #666670;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .claim-field {
+        margin: 22px 0;
+    }
+
+    .claim-field label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 9px;
+    }
+
+    .claim-field select,
+    .claim-field textarea {
+        width: 100%;
+        padding: 13px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .claim-field textarea {
+        min-height: 90px;
+        resize: vertical;
+        margin-top: 10px;
+    }
+
+    .claim-field select:focus,
+    .claim-field textarea:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .evidence-entry {
+        padding: 16px;
+        border: 1px solid #ECECF0;
+        border-radius: 12px;
+        margin: 16px 0;
+    }
+
+    .add-button,
+    .remove-button,
+    .secondary-button {
+        padding: 11px 15px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .remove-button {
+        margin-top: 8px;
+        font-size: 13px;
+    }
+
+    .primary-button {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        background: #6D5BD0;
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 20px;
+    }
+
+    .primary-button:hover {
+        background: #5846B8;
+    }
+
+    button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .error-box {
+        padding: 14px;
+        border-radius: 10px;
+        background: #FFF1F1;
+        color: #A32727;
+        line-height: 1.5;
+        margin-bottom: 18px;
+    }
+
+    .result-box {
+        background: #EFEBFA;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 16px;
+    }
+
+    .result-box p {
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+    }
+
+    .pickup-code {
+        font-size: 30px;
+        letter-spacing: 4px;
+        font-weight: 700;
+        color: #6D5BD0;
+        overflow-wrap: anywhere;
+    }
+
+    .result-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .claim-heading h1 {
+            font-size: 25px;
+        }
+
+        .claim-card {
+            padding: 22px 18px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="claim-page">
+
+    <a id="back-link"
+       href="/owner/reports"
+       class="claim-back">
+        ← Back to Report Details
+    </a>
+
+    <div class="claim-heading">
+        <h1>Verify Your Ownership</h1>
+        <p>
+            Provide details that only the real owner
+            is likely to know. Your evidence is
+            submitted privately for verification.
+        </p>
+    </div>
+
+    <p id="claim-error"
+       class="error-box"
+       role="alert"
+       hidden></p>
+
+    <section id="claim-loading"
+             class="claim-card"
+             role="status">
+        Checking the selected item...
+    </section>
+
+    <form id="claim-form"
+          class="claim-card"
+          hidden>
+
+        <h2>Ownership Evidence</h2>
+
+        <p class="claim-hint">
+            Add at least one identifying detail.
+            You can provide up to eight.
+            Avoid sharing your full password,
+            PIN, or unnecessary personal information.
+        </p>
+
+        <div id="evidence-list"></div>
+
+        <button type="button"
+                id="add-evidence"
+                class="add-button">
+            + Add Another Detail
+        </button>
+
+        <button type="submit"
+                id="submit-claim"
+                class="primary-button">
+            Submit Ownership Claim
+        </button>
+    </form>
+
+    <section id="claim-result"
+             class="claim-card"
+             role="status"
+             hidden>
+
+        <h2 id="result-heading"></h2>
+
+        <p id="result-message"
+           class="claim-hint"></p>
+
+        <div id="pickup-details"
+             class="result-box"
+             hidden>
+
+            <h2>Locker Pickup</h2>
+
+            <p>
+                <strong>Pickup code</strong>
+            </p>
+
+            <div id="pickup-code"
+                 class="pickup-code"></div>
+
+            <p>
+                Compartment:
+                <strong id="pickup-compartment"></strong>
+            </p>
+
+            <p>
+                Expires:
+                <span id="pickup-expiry"></span>
+            </p>
+
+            <p class="claim-hint">
+                Enter the pickup code at the locker.
+                Collection is complete only after
+                the locker confirms pickup.
+            </p>
+        </div>
+
+        <div class="result-actions">
+            <button type="button"
+                    id="check-status"
+                    class="secondary-button"
+                    hidden>
+                Check Claim Status
+            </button>
+
+            <button type="button"
+                    id="request-pickup"
+                    class="secondary-button"
+                    hidden>
+                Get Pickup Code
+            </button>
+        </div>
+
+        <p id="result-error"
+           class="error-box"
+           role="alert"
+           hidden></p>
+    </section>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const params = new URLSearchParams(
+        window.location.search
+    );
+
+    const reportId = params.get("report_id");
+    const itemId = params.get("item_id");
+
+    const claimForm = document.getElementById(
+        "claim-form"
+    );
+
+    const evidenceList = document.getElementById(
+        "evidence-list"
+    );
+
+    const claimError = document.getElementById(
+        "claim-error"
+    );
+
+    const resultError = document.getElementById(
+        "result-error"
+    );
+
+    const loadingBox = document.getElementById(
+        "claim-loading"
+    );
+
+    const resultBox = document.getElementById(
+        "claim-result"
+    );
+
+    const submitButton = document.getElementById(
+        "submit-claim"
+    );
+
+    const statusButton = document.getElementById(
+        "check-status"
+    );
+
+    const pickupButton = document.getElementById(
+        "request-pickup"
+    );
+
+    const pickupDetails = document.getElementById(
+        "pickup-details"
+    );
+
+    const evidenceTypes = {
+        serial_suffix: "Last digits of a serial number",
+        model: "Exact model",
+        sticker_or_mark: "Unique sticker or mark",
+        damage: "Distinctive damage",
+        contents: "Contents of the item",
+        accessory: "Accessory",
+        engraving: "Engraving",
+        other: "Other identifying detail"
+    };
+
+    let claimId = null;
+    let submitting = false;
+    let claimCreated = false;
+
+    function validId(value) {
+        return /^[1-9]\d*$/.test(value || "");
+    }
+
+    function showError(message) {
+        claimError.textContent = message;
+        claimError.hidden = false;
+    }
+
+    async function api(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            ...options
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Please sign in again.");
+        }
+
+        if (!response.ok) {
+            let message = "Request failed.";
+
+            try {
+                const data = await response.json();
+
+                message = data.error?.message || message;
+            } catch {
+                // Keep default message.
+            }
+
+            throw new Error(message);
+        }
+
+        return response.json();
+    }
+
+    function addEvidence() {
+        if (evidenceList.children.length >= 8) {
+            return;
+        }
+
+        const entry = document.createElement("div");
+        entry.className = "evidence-entry";
+
+        const typeField = document.createElement("div");
+        typeField.className = "claim-field";
+
+        const typeLabel = document.createElement("label");
+        typeLabel.textContent = "Type of evidence";
+
+        const select = document.createElement("select");
+        select.required = true;
+
+        for (const [value, label] of
+            Object.entries(evidenceTypes)) {
+
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            select.appendChild(option);
+        }
+
+        const valueField = document.createElement("div");
+        valueField.className = "claim-field";
+
+        const valueLabel = document.createElement("label");
+        valueLabel.textContent = "Identifying detail";
+
+        const textarea = document.createElement("textarea");
+        textarea.required = true;
+        textarea.maxLength = 200;
+        textarea.placeholder =
+            "Describe what makes this item yours";
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "remove-button";
+        remove.textContent = "Remove detail";
+
+        remove.addEventListener("click", () => {
+            entry.remove();
+            updateEvidenceButtons();
+        });
+
+        typeField.append(typeLabel, select);
+        valueField.append(valueLabel, textarea);
+
+        entry.append(typeField, valueField, remove);
+        evidenceList.appendChild(entry);
+
+        updateEvidenceButtons();
+    }
+
+    function updateEvidenceButtons() {
+        document.getElementById(
+            "add-evidence"
+        ).disabled = evidenceList.children.length >= 8;
+
+        const removeButtons =
+            evidenceList.querySelectorAll(
+                ".remove-button"
+            );
+
+        removeButtons.forEach(button => {
+            button.disabled =
+                evidenceList.children.length <= 1;
+        });
+    }
+
+    function getEvidence() {
+        return Array.from(
+            evidenceList.querySelectorAll(
+                ".evidence-entry"
+            )
+        ).map(entry => ({
+            type: entry.querySelector("select").value,
+            value: entry.querySelector("textarea").value.trim()
+        }));
+    }
+
+    function showPickup(code, compartment, expiry) {
+        // Codes are strings. Never convert them to numbers.
+        document.getElementById(
+            "pickup-code"
+        ).textContent = String(code);
+
+        document.getElementById(
+            "pickup-compartment"
+        ).textContent = String(compartment);
+
+        document.getElementById(
+            "pickup-expiry"
+        ).textContent = String(expiry);
+
+        pickupDetails.hidden = false;
+        pickupButton.hidden = true;
+    }
+
+    function showClaimResult(claim) {
+        claimId = claim.id;
+        claimCreated = true;
+
+        claimForm.hidden = true;
+        loadingBox.hidden = true;
+        resultBox.hidden = false;
+        resultError.hidden = true;
+
+        pickupDetails.hidden = true;
+        statusButton.hidden = true;
+        pickupButton.hidden = true;
+
+        const heading = document.getElementById(
+            "result-heading"
+        );
+
+        const message = document.getElementById(
+            "result-message"
+        );
+
+        message.textContent = claim.message || "";
+
+        if (claim.status === "approved") {
+            heading.textContent = "Ownership Approved";
+
+            if (
+                claim.pickup_code != null &&
+                claim.compartment != null &&
+                claim.pickup_expires_at != null
+            ) {
+                showPickup(
+                    claim.pickup_code,
+                    claim.compartment,
+                    claim.pickup_expires_at
+                );
+            } else {
+                pickupButton.hidden = false;
+            }
+
+        } else if (claim.status === "in_review") {
+            heading.textContent =
+                "Claim Under Admin Review";
+
+            statusButton.hidden = false;
+
+        } else if (claim.status === "rejected") {
+            heading.textContent =
+                "Ownership Not Verified";
+
+        } else {
+            heading.textContent =
+                "Claim Status: " + claim.status;
+
+            statusButton.hidden = false;
+        }
+    }
+
+    async function validateCandidate() {
+        if (!validId(reportId) || !validId(itemId)) {
+            loadingBox.hidden = true;
+            showError("Invalid report or found-item link.");
+            return;
+        }
+
+        document.getElementById(
+            "back-link"
+        ).href = "/owner/report/view?id=" +
+                 encodeURIComponent(reportId);
+
+        try {
+            // The backend records candidates shown to the
+            // Owner. This request must precede a claim.
+            const candidates = await api(
+                "/api/lost-reports/" +
+                encodeURIComponent(reportId) +
+                "/candidates"
+            );
+
+            if (!Array.isArray(candidates)) {
+                throw new Error(
+                    "Unexpected matching response."
+                );
+            }
+
+            const selected = candidates.find(
+                candidate =>
+                    String(candidate.found_item_id) === itemId
+            );
+
+            loadingBox.hidden = true;
+
+            if (!selected) {
+                showError(
+                    "This item is no longer an available " +
+                    "match. Return to Report Details " +
+                    "and check for matches again."
+                );
+                return;
+            }
+
+            claimForm.hidden = false;
+            addEvidence();
+
+        } catch (error) {
+            loadingBox.hidden = true;
+            showError(
+                error.message ||
+                "Could not verify the selected match."
+            );
+        }
+    }
+
+    document.getElementById(
+        "add-evidence"
+    ).addEventListener("click", addEvidence);
+
+    claimForm.addEventListener(
+        "submit",
+        async (event) => {
+            event.preventDefault();
+
+            if (submitting || claimCreated) {
+                return;
+            }
+
+            claimError.hidden = true;
+
+            if (!claimForm.reportValidity()) {
+                return;
+            }
+
+            const evidence = getEvidence();
+
+            if (
+                evidence.length < 1 ||
+                evidence.length > 8 ||
+                evidence.some(item =>
+                    item.value.length < 1 ||
+                    item.value.length > 200
+                )
+            ) {
+                showError(
+                    "Provide between 1 and 8 valid " +
+                    "identifying details."
+                );
+                return;
+            }
+
+            submitting = true;
+            submitButton.disabled = true;
+            submitButton.textContent = "Submitting...";
+
+            try {
+                const claim = await api(
+                    "/api/claims",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+                        body: JSON.stringify({
+                            lost_report_id: Number(reportId),
+                            found_item_id: Number(itemId),
+                            evidence: evidence
+                        })
+                    }
+                );
+
+                if (
+                    !claim.id ||
+                    !["approved", "in_review", "rejected"]
+                        .includes(claim.status)
+                ) {
+                    throw new Error(
+                        "Claim response was unexpected. " +
+                        "Check your claim status " +
+                        "before trying again."
+                    );
+                }
+
+                showClaimResult(claim);
+
+            } catch (error) {
+                showError(
+                    error.message ||
+                    "Could not submit the claim."
+                );
+
+            } finally {
+                submitting = false;
+
+                if (!claimCreated) {
+                    submitButton.disabled = false;
+                    submitButton.textContent =
+                        "Submit Ownership Claim";
+                }
+            }
+        }
+    );
+
+    statusButton.addEventListener(
+        "click",
+        async () => {
+            if (!claimId) return;
+
+            statusButton.disabled = true;
+            resultError.hidden = true;
+
+            try {
+                const claim = await api(
+                    "/api/claims/" +
+                    encodeURIComponent(claimId)
+                );
+
+                showClaimResult(claim);
+
+            } catch (error) {
+                resultError.textContent = error.message;
+                resultError.hidden = false;
+
+            } finally {
+                statusButton.disabled = false;
+            }
+        }
+    );
+
+    pickupButton.addEventListener(
+        "click",
+        async () => {
+            if (!claimId) return;
+
+            pickupButton.disabled = true;
+            resultError.hidden = true;
+
+            try {
+                const result = await api(
+                    "/api/claims/" +
+                    encodeURIComponent(claimId) +
+                    "/pickup-code",
+                    { method: "POST" }
+                );
+
+                if (
+                    result.pickup_code == null ||
+                    result.compartment == null ||
+                    result.expires_at == null
+                ) {
+                    throw new Error(
+                        "Pickup information is incomplete."
+                    );
+                }
+
+                showPickup(
+                    result.pickup_code,
+                    result.compartment,
+                    result.expires_at
+                );
+
+            } catch (error) {
+                resultError.textContent = error.message;
+                resultError.hidden = false;
+
+            } finally {
+                pickupButton.disabled = false;
+            }
+        }
+    );
+
+    validateCandidate();
+</script>
+{% endblock %}

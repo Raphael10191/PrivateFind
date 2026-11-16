@@ -34,18 +34,86 @@
     }
 
     .primary-button:hover {
-        background: #5846bb;
+        background: #5846BB;
         color: white;
+    }
+
+    .reports-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
     }
 
     .reports-heading {
         font-size: 20px;
-        margin-bottom: 16px;
+        margin: 0;
+    }
+
+    .view-all {
+        color: #6D5BD0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .recent-report {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 14px;
+    }
+
+    .report-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+    }
+
+    .report-top h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .report-status {
+        padding: 7px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .status-open {
+        background: #EFEBFA;
+        color: #6D5BD0;
+    }
+
+    .status-finished {
+        background: #E8F4EC;
+        color: #3D6750;
+    }
+
+    .report-location {
+        color: #666670;
+        font-size: 14px;
+        margin: 12px 0 18px;
+    }
+
+    .report-bottom {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 16px;
+        border-top: 1px solid #ECECF0;
+        font-size: 13px;
+        color: #777780;
     }
 
     .empty-state {
         background: white;
-        border: 1px solid #ececf0;
+        border: 1px solid #ECECF0;
         border-radius: 18px;
         padding: 60px 24px;
         text-align: center;
@@ -63,7 +131,7 @@
         font-size: 28px;
     }
 
-    .empty-state h2 {
+    .empty-state h3 {
         font-size: 22px;
         margin: 0 0 12px;
     }
@@ -89,8 +157,16 @@
             width: 100%;
         }
 
-        .empty-state {
-            padding: 44px 20px;
+        .recent-report {
+            padding: 18px;
+        }
+
+        .report-top {
+            align-items: flex-start;
+        }
+
+        .report-bottom {
+            flex-wrap: wrap;
         }
     }
 </style>
@@ -101,34 +177,118 @@
 <section class="home-header">
     <div>
         <h1>Welcome to PrivateFind</h1>
-        <p>Manage your lost-item reports in one place.</p>
+        <p>
+            Manage your lost-item reports in one place.
+        </p>
     </div>
 
-    <a href="/owner/report/new" class="primary-button">
+    <a href="/owner/report/new"
+       class="primary-button">
         + Report a Lost Item
     </a>
 </section>
 
 <section aria-labelledby="reports-heading">
-    <h2 id="reports-heading" class="reports-heading">
-        Your Recent Reports
-    </h2>
+
+    <div class="reports-header">
+        <h2 id="reports-heading"
+            class="reports-heading">
+            Your Recent Reports
+        </h2>
+
+        {% if reports %}
+            <a href="/owner/reports" class="view-all">
+                View all reports
+            </a>
+        {% endif %}
+    </div>
 
     {% if reports %}
-        <!-- Reports will be rendered here after
-             the frontend receives API data. -->
-        <p>Your reports will appear here.</p>
-    {% else %}
-        <div class="empty-state">
-            <div class="empty-icon" aria-hidden="true">📋</div>
 
-            <h2>No reports yet</h2>
+        {% for report in reports[:3] %}
+
+            {% set is_finished =
+                report.status in ['resolved', 'closed']
+            %}
+
+            <article class="recent-report">
+
+                <div class="report-top">
+                    <h3>
+                        {% if report.brand %}
+                            {{ report.brand }}
+
+                            {% if report.model %}
+                                {{ report.model }}
+                            {% else %}
+                                {{ report.category
+                                   | replace('_', ' ')
+                                   | title }}
+                            {% endif %}
+
+                        {% else %}
+
+                            {% if report.color %}
+                                {{ report.color | title }}
+                            {% endif %}
+
+                            {{ report.category
+                               | replace('_', ' ')
+                               | title }}
+
+                        {% endif %}
+                    </h3>
+
+                    {% if is_finished %}
+                        <span class="report-status status-finished">
+                            {{ report.status | title }}
+                        </span>
+                    {% else %}
+                        <span class="report-status status-open">
+                            Searching
+                        </span>
+                    {% endif %}
+                </div>
+
+                <p class="report-location">
+                    Lost at
+                    {{ report.location
+                       | replace('_', ' ')
+                       | title }}
+                </p>
+
+                <div class="report-bottom">
+                    <span>
+                        Lost date:
+                        {{ report.lost_at[:10] }}
+                    </span>
+
+                    <span>
+                        Report #{{ report.id }}
+                    </span>
+                </div>
+
+            </article>
+
+        {% endfor %}
+
+    {% else %}
+
+        <div class="empty-state">
+            <div class="empty-icon"
+                 aria-hidden="true">
+                📋
+            </div>
+
+            <h3>No reports yet</h3>
 
             <p>
                 You haven't reported any lost items yet.
             </p>
         </div>
+
     {% endif %}
+
 </section>
 
 {% endblock %}

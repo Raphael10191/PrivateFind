@@ -24,11 +24,13 @@
     }
 
     .new-report {
+        display: inline-block;
         background: #6D5BD0;
         color: white;
         padding: 13px 20px;
         border-radius: 10px;
         font-weight: 600;
+        text-align: center;
         white-space: nowrap;
     }
 
@@ -83,6 +85,7 @@
     .report-top h2 {
         font-size: 19px;
         margin: 0;
+        overflow-wrap: anywhere;
     }
 
     .status {
@@ -123,9 +126,15 @@
         font-size: 13px;
     }
 
-    .report-id {
-        color: #777780;
-        font-size: 13px;
+    .view-details {
+        color: #6D5BD0;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .view-details:hover {
+        text-decoration: underline;
     }
 
     .empty-message {
@@ -147,10 +156,6 @@
             font-size: 26px;
         }
 
-        .new-report {
-            text-align: center;
-        }
-
         .filters {
             overflow-x: auto;
         }
@@ -161,6 +166,10 @@
 
         .report-top {
             align-items: flex-start;
+        }
+
+        .report-bottom {
+            flex-wrap: wrap;
         }
     }
 </style>
@@ -214,52 +223,62 @@
 
     {% for report in reports %}
 
-    {% set is_completed = report.status in ['resolved', 'closed'] %}
+        {% set is_completed = report.status in ['resolved', 'closed'] %}
 
-    <article
-        class="report-card"
-        data-status="{{ 'completed' if is_completed else 'active' }}"
-    >
-        <div class="report-top">
-            <h2>
-                {% if report.brand %}
-                    {{ report.brand }}
-                    {{ report.model or report.category | replace('_', ' ') | title }}
-                {% else %}
-                    {% if report.color %}
-                        {{ report.color | title }}
+        <article
+            class="report-card"
+            data-status="{{ 'completed' if is_completed else 'active' }}"
+        >
+
+            <div class="report-top">
+                <h2>
+                    {% if report.brand %}
+                        {{ report.brand }}
+
+                        {% if report.model %}
+                            {{ report.model }}
+                        {% else %}
+                            {{ report.category | replace('_', ' ') | title }}
+                        {% endif %}
+
+                    {% else %}
+                        {% if report.color %}
+                            {{ report.color | title }}
+                        {% endif %}
+
+                        {{ report.category | replace('_', ' ') | title }}
                     {% endif %}
-                    {{ report.category | replace('_', ' ') | title }}
+                </h2>
+
+                {% if is_completed %}
+                    <span class="status completed">
+                        {{ report.status | title }}
+                    </span>
+                {% else %}
+                    <span class="status searching">
+                        Searching
+                    </span>
                 {% endif %}
-            </h2>
+            </div>
 
-            {% if is_completed %}
-                <span class="status completed">
-                    {{ report.status | title }}
+            <p class="report-location">
+                Lost at
+                {{ report.location | replace('_', ' ') | title }}
+            </p>
+
+            <div class="report-bottom">
+                <span class="report-date">
+                    Lost date: {{ report.lost_at[:10] }}
                 </span>
-            {% else %}
-                <span class="status searching">
-                    Searching
-                </span>
-            {% endif %}
-        </div>
 
-        <p class="report-location">
-            Lost at
-            {{ report.location | replace('_', ' ') | title }}
-        </p>
+                <a href="/owner/report/view?id={{ report.id }}"
+                   class="view-details"
+                   aria-label="View report {{ report.id }} details">
+                    View details · #{{ report.id }}
+                </a>
+            </div>
 
-        <div class="report-bottom">
-            <span class="report-date">
-                Lost date:
-                {{ report.lost_at[:10] }}
-            </span>
-
-            <span class="report-id">
-                Report #{{ report.id }}
-            </span>
-        </div>
-    </article>
+        </article>
 
     {% endfor %}
 
@@ -268,11 +287,13 @@
 <div id="filter-empty"
      class="empty-message"
      {% if reports %}hidden{% endif %}>
+
     {% if reports %}
         No reports in this category.
     {% else %}
         No reports yet. Create your first lost-item report.
     {% endif %}
+
 </div>
 
 {% endblock %}
@@ -302,7 +323,10 @@
                 const isActive = item === button;
 
                 item.classList.toggle("active", isActive);
-                item.setAttribute("aria-pressed", isActive);
+                item.setAttribute(
+                    "aria-pressed",
+                    String(isActive)
+                );
             });
 
             reportCards.forEach(card => {
@@ -319,13 +343,9 @@
 
             emptyMessage.hidden = visibleCount !== 0;
 
-            if (!hasReports) {
-                emptyMessage.textContent =
-                    "No reports yet. Create your first lost-item report.";
-            } else {
-                emptyMessage.textContent =
-                    "No reports in this category.";
-            }
+            emptyMessage.textContent = hasReports
+                ? "No reports in this category."
+                : "No reports yet. Create your first lost-item report.";
         });
     });
 </script>

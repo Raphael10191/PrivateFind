@@ -1,0 +1,492 @@
+
+{% extends "base.html" %}
+
+{% block title %}My Claims | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .claims-page {
+        max-width: 760px;
+        margin: 12px auto;
+    }
+
+    .claims-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 26px;
+    }
+
+    .claims-heading h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .claims-heading p {
+        color: #666670;
+        margin: 0;
+    }
+
+    .secondary-button {
+        border: 1px solid #DCDCE4;
+        background: white;
+        color: #1A1A1F;
+        border-radius: 10px;
+        padding: 11px 15px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .secondary-button:hover {
+        border-color: #6D5BD0;
+        color: #6D5BD0;
+    }
+
+    button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .claim-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 16px;
+    }
+
+    .claim-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .claim-card h2 {
+        font-size: 19px;
+        margin: 0;
+    }
+
+    .claim-meta {
+        color: #666670;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .claim-status {
+        border-radius: 20px;
+        padding: 7px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        white-space: nowrap;
+    }
+
+    .claim-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+    }
+
+    .report-link {
+        display: inline-flex;
+        align-items: center;
+        color: #6D5BD0;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .claim-message {
+        margin-top: 16px;
+        line-height: 1.6;
+        color: #666670;
+    }
+
+    .pickup-panel {
+        margin-top: 16px;
+        padding: 18px;
+        border-radius: 12px;
+        background: #EFEBFA;
+    }
+
+    .pickup-code {
+        display: block;
+        margin: 14px 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 4px;
+        color: #6D5BD0;
+        overflow-wrap: anywhere;
+    }
+
+    .feedback {
+        padding: 18px;
+        border-radius: 12px;
+        background: white;
+        border: 1px solid #ECECF0;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .feedback.error {
+        background: #FFF1F1;
+        color: #A32727;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .claims-heading {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .claims-heading h1 {
+            font-size: 26px;
+        }
+
+        .claim-card {
+            padding: 18px;
+        }
+
+        .claim-card-header {
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="claims-page">
+    <header class="claims-heading">
+        <div>
+            <h1>My Claims</h1>
+            <p>Track your ownership verification requests.</p>
+        </div>
+
+        <button id="refresh-claims"
+                class="secondary-button"
+                type="button">
+            Refresh
+        </button>
+    </header>
+
+    <div id="claims-feedback"
+         class="feedback"
+         role="status">
+        Loading your claims...
+    </div>
+
+    <div id="claims-list" hidden></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const claimsList = document.getElementById(
+        "claims-list"
+    );
+
+    const feedback = document.getElementById(
+        "claims-feedback"
+    );
+
+    const refreshButton = document.getElementById(
+        "refresh-claims"
+    );
+
+    function setFeedback(message, isError = false) {
+        feedback.textContent = message;
+        feedback.classList.toggle("error", isError);
+        feedback.hidden = false;
+    }
+
+    function statusLabel(status) {
+        const labels = {
+            approved: "Approved",
+            in_review: "Under Review",
+            rejected: "Rejected",
+            pending: "Pending"
+        };
+
+        return labels[status] || "Unknown Status";
+    }
+
+    async function api(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            ...options
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Please sign in again.");
+        }
+
+        if (!response.ok) {
+            let message = "Unable to complete the request.";
+
+            try {
+                const data = await response.json();
+                message = data.error?.message || message;
+            } catch {
+                // Keep the default error.
+            }
+
+            throw new Error(message);
+        }
+
+        return response.json();
+    }
+
+    function paragraph(text, className = "") {
+        const element = document.createElement("p");
+        element.textContent = text;
+        element.className = className;
+        return element;
+    }
+
+    function actionButton(text, callback) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary-button";
+        button.textContent = text;
+
+        button.addEventListener("click", async () => {
+            if (button.disabled) return;
+
+            button.disabled = true;
+
+            try {
+                await callback();
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        return button;
+    }
+
+    function renderClaim(claim) {
+        const card = document.createElement("article");
+        card.className = "claim-card";
+
+        const header = document.createElement("div");
+        header.className = "claim-card-header";
+
+        const title = document.createElement("h2");
+        title.textContent = "Claim #" + claim.id;
+
+        const status = document.createElement("span");
+        status.className = "claim-status";
+        status.textContent = statusLabel(claim.status);
+
+        header.append(title, status);
+        card.appendChild(header);
+
+        card.appendChild(paragraph(
+            "Lost report #" + claim.lost_report_id +
+            " · Found item #" + claim.found_item_id,
+            "claim-meta"
+        ));
+
+        const message = paragraph(
+            claim.message || "",
+            "claim-message"
+        );
+
+        card.appendChild(message);
+
+        const actions = document.createElement("div");
+        actions.className = "claim-actions";
+
+        const reportLink = document.createElement("a");
+        reportLink.className = "report-link";
+        reportLink.href =
+            "/owner/report/view?id=" +
+            encodeURIComponent(claim.lost_report_id);
+
+        reportLink.textContent = "View Lost Report";
+        actions.appendChild(reportLink);
+
+        const pickupPanel = document.createElement("div");
+        pickupPanel.className = "pickup-panel";
+        pickupPanel.hidden = true;
+
+        const errorMessage = paragraph("");
+        errorMessage.className = "claim-message";
+        errorMessage.setAttribute("role", "alert");
+        errorMessage.hidden = true;
+
+        function showStatus(updated) {
+            status.textContent = statusLabel(updated.status);
+            message.textContent = updated.message || "";
+
+            while (actions.children.length > 1) {
+                actions.lastElementChild.remove();
+            }
+
+            pickupPanel.hidden = true;
+            pickupPanel.replaceChildren();
+            errorMessage.hidden = true;
+
+            if (
+                updated.status === "in_review" ||
+                updated.status === "pending"
+            ) {
+                actions.appendChild(
+                    actionButton("Check Status", async () => {
+                        try {
+                            const latest = await api(
+                                "/api/claims/" +
+                                encodeURIComponent(updated.id)
+                            );
+
+                            showStatus(latest);
+                        } catch (error) {
+                            errorMessage.textContent =
+                                error.message;
+                            errorMessage.hidden = false;
+                        }
+                    })
+                );
+            }
+
+            if (updated.status === "approved") {
+                actions.appendChild(
+                    actionButton(
+                        "Get Pickup Code",
+                        async () => {
+                            errorMessage.hidden = true;
+
+                            try {
+                                const result = await api(
+                                    "/api/claims/" +
+                                    encodeURIComponent(updated.id) +
+                                    "/pickup-code",
+                                    { method: "POST" }
+                                );
+
+                                if (
+                                    result.pickup_code == null ||
+                                    result.compartment == null ||
+                                    result.expires_at == null
+                                ) {
+                                    throw new Error(
+                                        "Pickup information is incomplete."
+                                    );
+                                }
+
+                                pickupPanel.replaceChildren();
+
+                                const heading =
+                                    document.createElement("strong");
+
+                                heading.textContent =
+                                    "Locker Pickup Instructions";
+
+                                const code =
+                                    document.createElement("span");
+
+                                code.className = "pickup-code";
+                                code.textContent =
+                                    String(result.pickup_code);
+
+                                pickupPanel.append(
+                                    heading,
+                                    code,
+                                    paragraph(
+                                        "Compartment: " +
+                                        result.compartment
+                                    ),
+                                    paragraph(
+                                        "Expires: " +
+                                        result.expires_at
+                                    ),
+                                    paragraph(
+                                        "Enter this code at the locker. " +
+                                        "Collection is complete only " +
+                                        "after the locker confirms pickup."
+                                    )
+                                );
+
+                                pickupPanel.hidden = false;
+
+                            } catch (error) {
+                                errorMessage.textContent =
+                                    error.message;
+                                errorMessage.hidden = false;
+                            }
+                        }
+                    )
+                );
+            }
+        }
+
+        card.append(actions, errorMessage, pickupPanel);
+        showStatus(claim);
+
+        return card;
+    }
+
+    async function loadClaims() {
+        refreshButton.disabled = true;
+        claimsList.hidden = true;
+        setFeedback("Loading your claims...");
+
+        try {
+            const claims = await api("/api/claims");
+
+            if (!Array.isArray(claims)) {
+                throw new Error(
+                    "Unexpected claims response."
+                );
+            }
+
+            claimsList.replaceChildren();
+
+            if (claims.length === 0) {
+                setFeedback(
+                    "No ownership claims yet. " +
+                    "Claims will appear here after you " +
+                    "select a possible match and " +
+                    "submit ownership evidence."
+                );
+                return;
+            }
+
+            claims.forEach(claim => {
+                claimsList.appendChild(
+                    renderClaim(claim)
+                );
+            });
+
+            feedback.hidden = true;
+            claimsList.hidden = false;
+
+        } catch (error) {
+            setFeedback(
+                error.message || "Could not load claims.",
+                true
+            );
+        } finally {
+            refreshButton.disabled = false;
+        }
+    }
+
+    refreshButton.addEventListener(
+        "click",
+        loadClaims
+    );
+
+    loadClaims();
+</script>
+{% endblock %}
+

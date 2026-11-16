@@ -71,6 +71,7 @@
         margin: 8px 0 24px;
     }
 
+    .account-link,
     .account-signout-button {
         display: block;
         width: 100%;
@@ -85,9 +86,20 @@
         cursor: pointer;
     }
 
+    .account-link {
+        margin-bottom: 12px;
+    }
+
+    .account-link:hover,
     .account-signout-button:hover {
         background: #EFEBFA;
         color: #6D5BD0;
+    }
+
+    .account-link:focus-visible,
+    .account-signout-button:focus-visible {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 2px;
     }
 
     .account-signout-button:disabled {
@@ -139,11 +151,14 @@
 
         <hr class="account-divider">
 
+        <a href="/owner/claims" class="account-link">
+            My Claims
+        </a>
+
         <button
             type="button"
             class="account-signout-button"
-            data-signout
-        >
+            data-signout>
             Sign out
         </button>
     </div>

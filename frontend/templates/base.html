@@ -87,8 +87,8 @@
             position: absolute;
             top: 46px;
             right: 0;
-            min-width: 150px;
-            padding: 14px;
+            min-width: 170px;
+            padding: 10px;
             background: white;
             border: 1px solid #e8e8e8;
             border-radius: 10px;
@@ -96,25 +96,33 @@
             z-index: 10;
         }
 
-        .profile-options a {
-            display: block;
-            padding: 9px;
-        }
-
+        .profile-options a,
         .signout-button {
             display: block;
             width: 100%;
-            padding: 9px;
+            padding: 11px;
+            border-radius: 7px;
+            font-size: 14px;
+        }
+
+        .profile-options a:hover,
+        .signout-button:hover {
+            background: var(--purple-light);
+            color: var(--purple);
+        }
+
+        .signout-button {
             border: 0;
             background: transparent;
             color: inherit;
             text-align: left;
-            font: inherit;
+            font-family: inherit;
             cursor: pointer;
         }
 
-        .signout-button:hover {
+        .profile-options .current-link {
             color: var(--purple);
+            font-weight: 600;
         }
 
         /* Page content */
@@ -201,12 +209,12 @@
         <nav class="navigation"
              aria-label="Main navigation">
 
-            <!-- Shown before login -->
+            <!-- Guest navigation -->
             <a href="/login" class="guest-only">
                 Sign In
             </a>
 
-            <!-- Shown after Owner login -->
+            <!-- Owner navigation -->
             <a href="/owner"
                class="auth-required
                {% if active_page == 'home' %}
@@ -229,14 +237,28 @@
                 My Reports
             </a>
 
+            <!-- Account menu -->
             <details class="profile-menu auth-required">
                 <summary aria-label="Account menu">
                     👤
                 </summary>
 
                 <div class="profile-options">
-                    <a href="/owner/account">
+
+                    <a href="/owner/account"
+                       {% if active_page == 'account' %}
+                           class="current-link"
+                           aria-current="page"
+                       {% endif %}>
                         My Account
+                    </a>
+
+                    <a href="/owner/claims"
+                       {% if active_page == 'claims' %}
+                           class="current-link"
+                           aria-current="page"
+                       {% endif %}>
+                        My Claims
                     </a>
 
                     <button
@@ -245,6 +267,7 @@
                         data-signout>
                         Sign out
                     </button>
+
                 </div>
             </details>
 
@@ -256,7 +279,6 @@
     </main>
 
     <!-- Mobile Owner navigation -->
-
     <nav class="mobile-navigation auth-required"
          aria-label="Mobile owner navigation">
 
@@ -275,7 +297,8 @@
         </a>
 
         <a href="/owner/account"
-           {% if active_page == 'account' %}
+           {% if active_page == 'account'
+              or active_page == 'claims' %}
                aria-current="page"
            {% endif %}>
             Account
@@ -283,8 +306,7 @@
 
     </nav>
 
-    <!-- Authentication check -->
-
+    <!-- Authentication and sign out -->
     <script>
         document.addEventListener(
             "DOMContentLoaded",
@@ -320,10 +342,14 @@
                         document.body.classList.add(
                             "auth-owner"
                         );
-                    } else if (user && user.role === "admin") {
+
+                    } else if (
+                        user && user.role === "admin"
+                    ) {
                         document.body.classList.add(
                             "auth-admin"
                         );
+
                     } else {
                         document.body.classList.add(
                             "auth-guest"
@@ -331,7 +357,6 @@
                     }
                 }
 
-                // Sign out using the real backend API.
                 document.querySelectorAll(
                     "[data-signout]"
                 ).forEach(button => {
@@ -357,13 +382,19 @@
                                     );
                                 }
 
+                                // Remove unfinished private report drafts.
+                                sessionStorage.removeItem(
+                                    "privatefind_lost_report_draft"
+                                );
+
                                 window.location.replace(
                                     "/login"
                                 );
 
                             } catch (error) {
                                 alert(
-                                    "Could not sign out. Please try again."
+                                    "Could not sign out. " +
+                                    "Please try again."
                                 );
 
                                 button.disabled = false;

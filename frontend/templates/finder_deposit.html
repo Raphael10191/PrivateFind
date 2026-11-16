@@ -1,0 +1,697 @@
+
+{% extends "base.html" %}
+
+{% block title %}Deposit a Found Item | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .finder-page {
+        max-width: 680px;
+        margin: 12px auto;
+    }
+
+    .finder-heading {
+        margin-bottom: 26px;
+    }
+
+    .finder-heading h1 {
+        font-size: 30px;
+        margin: 0 0 10px;
+    }
+
+    .finder-heading p {
+        color: #666670;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    .finder-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .locker-info {
+        background: #EFEBFA;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 26px;
+    }
+
+    .locker-info strong {
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    .locker-info p {
+        margin: 0;
+        color: #666670;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .finder-field {
+        margin-bottom: 24px;
+    }
+
+    .finder-field label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 9px;
+    }
+
+    .finder-field input,
+    .finder-field select,
+    .finder-field textarea {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .finder-field input[type="file"] {
+        padding: 12px;
+    }
+
+    .finder-field textarea {
+        min-height: 105px;
+        resize: vertical;
+    }
+
+    .finder-field input:focus,
+    .finder-field select:focus,
+    .finder-field textarea:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .field-hint {
+        color: #666670;
+        font-size: 12px;
+        line-height: 1.5;
+        margin: 7px 0 0;
+    }
+
+    .submit-button {
+        display: block;
+        width: 100%;
+        padding: 14px 20px;
+        border: 0;
+        border-radius: 10px;
+        background: #6D5BD0;
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .submit-button:hover {
+        background: #5846B8;
+    }
+
+    .submit-button:disabled {
+        opacity: 0.65;
+        cursor: wait;
+    }
+
+    .finder-error {
+        margin: 0 0 20px;
+        padding: 14px;
+        border-radius: 10px;
+        background: #FFF1F1;
+        color: #A32727;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .success-heading {
+        font-size: 23px;
+        margin: 0 0 12px;
+    }
+
+    .success-description {
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .deposit-code {
+        background: #EFEBFA;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        margin: 24px 0;
+    }
+
+    .deposit-code span {
+        display: block;
+        color: #666670;
+        font-size: 13px;
+        margin-bottom: 10px;
+    }
+
+    .deposit-code strong {
+        display: block;
+        font-size: 34px;
+        color: #6D5BD0;
+        letter-spacing: 5px;
+        overflow-wrap: anywhere;
+    }
+
+    .deposit-detail {
+        padding: 14px 0;
+        border-bottom: 1px solid #ECECF0;
+        line-height: 1.5;
+    }
+
+    .deposit-detail strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .instructions {
+        margin-top: 24px;
+        padding: 18px;
+        background: #FAFAF8;
+        border: 1px solid #ECECF0;
+        border-radius: 12px;
+        line-height: 1.7;
+    }
+
+    .instructions h3 {
+        margin: 0 0 12px;
+        font-size: 17px;
+    }
+
+    .instructions ol {
+        margin: 0;
+        padding-left: 22px;
+    }
+
+    .instructions li {
+        margin-bottom: 8px;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .finder-heading h1 {
+            font-size: 25px;
+        }
+
+        .finder-card {
+            padding: 22px 18px;
+        }
+
+        .deposit-code strong {
+            font-size: 28px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="finder-page">
+
+    <div class="finder-heading">
+        <h1>Deposit a Found Item</h1>
+        <p>
+            Found something on campus?
+            Help return it to its owner.
+            No account is required.
+        </p>
+    </div>
+
+    <div id="loading-locker"
+         class="finder-card"
+         role="status">
+        Checking locker availability...
+    </div>
+
+    <p id="finder-error"
+       class="finder-error"
+       role="alert"
+       hidden></p>
+
+    <form id="deposit-form"
+          class="finder-card"
+          hidden>
+
+        <div class="locker-info">
+            <strong id="locker-name"></strong>
+            <p id="locker-availability"></p>
+        </div>
+
+        <div class="finder-field">
+            <label for="location">
+                Where was the item found? *
+            </label>
+
+            <select
+                id="location"
+                name="location"
+                required>
+                <option value="">
+                    Select a location
+                </option>
+            </select>
+
+            <p class="field-hint">
+                Choose the campus area where
+                you found the item.
+            </p>
+        </div>
+
+        <div class="finder-field">
+            <label for="photos">
+                Item photos *
+            </label>
+
+            <input
+                type="file"
+                id="photos"
+                name="photos"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                multiple
+                required
+            >
+
+            <p class="field-hint">
+                Upload 1–3 clear photos.
+                JPEG, PNG, or WebP only.
+                Maximum 5 MB per photo.
+            </p>
+        </div>
+
+        <div class="finder-field">
+            <label for="note">
+                Additional note (optional)
+            </label>
+
+            <textarea
+                id="note"
+                name="note"
+                maxlength="500"
+                placeholder="e.g., Found near the library entrance"
+            ></textarea>
+
+            <p class="field-hint">
+                Describe where you found the item
+                or anything useful for identification.
+            </p>
+        </div>
+
+        <button
+            type="submit"
+            class="submit-button"
+            id="deposit-button">
+            Continue to Locker Instructions
+        </button>
+    </form>
+
+    <section id="deposit-success"
+             class="finder-card"
+             role="status"
+             hidden>
+
+        <h2 class="success-heading">
+            Your Deposit Code Is Ready
+        </h2>
+
+        <p class="success-description">
+            Your deposit request was accepted.
+            Follow the instructions below to
+            place the item in the locker.
+        </p>
+
+        <div class="deposit-code">
+            <span>Your deposit code</span>
+            <strong id="result-code"></strong>
+        </div>
+
+        <div class="deposit-detail">
+            <strong>Assigned compartment</strong>
+            <span id="result-compartment"></span>
+        </div>
+
+        <div class="deposit-detail">
+            <strong>Code expires</strong>
+            <span id="result-expiry"></span>
+        </div>
+
+        <div class="instructions">
+            <h3>How to finish your deposit</h3>
+
+            <ol>
+                <li>
+                    Go to the smart locker.
+                </li>
+                <li>
+                    Enter your deposit code
+                    on the locker.
+                </li>
+                <li>
+                    Place the found item inside
+                    the assigned compartment.
+                </li>
+                <li>
+                    Close the compartment and
+                    press # on the locker.
+                </li>
+            </ol>
+        </div>
+
+        <p class="field-hint">
+            Your item is not confirmed as stored
+            until the locker completes the
+            physical deposit process.
+        </p>
+    </section>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const params = new URLSearchParams(
+        window.location.search
+    );
+
+    const lockerCode = params.get("locker");
+
+    const form = document.getElementById(
+        "deposit-form"
+    );
+
+    const loadingBox = document.getElementById(
+        "loading-locker"
+    );
+
+    const errorBox = document.getElementById(
+        "finder-error"
+    );
+
+    const successBox = document.getElementById(
+        "deposit-success"
+    );
+
+    const depositButton = document.getElementById(
+        "deposit-button"
+    );
+
+    let submitting = false;
+    let submitted = false;
+
+    function humanize(value) {
+        return String(value || "")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, letter =>
+                letter.toUpperCase()
+            );
+    }
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+    }
+
+    async function getApiError(response) {
+        let message =
+            "The request could not be completed.";
+
+        try {
+            const data = await response.json();
+
+            message =
+                data.error?.message || message;
+        } catch {
+            // Keep the default message.
+        }
+
+        return message;
+    }
+
+    async function loadLocker() {
+        if (
+            !lockerCode ||
+            !/^[A-Za-z0-9_-]{1,20}$/.test(lockerCode)
+        ) {
+            loadingBox.hidden = true;
+            showError(
+                "Invalid or missing locker code. " +
+                "Please scan the locker QR code again."
+            );
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                "/api/lockers/" +
+                encodeURIComponent(lockerCode),
+                {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    await getApiError(response)
+                );
+            }
+
+            const locker = await response.json();
+
+            document.getElementById(
+                "locker-name"
+            ).textContent =
+                locker.name ||
+                "Locker " + lockerCode;
+
+            document.getElementById(
+                "locker-availability"
+            ).textContent =
+                locker.free_compartments +
+                " compartment(s) available";
+
+            const locationSelect =
+                form.elements.location;
+
+            for (const location of locker.locations || []) {
+                const option =
+                    document.createElement("option");
+
+                option.value = location;
+                option.textContent = humanize(location);
+
+                locationSelect.appendChild(option);
+            }
+
+            loadingBox.hidden = true;
+
+            if (locker.free_compartments <= 0) {
+                showError(
+                    "This locker is currently full. " +
+                    "Please use another available locker."
+                );
+                form.hidden = true;
+                return;
+            }
+
+            if (
+                !Array.isArray(locker.locations) ||
+                locker.locations.length === 0
+            ) {
+                showError(
+                    "Campus locations are unavailable. " +
+                    "Please try again later."
+                );
+                return;
+            }
+
+            form.hidden = false;
+
+        } catch (error) {
+            loadingBox.hidden = true;
+            showError(
+                error.message ||
+                "Could not connect to the locker."
+            );
+        }
+    }
+
+    function validatePhotos(files) {
+        if (files.length < 1 || files.length > 3) {
+            throw new Error(
+                "Please select between 1 and 3 photos."
+            );
+        }
+
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        ];
+
+        const maxFileSize = 5 * 1024 * 1024;
+
+        for (const file of files) {
+            if (!allowedTypes.includes(file.type)) {
+                throw new Error(
+                    "Only JPEG, PNG, and WebP " +
+                    "photos are supported."
+                );
+            }
+
+            if (file.size > maxFileSize) {
+                throw new Error(
+                    "Each photo must be 5 MB or smaller."
+                );
+            }
+        }
+    }
+
+    form.addEventListener(
+        "submit",
+        async (event) => {
+            event.preventDefault();
+
+            if (submitting || submitted) {
+                return;
+            }
+
+            errorBox.hidden = true;
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            const files =
+                Array.from(form.elements.photos.files);
+
+            try {
+                validatePhotos(files);
+            } catch (error) {
+                showError(error.message);
+                return;
+            }
+
+            const data = new FormData();
+
+            data.append(
+                "locker_code",
+                lockerCode
+            );
+
+            data.append(
+                "location",
+                form.elements.location.value
+            );
+
+            data.append(
+                "note",
+                form.elements.note.value.trim()
+            );
+
+            for (const file of files) {
+                data.append("photos", file);
+            }
+
+            submitting = true;
+            depositButton.disabled = true;
+            depositButton.textContent = "Submitting...";
+
+            try {
+                const response = await fetch(
+                    "/api/deposits",
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        body: data
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        await getApiError(response)
+                    );
+                }
+
+                if (response.status !== 201) {
+                    throw new Error(
+                        "Unexpected server response. " +
+                        "Check the locker before trying again."
+                    );
+                }
+
+                const result = await response.json();
+
+                if (
+                    !result.deposit_code ||
+                    result.compartment == null ||
+                    !result.expires_at
+                ) {
+                    throw new Error(
+                        "Deposit request was accepted, " +
+                        "but the instructions are incomplete. " +
+                        "Do not submit again automatically."
+                    );
+                }
+
+                submitted = true;
+
+                document.getElementById(
+                    "result-code"
+                ).textContent =
+                    String(result.deposit_code);
+
+                document.getElementById(
+                    "result-compartment"
+                ).textContent =
+                    String(result.compartment);
+
+                // Keep the backend's timestamp text.
+                // Do not assume an unspecified timezone.
+                document.getElementById(
+                    "result-expiry"
+                ).textContent =
+                    String(result.expires_at);
+
+                form.hidden = true;
+                successBox.hidden = false;
+
+                successBox.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start"
+                });
+
+            } catch (error) {
+                showError(
+                    error.message ||
+                    "The request failed. Please check " +
+                    "before submitting again."
+                );
+
+            } finally {
+                submitting = false;
+
+                if (!submitted) {
+                    depositButton.disabled = false;
+                    depositButton.textContent =
+                        "Continue to Locker Instructions";
+                }
+            }
+        }
+    );
+
+    loadLocker();
+</script>
+{% endblock %}

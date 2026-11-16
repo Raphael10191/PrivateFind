@@ -1,0 +1,593 @@
+
+{% extends "base.html" %}
+
+{% block title %}Report Details | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .detail-page {
+        max-width: 760px;
+        margin: 12px auto;
+    }
+
+    .detail-back {
+        display: inline-block;
+        color: #6D5BD0;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+
+    .detail-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 26px;
+    }
+
+    .detail-heading h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .detail-subtitle {
+        color: #666670;
+        margin: 0;
+    }
+
+    .detail-status {
+        padding: 8px 13px;
+        border-radius: 20px;
+        color: #6D5BD0;
+        background: #EFEBFA;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .detail-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 28px;
+        margin-bottom: 20px;
+    }
+
+    .detail-card h2 {
+        margin: 0 0 22px;
+        font-size: 20px;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+    }
+
+    .detail-field label {
+        display: block;
+        color: #666670;
+        font-size: 13px;
+        margin-bottom: 7px;
+    }
+
+    .detail-value {
+        font-size: 15px;
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+
+    .description {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        line-height: 1.6;
+    }
+
+    .check-button,
+    .claim-link {
+        display: inline-block;
+        padding: 13px 20px;
+        border: 0;
+        border-radius: 10px;
+        background: #6D5BD0;
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+    }
+
+    .check-button:hover,
+    .claim-link:hover {
+        background: #5846B8;
+        color: white;
+    }
+
+    .check-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .match-card {
+        border: 1px solid #ECECF0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 16px;
+        background: #FAFAF8;
+    }
+
+    .match-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .match-top h3 {
+        margin: 0;
+        font-size: 17px;
+    }
+
+    .match-score {
+        color: #6D5BD0;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .match-card p,
+    .match-message {
+        color: #666670;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .match-note {
+        margin: 14px 0;
+    }
+
+    .claim-link {
+        margin-top: 8px;
+        font-size: 14px;
+    }
+
+    .error-message {
+        color: #A32727;
+        background: #FFF1F1;
+        padding: 14px;
+        border-radius: 10px;
+        line-height: 1.5;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .detail-heading {
+            flex-wrap: wrap;
+        }
+
+        .detail-heading h1 {
+            font-size: 25px;
+        }
+
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-card {
+            padding: 22px 18px;
+        }
+
+        .check-button,
+        .claim-link {
+            width: 100%;
+        }
+
+        .match-top {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="detail-page">
+
+    <a href="/owner/reports" class="detail-back">
+        ← Back to My Reports
+    </a>
+
+    <div class="detail-heading">
+        <div>
+            <h1 id="report-title">Report Details</h1>
+
+            <p id="report-subtitle"
+               class="detail-subtitle">
+                Loading your report...
+            </p>
+        </div>
+
+        <span id="report-status"
+              class="detail-status"
+              hidden></span>
+    </div>
+
+    <p id="report-error"
+       class="error-message"
+       role="alert"
+       hidden></p>
+
+    <div id="report-content" hidden>
+
+        <section class="detail-card">
+            <h2>Lost Item Information</h2>
+
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <label>Category</label>
+                    <div id="field-category"
+                         class="detail-value"></div>
+                </div>
+
+                <div class="detail-field">
+                    <label>Location</label>
+                    <div id="field-location"
+                         class="detail-value"></div>
+                </div>
+
+                <div class="detail-field">
+                    <label>Date lost</label>
+                    <div id="field-date"
+                         class="detail-value"></div>
+                </div>
+
+                <div class="detail-field">
+                    <label>Color</label>
+                    <div id="field-color"
+                         class="detail-value"></div>
+                </div>
+
+                <div class="detail-field">
+                    <label>Brand</label>
+                    <div id="field-brand"
+                         class="detail-value"></div>
+                </div>
+
+                <div class="detail-field">
+                    <label>Model</label>
+                    <div id="field-model"
+                         class="detail-value"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="detail-card">
+            <h2>Item Description</h2>
+
+            <div id="field-description"
+                 class="description"></div>
+        </section>
+
+        <section class="detail-card">
+            <h2>Possible Matches</h2>
+
+            <p class="match-message">
+                Check whether any found items
+                match your lost-item report.
+            </p>
+
+            <button type="button"
+                    id="check-matches"
+                    class="check-button">
+                Check for Matches
+            </button>
+
+            <p id="matches-message"
+               class="match-message"
+               role="status"
+               aria-live="polite"></p>
+
+            <div id="matches-list"></div>
+        </section>
+
+    </div>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const params = new URLSearchParams(
+        window.location.search
+    );
+
+    const reportId = params.get("id");
+
+    const reportError = document.getElementById(
+        "report-error"
+    );
+
+    const reportContent = document.getElementById(
+        "report-content"
+    );
+
+    const checkButton = document.getElementById(
+        "check-matches"
+    );
+
+    const matchesMessage = document.getElementById(
+        "matches-message"
+    );
+
+    const matchesList = document.getElementById(
+        "matches-list"
+    );
+
+    function validId(value) {
+        return /^[1-9]\d*$/.test(String(value || ""));
+    }
+
+    function humanize(value) {
+        return String(value || "")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, character =>
+                character.toUpperCase()
+            );
+    }
+
+    function setField(id, value) {
+        document.getElementById(id).textContent =
+            value || "Not specified";
+    }
+
+    async function requestJson(url) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error("Please sign in again.");
+        }
+
+        if (!response.ok) {
+            let message = "Unable to load information.";
+
+            try {
+                const data = await response.json();
+                message = data.error?.message || message;
+            } catch {
+                // Retain the default message.
+            }
+
+            throw new Error(message);
+        }
+
+        return response.json();
+    }
+
+    async function loadReport() {
+        if (!validId(reportId)) {
+            reportError.textContent = "Invalid report ID.";
+            reportError.hidden = false;
+            return;
+        }
+
+        try {
+            const report = await requestJson(
+                "/api/lost-reports/" +
+                encodeURIComponent(reportId)
+            );
+
+            const title = report.brand
+                ? [
+                    report.brand,
+                    report.model ||
+                    humanize(report.category)
+                ].filter(Boolean).join(" ")
+                : [
+                    humanize(report.color),
+                    humanize(report.category)
+                ].filter(Boolean).join(" ");
+
+            document.getElementById(
+                "report-title"
+            ).textContent = title || "Report Details";
+
+            document.getElementById(
+                "report-subtitle"
+            ).textContent = "Report #" + report.id;
+
+            const status = document.getElementById(
+                "report-status"
+            );
+
+            status.textContent = humanize(report.status);
+            status.hidden = false;
+
+            setField(
+                "field-category",
+                humanize(report.category)
+            );
+
+            setField(
+                "field-location",
+                humanize(report.location)
+            );
+
+            setField(
+                "field-date",
+                report.lost_at
+                    ? report.lost_at.slice(0, 10)
+                    : null
+            );
+
+            setField(
+                "field-color",
+                humanize(report.color)
+            );
+
+            setField(
+                "field-brand",
+                report.brand
+            );
+
+            setField(
+                "field-model",
+                report.model
+            );
+
+            setField(
+                "field-description",
+                report.description
+            );
+
+            reportContent.hidden = false;
+
+            if (report.status !== "open") {
+                checkButton.disabled = true;
+
+                matchesMessage.textContent =
+                    "Matching is available for open reports.";
+            }
+
+        } catch (error) {
+            reportError.textContent =
+                error.message || "Could not load report.";
+
+            reportError.hidden = false;
+        }
+    }
+
+    function createMatchCard(match) {
+        const card = document.createElement("article");
+        card.className = "match-card";
+
+        const top = document.createElement("div");
+        top.className = "match-top";
+
+        const name = document.createElement("h3");
+        name.textContent =
+            match.public_summary ||
+            humanize(match.category) ||
+            "Found Item";
+
+        const score = document.createElement("span");
+        score.className = "match-score";
+
+        if (
+            Number.isFinite(match.score) &&
+            match.score >= 0 &&
+            match.score <= 100
+        ) {
+            score.textContent =
+                match.score + "% match score";
+        }
+
+        top.append(name, score);
+
+        const location = document.createElement("p");
+        location.textContent =
+            "Found at " + humanize(match.location);
+
+        const note = document.createElement("p");
+        note.className = "match-note";
+
+        note.textContent =
+            "This is a possible match, not proof of " +
+            "ownership. Verification is required.";
+
+        card.append(top, location, note);
+
+        // Claim links use IDs supplied by the
+        // backend's candidate response only.
+        if (validId(match.found_item_id)) {
+            const claimUrl = new URLSearchParams({
+                report_id: reportId,
+                item_id: String(match.found_item_id)
+            });
+
+            const link = document.createElement("a");
+
+            link.href =
+                "/owner/claim?" + claimUrl.toString();
+
+            link.className = "claim-link";
+            link.textContent = "Verify Ownership";
+
+            link.setAttribute(
+                "aria-label",
+                "Verify ownership of " + name.textContent
+            );
+
+            card.appendChild(link);
+        }
+
+        return card;
+    }
+
+    checkButton.addEventListener(
+        "click",
+        async () => {
+            if (!validId(reportId)) {
+                return;
+            }
+
+            checkButton.disabled = true;
+            checkButton.textContent = "Checking...";
+
+            matchesMessage.textContent =
+                "Looking for possible matches...";
+
+            matchesList.replaceChildren();
+
+            try {
+                const matches = await requestJson(
+                    "/api/lost-reports/" +
+                    encodeURIComponent(reportId) +
+                    "/candidates"
+                );
+
+                if (!Array.isArray(matches)) {
+                    throw new Error(
+                        "Unexpected matching response."
+                    );
+                }
+
+                if (matches.length === 0) {
+                    matchesMessage.textContent =
+                        "No possible matches found yet. " +
+                        "You can check again later.";
+                    return;
+                }
+
+                matchesMessage.textContent =
+                    matches.length +
+                    " possible match(es) found.";
+
+                matches.forEach(match => {
+                    matchesList.appendChild(
+                        createMatchCard(match)
+                    );
+                });
+
+            } catch (error) {
+                matchesMessage.textContent =
+                    error.message ||
+                    "Could not check for matches.";
+
+            } finally {
+                checkButton.disabled = false;
+                checkButton.textContent =
+                    "Check for Matches";
+            }
+        }
+    );
+
+    loadReport();
+</script>
+{% endblock %}
