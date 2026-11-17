@@ -12,6 +12,7 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       QWEN_MODEL: ${QWEN_MODEL:-}
       QWEN_TIMEOUT: ${QWEN_TIMEOUT:-25}
+      QWEN_LOG_ANALYSIS: ${QWEN_LOG_ANALYSIS:-false}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
       STORAGE_DIR: /app/storage/photos

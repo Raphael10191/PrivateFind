@@ -12,8 +12,10 @@ def response(payload):
     return {"choices": [{"message": {"content": f"<think>ignore</think>\n{json.dumps(payload)}"}}]}
 
 
-async def test_qwen_extraction_sends_both_images_and_normalizes_output(monkeypatch):
-    settings = Settings(ai_provider="qwen", qwen_base_url="https://example.test/v1/")
+async def test_qwen_extraction_sends_both_images_and_normalizes_output(monkeypatch, caplog):
+    settings = Settings(
+        ai_provider="qwen", qwen_base_url="https://example.test/v1/", qwen_log_analysis=True
+    )
     monkeypatch.setattr(provider, "get_settings", lambda: settings)
     ai = provider.get_ai_provider()
     assert isinstance(ai, QwenProvider)
@@ -32,7 +34,12 @@ async def test_qwen_extraction_sends_both_images_and_normalizes_output(monkeypat
     }
     request = Mock(side_effect=[{"data": [{"id": "test-qwen"}]}, response(raw)])
     monkeypatch.setattr(ai, "_request", request)
-    result = await ai.extract_attributes([Photo(b"a"), Photo(b"b", "image/png")], "finder note")
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        result = await ai.extract_attributes([Photo(b"a"), Photo(b"b", "image/png")], "finder note")
+    message = next(
+        msg for msg in caplog.messages if msg.startswith("[QWEN] Bildanalyse OK (2 Fotos): ")
+    )
+    assert json.loads(message.split(": ", 1)[1])["description"] == "Black phone with a scratch"
     assert (result.category, result.color, result.brand, result.confidence) == (
         "phone",
         "black",

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     qwen_api_key: SecretStr = SecretStr("")
     qwen_model: str = ""
     qwen_timeout: float = Field(default=25, gt=0)
+    qwen_log_analysis: bool = False
     ai_max_attempts: int = 3
     ai_retry_base_delay_s: float = 1.0  # backoff: 1s, 4s, 16s
 

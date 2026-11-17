@@ -28,6 +28,7 @@ from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType, Strength
 
 log = logging.getLogger(__name__)
+analysis_log = logging.getLogger("uvicorn.error")
 RESPONSE_ERRORS = (AIError, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError)
 
 EXTRACT_HINT = """
@@ -90,6 +91,7 @@ class QwenProvider:
         self.model = settings.qwen_model
         self.timeout = settings.qwen_timeout
         self.max_photos = settings.max_photos
+        self.log_analysis = settings.qwen_log_analysis
         self.mock = MockAIProvider()
 
     def _request(self, method: str, path: str, body: dict | None = None) -> dict:
@@ -154,10 +156,17 @@ class QwenProvider:
         content = self._images(photos)
         content.append({"type": "text", "text": f"Finder's note: {note or '(none)'}"})
         try:
-            return _clean_extraction(await self._chat(EXTRACT_SYSTEM + EXTRACT_HINT, content), note)
+            result = _clean_extraction(
+                await self._chat(EXTRACT_SYSTEM + EXTRACT_HINT, content), note
+            )
         except RESPONSE_ERRORS as exc:
             log.warning("Qwen extraction failed (%s); using mock", type(exc).__name__)
             return await self.mock.extract_attributes(photos, note)
+        if self.log_analysis:
+            analysis_log.info(
+                "[QWEN] Bildanalyse OK (%d Fotos): %s", len(photos), result.model_dump_json()
+            )
+        return result
 
     async def verify_photos(self, photos: list[Photo], evidence: list[str]) -> list[float]:
         content = self._images(photos)
