@@ -5,7 +5,7 @@ from datetime import datetime
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -32,7 +32,32 @@ def english_date(value):
 
 templates.filters["english_date"] = english_date
 
+ASSETS = {
+    "/assets/privatefind.css": ("privatefind.css", "text/css"),
+    "/assets/privatefind.js": ("privatefind.js", "text/javascript"),
+}
+
+ACTIVE_PAGES = {
+    "/": "public",
+    "/login": "login",
+    "/register": "register",
+    "/found/new": "finder",
+    "/owner/reports": "reports",
+    "/owner/report/new": "reports",
+    "/owner/report/details": "reports",
+    "/owner/report/view": "reports",
+    "/owner/claim": "claims",
+    "/owner/claims": "claims",
+    "/owner/account": "account",
+    "/admin": "admin",
+    "/admin/items": "admin_items",
+    "/admin/claims": "admin_claims",
+    "/admin/lockers": "admin_lockers",
+    "/admin/audit": "admin_audit",
+}
+
 PAGES = {
+    "/": "public_home.html",
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
     "/owner/account": "owner_account.html",
@@ -47,6 +72,8 @@ PAGES = {
     "/admin": "admin_dashboard.html",
     "/admin/claims": "admin_claims.html",
     "/admin/items": "admin_items.html",
+    "/admin/lockers": "admin_lockers.html",
+    "/admin/audit": "admin_audit.html",
 }
 
 
@@ -190,9 +217,14 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.proxy_api()
             return
 
-        # Root sends visitors to the login page.
-        if path == "/":
-            self.redirect("/login")
+        if path in ASSETS:
+            name, content_type = ASSETS[path]
+            body = (FRONTEND_DIR / "assets" / name).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         template_name = PAGES.get(path)
@@ -227,7 +259,10 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 return
 
             if user is None:
-                self.redirect("/login")
+                login_url = "/login"
+                if path in ("/owner/report/new", "/owner/report/details"):
+                    login_url += "?" + urlencode({"next": "/owner/report/new"})
+                self.redirect(login_url)
                 return
 
             # Admin-only routes.
@@ -282,21 +317,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-        # Determine which navigation item is active.
-        if path == "/admin":
-            active_page = "admin"
-        elif path == "/admin/items":
-            active_page = "admin_items"
-        elif path == "/admin/claims":
-            active_page = "admin_claims"
-        elif path == "/owner/claims":
-            active_page = "claims"
-        elif path == "/owner/account":
-            active_page = "account"
-        elif path == "/owner/reports":
-            active_page = "reports"
-        else:
-            active_page = "home"
+        active_page = ACTIVE_PAGES.get(path, "home")
+        role = user.get("role") if user else "guest"
 
         # Render the requested HTML page.
         html = templates.get_template(
@@ -305,6 +327,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             reports=reports,
             active_page=active_page,
             account=account,
+            role=role,
         )
 
         body = html.encode("utf-8")

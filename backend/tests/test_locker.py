@@ -82,3 +82,25 @@ async def test_full_locker_and_wrong_code_limit(client, session):
         "/api/device/codes/validate", json={"device_id": "locker_01", "code": "000000"}, headers=h
     )
     assert r.json()["authorized"] is False
+
+
+async def test_operator_overview_uses_real_compartments_and_heartbeat(client, owner, admin, locker):
+    _, headers = locker
+    url = "/api/admin/lockers"
+
+    assert (await client.get(url)).status_code == 401
+    assert (await owner.get(url)).status_code == 403
+
+    before = (await admin.get(url)).json()
+    assert len(before) == 1 and before[0]["code"] == "L1"
+    assert before[0]["compartments"] == [
+        {"number": 1, "state": "free"},
+        {"number": 2, "state": "free"},
+    ]
+    assert before[0]["last_seen_at"] is None
+    assert "device_key_hash" not in before[0]
+
+    response = await client.post("/api/device/heartbeat", headers=headers, json={})
+    assert response.status_code == 200
+    after = (await admin.get(url)).json()[0]
+    assert after["last_seen_at"] is not None

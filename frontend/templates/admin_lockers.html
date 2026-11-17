@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "icons.html" import icon %}
+{% block title %}Lockers & Devices | PrivateFind{% endblock %}
+{% block content %}
+<header class="workspace-title">
+    <h1>Lockers & devices.</h1>
+    <p>Compartment states and the last heartbeat reported by each device.</p>
+</header>
+<button type="button" class="pf-button pf-secondary" id="refresh-lockers">Refresh status</button>
+<p id="lockers-status" class="workspace-message" role="status"></p>
+<div class="operations-grid" id="lockers-list"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const list = document.getElementById("lockers-list");
+    const notice = document.getElementById("lockers-status");
+    const refresh = document.getElementById("refresh-lockers");
+
+    const states = {
+        free: "Available",
+        occupied: "Occupied",
+        deposit_reserved: "Deposit reserved",
+        deposit_open: "Deposit open",
+        pickup_reserved: "Pickup reserved",
+        pickup_open: "Pickup open",
+    };
+
+    function text(parent, tag, value, className) {
+        const node = document.createElement(tag);
+        node.textContent = value;
+        if (className) node.className = className;
+        parent.append(node);
+        return node;
+    }
+
+    function renderLocker(locker) {
+        const card = document.createElement("section");
+        card.className = "pf-card operations-card";
+        text(card, "h2", locker.name + " · " + locker.code);
+        const heartbeat = locker.last_seen_at
+            ? new Intl.DateTimeFormat("en", {dateStyle:"medium", timeStyle:"short"})
+                .format(new Date(locker.last_seen_at + "Z"))
+            : "No heartbeat recorded";
+        text(card, "p", locker.device_id + " · " + heartbeat, "muted-text");
+        const slots = document.createElement("ol");
+        slots.className = "compartments";
+        slots.setAttribute("aria-label", "Compartment states");
+        for (const compartment of locker.compartments) {
+            const slot = document.createElement("li");
+            slot.dataset.state = compartment.state;
+            text(slot, "span", "Compartment " + compartment.number);
+            text(slot, "strong", states[compartment.state] || "Unknown");
+            slots.append(slot);
+        }
+        if (slots.children.length) card.append(slots);
+        else text(card, "p", "No compartments configured.", "muted-text");
+        return card;
+    }
+
+    async function loadLockers() {
+        refresh.disabled = true;
+        notice.textContent = "Loading locker status…";
+        try {
+            const response = await fetch("/api/admin/lockers", {cache:"no-store"});
+            if (response.status === 401) { location.replace("/login"); return; }
+            if (!response.ok) throw new Error("Could not load lockers. Try refreshing.");
+            const lockers = await response.json();
+            list.replaceChildren(...lockers.map(renderLocker));
+            notice.textContent = lockers.length ? "" : "No lockers are configured.";
+        } catch (error) {
+            notice.textContent = error.message;
+        } finally {
+            refresh.disabled = false;
+        }
+    }
+
+    refresh.addEventListener("click", loadLockers);
+    loadLockers();
+</script>
+{% endblock %}

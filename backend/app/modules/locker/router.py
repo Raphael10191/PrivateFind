@@ -1,17 +1,20 @@
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header
+from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.modules.identity.deps import AdminUser, SessionDep
 from app.modules.locker import service
-from app.modules.locker.models import Locker
+from app.modules.locker.models import Compartment, Locker
 from app.modules.locker.schemas import (
     CodeIn,
     CodeResult,
+    CompartmentOverview,
     HeartbeatIn,
     LockerInfo,
+    LockerOverview,
     StateIn,
     StateResult,
 )
@@ -45,6 +48,31 @@ async def locker_info(locker_code: str, session: SessionDep):
         free_compartments=free,
         locations=get_settings().locations,
     )
+
+
+@router.get("/api/admin/lockers", response_model=list[LockerOverview], tags=["admin"])
+async def locker_overview(_: AdminUser, session: SessionDep):
+    rows = await session.execute(
+        select(Locker, Compartment)
+        .outerjoin(Compartment, Compartment.locker_id == Locker.id)
+        .where(Locker.code.is_not(None))
+        .order_by(Locker.code, Compartment.number)
+    )
+    overview: dict[int, LockerOverview] = {}
+    for locker, slot in rows:
+        if locker.id not in overview:
+            overview[locker.id] = LockerOverview(
+                code=locker.code,
+                name=locker.name or locker.code,
+                location=locker.location,
+                device_id=locker.device_id,
+                last_seen_at=locker.last_seen_at,
+            )
+        if slot is not None:
+            overview[locker.id].compartments.append(
+                CompartmentOverview(number=slot.number, state=slot.state)
+            )
+    return list(overview.values())
 
 
 @router.post("/api/admin/lockers/{code}/reset", tags=["admin"])

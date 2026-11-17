@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Activity Log | PrivateFind{% endblock %}
+{% block content %}
+<header class="workspace-title">
+    <h1>Activity log.</h1>
+    <p>Recent locker activity, report updates and claim decisions.</p>
+</header>
+<button type="button" class="pf-button pf-secondary" id="refresh-activity">Refresh activity</button>
+<p id="activity-status" class="workspace-message" role="status"></p>
+<ol class="pf-card activity-list" id="activity-list" hidden></ol>
+{% endblock %}
+{% block scripts %}
+<script>
+    const activity = document.getElementById("activity-list");
+    const notice = document.getElementById("activity-status");
+    const refresh = document.getElementById("refresh-activity");
+    const date = new Intl.DateTimeFormat("en", {dateStyle:"medium", timeStyle:"short"});
+
+    function renderEvent(event) {
+        const row = document.createElement("li");
+        const label = document.createElement("strong");
+        label.textContent = event.action.replaceAll("_", " ");
+        const summary = document.createElement("span");
+        const labelId = event.entity_id ? " #" + event.entity_id : "";
+        summary.textContent = event.entity_type.replaceAll("_", " ") + labelId + " · " + event.actor_type;
+        const when = document.createElement("time");
+        when.dateTime = event.at + "Z";
+        when.textContent = date.format(new Date(when.dateTime));
+        row.append(label, summary, when);
+        return row;
+    }
+
+    async function loadActivity() {
+        refresh.disabled = true;
+        notice.textContent = "Loading recent activity…";
+        try {
+            const response = await fetch("/api/admin/audit?limit=30", {cache:"no-store"});
+            if (response.status === 401) { location.replace("/login"); return; }
+            if (!response.ok) throw new Error("Could not load activity. Try refreshing.");
+            const rows = await response.json();
+            activity.replaceChildren(...rows.map(renderEvent));
+            activity.hidden = !rows.length;
+            notice.textContent = rows.length ? "" : "No activity recorded yet.";
+        } catch (error) {
+            notice.textContent = error.message;
+        } finally {
+            refresh.disabled = false;
+        }
+    }
+
+    refresh.addEventListener("click", loadActivity);
+    loadActivity();
+</script>
+{% endblock %}

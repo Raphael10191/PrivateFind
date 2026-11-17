@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -9,6 +10,20 @@ class LockerInfo(BaseModel):
     location: str
     free_compartments: int
     locations: list[str]
+
+
+class CompartmentOverview(BaseModel):
+    number: int
+    state: str
+
+
+class LockerOverview(BaseModel):
+    code: str
+    name: str
+    location: str
+    device_id: str
+    last_seen_at: datetime | None
+    compartments: list[CompartmentOverview] = Field(default_factory=list)
 
 
 class CodeIn(BaseModel):

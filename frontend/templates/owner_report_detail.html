@@ -12,7 +12,7 @@
 
     .detail-back {
         display: inline-block;
-        color: #6D5BD0;
+        color: var(--ink);
         font-size: 14px;
         font-weight: 600;
         margin-bottom: 24px;
@@ -28,27 +28,27 @@
 
     .detail-heading h1 {
         margin: 0 0 8px;
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .detail-subtitle {
-        color: #666670;
+        color: var(--muted);
         margin: 0;
     }
 
     .detail-status {
         padding: 8px 13px;
         border-radius: 20px;
-        color: #6D5BD0;
-        background: #EFEBFA;
+        color: var(--ink);
+        background: var(--sage);
         font-size: 13px;
         font-weight: 600;
         white-space: nowrap;
     }
 
     .detail-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 28px;
         margin-bottom: 20px;
@@ -67,7 +67,7 @@
 
     .detail-field label {
         display: block;
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         margin-bottom: 7px;
     }
@@ -90,7 +90,7 @@
         padding: 13px 20px;
         border: 0;
         border-radius: 10px;
-        background: #6D5BD0;
+        background: var(--ink);
         color: white;
         font: inherit;
         font-weight: 600;
@@ -100,7 +100,7 @@
 
     .check-button:hover,
     .claim-link:hover {
-        background: #5846B8;
+        background: var(--green);
         color: white;
     }
 
@@ -110,11 +110,11 @@
     }
 
     .match-card {
-        border: 1px solid #ECECF0;
+        border: 1px solid var(--line);
         border-radius: 12px;
         padding: 20px;
         margin-top: 16px;
-        background: #FAFAF8;
+        background: var(--paper);
     }
 
     .match-top {
@@ -133,7 +133,7 @@
 
     .match-card p,
     .match-message {
-        color: #666670;
+        color: var(--muted);
         font-size: 14px;
         line-height: 1.6;
     }
@@ -148,8 +148,8 @@
     }
 
     .error-message {
-        color: #A32727;
-        background: #FFF1F1;
+        color: var(--danger);
+        background: var(--danger-bg);
         padding: 14px;
         border-radius: 10px;
         line-height: 1.5;
@@ -165,7 +165,7 @@
         }
 
         .detail-heading h1 {
-            font-size: 25px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .detail-grid {

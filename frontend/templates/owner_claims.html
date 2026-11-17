@@ -20,18 +20,18 @@
 
     .claims-heading h1 {
         margin: 0 0 8px;
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .claims-heading p {
-        color: #666670;
+        color: var(--muted);
         margin: 0;
     }
 
     .secondary-button {
-        border: 1px solid #DCDCE4;
-        background: white;
-        color: #1A1A1F;
+        border: 1px solid var(--field-border);
+        background: var(--surface);
+        color: var(--ink);
         border-radius: 10px;
         padding: 11px 15px;
         font: inherit;
@@ -40,8 +40,8 @@
     }
 
     .secondary-button:hover {
-        border-color: #6D5BD0;
-        color: #6D5BD0;
+        border-color: var(--ink);
+        color: var(--ink);
     }
 
     button:disabled {
@@ -50,8 +50,8 @@
     }
 
     .claim-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 16px;
         padding: 24px;
         margin-bottom: 16px;
@@ -70,7 +70,7 @@
     }
 
     .claim-meta {
-        color: #666670;
+        color: var(--muted);
         font-size: 14px;
         line-height: 1.6;
     }
@@ -80,8 +80,8 @@
         padding: 7px 12px;
         font-size: 13px;
         font-weight: 600;
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
         white-space: nowrap;
     }
 
@@ -95,7 +95,7 @@
     .report-link {
         display: inline-flex;
         align-items: center;
-        color: #6D5BD0;
+        color: var(--ink);
         font-weight: 600;
         font-size: 14px;
     }
@@ -103,14 +103,14 @@
     .claim-message {
         margin-top: 16px;
         line-height: 1.6;
-        color: #666670;
+        color: var(--muted);
     }
 
     .pickup-panel {
         margin-top: 16px;
         padding: 18px;
         border-radius: 12px;
-        background: #EFEBFA;
+        background: var(--sage);
     }
 
     .pickup-code {
@@ -119,22 +119,22 @@
         font-size: 28px;
         font-weight: 700;
         letter-spacing: 4px;
-        color: #6D5BD0;
+        color: var(--ink);
         overflow-wrap: anywhere;
     }
 
     .feedback {
         padding: 18px;
         border-radius: 12px;
-        background: white;
-        border: 1px solid #ECECF0;
-        color: #666670;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        color: var(--muted);
         line-height: 1.6;
     }
 
     .feedback.error {
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
     }
 
     [hidden] {
@@ -148,7 +148,7 @@
         }
 
         .claims-heading h1 {
-            font-size: 26px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .claim-card {

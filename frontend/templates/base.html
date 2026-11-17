@@ -1,530 +1,92 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#F7F5EF">
     <title>{% block title %}PrivateFind{% endblock %}</title>
-
-    <style>
-        :root {
-            --background: #FAFAF8;
-            --text: #1A1A1F;
-            --purple: #6D5BD0;
-            --purple-light: #EFEBFA;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: var(--background);
-            color: var(--text);
-        }
-
-        a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        a:hover {
-            color: var(--purple);
-        }
-
-        /* Header */
-
-        .header {
-            background: white;
-            border-bottom: 1px solid #e8e8e8;
-            padding: 18px 6%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .logo {
-            font-size: 20px;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-
-        .navigation {
-            display: flex;
-            align-items: center;
-            gap: 28px;
-        }
-
-        .navigation a.active-link {
-            color: var(--purple);
-            font-weight: 600;
-            border-bottom: 2px solid var(--purple);
-            padding-bottom: 6px;
-        }
-
-        /* Owner account dropdown */
-
-        .profile-menu {
-            position: relative;
-        }
-
-        .profile-menu summary {
-            cursor: pointer;
-            list-style: none;
-            background: var(--purple-light);
-            border-radius: 50%;
-            padding: 10px 13px;
-        }
-
-        .profile-menu summary::-webkit-details-marker {
-            display: none;
-        }
-
-        .profile-options {
-            position: absolute;
-            top: 46px;
-            right: 0;
-            min-width: 170px;
-            padding: 10px;
-            background: white;
-            border: 1px solid #e8e8e8;
-            border-radius: 10px;
-            box-shadow: 0 8px 24px #00000012;
-            z-index: 30;
-        }
-
-        .profile-options a,
-        .signout-button {
-            display: block;
-            width: 100%;
-            padding: 11px;
-            border-radius: 7px;
-            font-size: 14px;
-        }
-
-        .profile-options a:hover,
-        .signout-button:hover {
-            background: var(--purple-light);
-            color: var(--purple);
-        }
-
-        .signout-button {
-            border: 0;
-            background: transparent;
-            color: inherit;
-            text-align: left;
-            font-family: inherit;
-            cursor: pointer;
-        }
-
-        .signout-button:disabled {
-            opacity: 0.6;
-            cursor: wait;
-        }
-
-        .profile-options .current-link {
-            color: var(--purple);
-            font-weight: 600;
-        }
-
-        /* Admin sign-out */
-
-        .admin-signout {
-            border: 1px solid #E4E2EB;
-            border-radius: 10px;
-            padding: 10px 15px;
-            background: white;
-            color: var(--text);
-            font: inherit;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .admin-signout:hover {
-            background: var(--purple-light);
-            color: var(--purple);
-        }
-
-        .admin-signout:disabled {
-            opacity: 0.6;
-            cursor: wait;
-        }
-
-        /* Page content */
-
-        main {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 40px 24px;
-        }
-
-        /* Role-aware navigation */
-
-        .auth-required,
-        .guest-only,
-        .admin-only {
-            display: none;
-        }
-
-        body.auth-owner .navigation .auth-required {
-            display: inline-block;
-        }
-
-        body.auth-owner .navigation .profile-menu {
-            display: block;
-        }
-
-        body.auth-guest .navigation .guest-only {
-            display: inline-block;
-        }
-
-        body.auth-admin .navigation .admin-only {
-            display: inline-block;
-        }
-
-        /* Mobile Owner navigation */
-
-        .mobile-navigation {
-            display: none;
-        }
-
-        .mobile-navigation a[aria-current="page"] {
-            color: var(--purple);
-            font-weight: 700;
-        }
-
-        /* Keyboard accessibility */
-
-        a:focus-visible,
-        button:focus-visible,
-        summary:focus-visible {
-            outline: 2px solid var(--purple);
-            outline-offset: 3px;
-        }
-
-        @media (max-width: 600px) {
-            .header {
-                padding: 16px 6%;
-            }
-
-            .logo {
-                font-size: 18px;
-            }
-
-            .navigation {
-                display: none;
-            }
-
-            main {
-                padding: 24px 16px 90px;
-            }
-
-            body.auth-owner .mobile-navigation {
-                display: flex;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                justify-content: space-around;
-                padding: 16px;
-                background: white;
-                border-top: 1px solid #e8e8e8;
-                z-index: 20;
-            }
-
-            body.auth-guest main,
-            body.auth-admin main {
-                padding-bottom: 24px;
-            }
-
-            body.auth-guest .navigation,
-            body.auth-admin .navigation {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-
-            .admin-signout {
-                padding: 9px 12px;
-                font-size: 13px;
-            }
-        }
-
-        @media (max-width: 600px) {
-            .header {
-                flex-wrap: wrap;
-            }
-
-            body.auth-admin .navigation {
-                width: 100%;
-                justify-content: flex-start;
-                flex-wrap: wrap;
-                gap: 12px 18px;
-            }
-
-            .navigation a {
-                font-size: 13px;
-            }
-        }
-    </style>
-
     {% block head %}{% endblock %}
+    <link rel="stylesheet" href="/assets/privatefind.css">
 </head>
-
-<body>
-
-    <header class="header">
-        <a href="/" class="logo">PrivateFind</a>
-
-        <nav class="navigation"
-             aria-label="Main navigation">
-
-            <!-- Guest navigation -->
-            <a href="/login"
-               class="guest-only">
-                Sign In
+{% from "icons.html" import icon %}
+{% set owner_nav = [
+    ('home', '/owner', 'Home', 'home'),
+    ('reports', '/owner/reports', 'Searches', 'search'),
+    ('claims', '/owner/claims', 'Claims', 'shield'),
+    ('account', '/owner/account', 'Profile', 'person')
+] %}
+{% set admin_nav = [
+    ('admin', '/admin', 'Overview', 'home'),
+    ('admin_claims', '/admin/claims', 'Reviews', 'shield'),
+    ('admin_items', '/admin/items', 'Found items', 'box')
+] %}
+{% set operations_nav = [
+    ('admin_lockers', '/admin/lockers', 'Lockers & devices', 'activity'),
+    ('admin_audit', '/admin/audit', 'Activity log', 'list')
+] %}
+{% set role_links = admin_nav if role == 'admin' else owner_nav %}
+{% macro nav_links(entries) -%}
+    {% for key, href, label, symbol in entries %}
+        <a href="{{ href }}"{% if active_page == key %} aria-current="page"{% endif %}>
+            {{ icon(symbol) }}<span>{{ label }}</span>
+        </a>
+    {% endfor %}
+{%- endmacro %}
+<body class="role-{{ role | default('guest') }}">
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="{{ '/admin' if role == 'admin' else '/owner' if role == 'owner' else '/' }}"
+               aria-label="PrivateFind home">
+                <span class="brand-mark" aria-hidden="true">pf</span>
+                <span class="wordmark" aria-hidden="true">privatefind<span>.</span></span>
             </a>
-
-            <!-- Owner navigation -->
-            <a href="/owner"
-               class="auth-required
-               {% if active_page == 'home' %}
-                   active-link
-               {% endif %}"
-               {% if active_page == 'home' %}
-                   aria-current="page"
-               {% endif %}>
-                Home
-            </a>
-
-            <a href="/owner/reports"
-               class="auth-required
-               {% if active_page == 'reports' %}
-                   active-link
-               {% endif %}"
-               {% if active_page == 'reports' %}
-                   aria-current="page"
-               {% endif %}>
-                My Reports
-            </a>
-
-            <!-- Owner account menu -->
-            <details class="profile-menu auth-required">
-                <summary aria-label="Account menu">
-                    👤
-                </summary>
-
-                <div class="profile-options">
-
-                    <a href="/owner/account"
-                       {% if active_page == 'account' %}
-                           class="current-link"
-                           aria-current="page"
-                       {% endif %}>
-                        My Account
-                    </a>
-
-                    <a href="/owner/claims"
-                       {% if active_page == 'claims' %}
-                           class="current-link"
-                           aria-current="page"
-                       {% endif %}>
-                        My Claims
-                    </a>
-
-                    <button
-                        type="button"
-                        class="signout-button"
-                        data-signout>
-                        Sign out
-                    </button>
-
-                </div>
-            </details>
-
-            <!-- Admin navigation -->
-            <a href="/admin"
-               class="admin-only
-               {% if active_page == 'admin' %}
-                   active-link
-               {% endif %}"
-               {% if active_page == 'admin' %}
-                   aria-current="page"
-               {% endif %}>
-                Dashboard
-            </a>
-
-            <a href="/admin/items"
-               class="admin-only
-               {% if active_page == 'admin_items' %}
-                   active-link
-               {% endif %}"
-               {% if active_page == 'admin_items' %}
-                   aria-current="page"
-               {% endif %}>
-                Found Items
-            </a>
-
-            <a href="/admin/claims"
-               class="admin-only
-               {% if active_page == 'admin_claims' %}
-                   active-link
-               {% endif %}"
-               {% if active_page == 'admin_claims' %}
-                   aria-current="page"
-               {% endif %}>
-                Claim Reviews
-            </a>
-
-            <button
-                type="button"
-                class="admin-signout admin-only"
-                data-signout>
-                Sign out
-            </button>
-
-        </nav>
+            {% if role in ('owner', 'admin') %}
+                <button type="button" class="pf-button pf-secondary desktop-signout" data-signout>Sign out</button>
+            {% elif active_page != 'login' %}
+                <a class="pf-button pf-secondary header-entry" href="/login">Sign in</a>
+            {% endif %}
+        </div>
     </header>
 
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+    <div class="site-layout{% if role in ('owner', 'admin') %} has-workspace{% endif %}">
+        {% if role in ('owner', 'admin') %}
+            <aside class="sidebar">
+                <nav class="side-nav" aria-label="{{ 'Operator' if role == 'admin' else 'Owner' }} navigation">
+                    {{ nav_links(role_links) }}
+                    {% if role == 'admin' %}{{ nav_links(operations_nav) }}{% endif %}
+                </nav>
+            </aside>
+        {% endif %}
+        <main id="main-content" tabindex="-1">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
 
-    <!-- Mobile Owner navigation -->
-    <nav class="mobile-navigation auth-required"
-         aria-label="Mobile owner navigation">
+    {% if role in ('owner', 'admin') %}
+        <nav class="mobile-nav" aria-label="{{ 'Mobile operator' if role == 'admin' else 'Mobile owner' }} navigation">
+            {% if role == 'admin' %}
+                {{ nav_links([
+                    ('admin', '/admin', 'Home', 'home'),
+                    ('admin_claims', '/admin/claims', 'Reviews', 'shield'),
+                    ('admin_items', '/admin/items', 'Items', 'box')
+                ]) }}
+                <details class="mobile-more">
+                    <summary{% if active_page in ('admin_lockers', 'admin_audit') %} class="current-section"{% endif %}>
+                        {{ icon('grid') }}<span>More</span>
+                    </summary>
+                    <div class="more-panel">
+                        {{ nav_links(operations_nav) }}
+                        <button type="button" data-signout>{{ icon('exit') }}<span>Sign out</span></button>
+                    </div>
+                </details>
+            {% else %}
+                {{ nav_links(owner_nav) }}
+            {% endif %}
+        </nav>
+    {% endif %}
 
-        <a href="/owner"
-           {% if active_page == 'home' %}
-               aria-current="page"
-           {% endif %}>
-            Home
-        </a>
-
-        <a href="/owner/reports"
-           {% if active_page == 'reports' %}
-               aria-current="page"
-           {% endif %}>
-            My Reports
-        </a>
-
-        <a href="/owner/account"
-           {% if active_page == 'account'
-              or active_page == 'claims' %}
-               aria-current="page"
-           {% endif %}>
-            Account
-        </a>
-
-    </nav>
-
-    <!-- Authentication and sign out -->
-    <script>
-        document.addEventListener(
-            "DOMContentLoaded",
-            async () => {
-
-                let user = null;
-                let authChecked = false;
-
-                try {
-                    const response = await fetch(
-                        "/api/auth/me",
-                        {
-                            credentials: "same-origin",
-                            cache: "no-store"
-                        }
-                    );
-
-                    if (response.ok) {
-                        user = await response.json();
-                    }
-
-                    authChecked = true;
-
-                } catch (error) {
-                    console.error(
-                        "Authentication check failed:",
-                        error
-                    );
-                }
-
-                if (authChecked) {
-                    if (user && user.role === "owner") {
-                        document.body.classList.add(
-                            "auth-owner"
-                        );
-
-                    } else if (
-                        user && user.role === "admin"
-                    ) {
-                        document.body.classList.add(
-                            "auth-admin"
-                        );
-
-                    } else {
-                        document.body.classList.add(
-                            "auth-guest"
-                        );
-                    }
-                }
-
-                document.querySelectorAll(
-                    "[data-signout]"
-                ).forEach(button => {
-
-                    button.addEventListener(
-                        "click",
-                        async () => {
-
-                            button.disabled = true;
-
-                            try {
-                                const response = await fetch(
-                                    "/api/auth/logout",
-                                    {
-                                        method: "POST",
-                                        credentials: "same-origin"
-                                    }
-                                );
-
-                                if (!response.ok) {
-                                    throw new Error(
-                                        "Sign out failed"
-                                    );
-                                }
-
-                                // Clear unfinished Owner drafts.
-                                sessionStorage.removeItem(
-                                    "privatefind_lost_report_draft"
-                                );
-
-                                window.location.replace(
-                                    "/login"
-                                );
-
-                            } catch (error) {
-                                alert(
-                                    "Could not sign out. " +
-                                    "Please try again."
-                                );
-
-                                button.disabled = false;
-                            }
-                        }
-                    );
-                });
-            }
-        );
-    </script>
-
+    <script src="/assets/privatefind.js" defer></script>
     {% block scripts %}{% endblock %}
-
 </body>
 </html>

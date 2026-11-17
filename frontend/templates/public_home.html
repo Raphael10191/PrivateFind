@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "icons.html" import icon %}
+{% block content %}
+<section class="public-hero">
+    <div>
+        <h1>Lost things.<br><em>Found again.</em></h1>
+        <p>Report a lost item or return something you found at a campus locker.</p>
+        <div class="public-actions">
+            <a class="pf-button" href="/owner/report/new">{{ icon('search') }} I lost something</a>
+            <a class="pf-button pf-secondary" href="/found/new">{{ icon('box') }} I found something</a>
+        </div>
+    </div>
+    <section class="public-guide pf-card" aria-labelledby="public-guide-heading">
+        <h2 id="public-guide-heading">How it works</h2>
+        <div>{{ icon('box') }}<p><strong>Hand it in</strong><span>Scan the QR code on the locker and take a photo.</span></p></div>
+        <div>{{ icon('search') }}<p><strong>Search for it</strong><span>Describe the lost item to see possible matches.</span></p></div>
+        <div>{{ icon('shield') }}<p><strong>Collect it</strong><span>Verify ownership to receive a pickup code.</span></p></div>
+    </section>
+</section>
+{% endblock %}

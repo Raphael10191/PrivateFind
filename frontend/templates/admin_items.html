@@ -20,30 +20,30 @@
 
     .items-heading h1 {
         margin: 0 0 8px;
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .items-heading p,
     .muted {
         margin: 0;
-        color: #666670;
+        color: var(--muted);
         line-height: 1.5;
     }
 
     .items-button {
         padding: 11px 16px;
-        border: 1px solid #E4E2EB;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        background: white;
-        color: #1A1A1F;
+        background: var(--surface);
+        color: var(--ink);
         font: inherit;
         font-weight: 600;
         cursor: pointer;
     }
 
     .items-button:hover {
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
     }
 
     .items-button:disabled {
@@ -62,17 +62,17 @@
         display: flex;
         flex-direction: column;
         gap: 7px;
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
     }
 
     .items-filters select {
         min-width: 165px;
         padding: 11px;
-        border: 1px solid #E4E2EB;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        background: white;
-        color: #1A1A1F;
+        background: var(--surface);
+        color: var(--ink);
         font: inherit;
         font-size: 14px;
     }
@@ -85,8 +85,8 @@
     }
 
     .items-panel {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 24px;
         min-width: 0;
@@ -103,8 +103,8 @@
         text-align: left;
         padding: 15px;
         margin-bottom: 10px;
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 12px;
         font: inherit;
         cursor: pointer;
@@ -112,8 +112,8 @@
 
     .item-option:hover,
     .item-option.selected {
-        background: #EFEBFA;
-        border-color: #6D5BD0;
+        background: var(--sage);
+        border-color: var(--ink);
     }
 
     .item-option strong,
@@ -127,7 +127,7 @@
     }
 
     .item-option span {
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         line-height: 1.6;
     }
@@ -138,7 +138,7 @@
 
     .item-label {
         display: block;
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         margin-bottom: 6px;
     }
@@ -151,7 +151,7 @@
 
     .item-divider {
         border: 0;
-        border-top: 1px solid #ECECF0;
+        border-top: 1px solid var(--line);
         margin: 22px 0;
     }
 
@@ -159,8 +159,8 @@
         display: inline-block;
         padding: 7px 12px;
         border-radius: 20px;
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
         font-size: 12px;
         font-weight: 600;
         margin-bottom: 20px;
@@ -169,8 +169,8 @@
     .item-attribute {
         padding: 12px;
         margin-bottom: 9px;
-        background: #FAFAF8;
-        border: 1px solid #ECECF0;
+        background: var(--paper);
+        border: 1px solid var(--line);
         border-radius: 10px;
     }
 
@@ -197,9 +197,9 @@
         width: 100%;
         aspect-ratio: 4 / 3;
         object-fit: cover;
-        border: 1px solid #ECECF0;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        background: #FAFAF8;
+        background: var(--paper);
     }
 
     .item-message {
@@ -210,28 +210,28 @@
     }
 
     .item-error {
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
     }
 
     .item-success {
-        background: #EFEBFA;
-        color: #42338C;
+        background: var(--sage);
+        color: var(--green);
     }
 
     .item-empty {
         padding: 20px 0;
-        color: #666670;
+        color: var(--muted);
         line-height: 1.6;
     }
 
     .item-warning {
         padding: 13px;
         margin: 16px 0;
-        border: 1px solid #E4E2EB;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        background: #FAFAF8;
-        color: #666670;
+        background: var(--paper);
+        color: var(--muted);
         font-size: 13px;
         line-height: 1.6;
     }
@@ -247,7 +247,7 @@
         }
 
         .items-heading h1 {
-            font-size: 26px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .items-grid {
@@ -339,7 +339,7 @@
                 Select a found item to view its details.
             </p>
 
-            <div id="item-details" hidden>
+            <div id="item-details" tabindex="-1" hidden>
 
                 <span id="detail-status"
                       class="item-status"></span>
@@ -710,6 +710,7 @@
             selectedItemStatus = item.status;
 
             renderItemDetails(item);
+            if (window.matchMedia("(max-width: 760px)").matches) detailsBox.focus();
 
             itemsList.querySelectorAll(
                 ".item-option"
@@ -881,6 +882,12 @@
     aiFilter.addEventListener("change", loadItems);
     retryButton.addEventListener("click", retryAI);
 
-    loadItems();
+    loadItems().then(() => {
+        const id = new URLSearchParams(location.search).get("id");
+        if (!id) return;
+        const option = Array.from(itemsList.querySelectorAll("button"))
+            .find(button => button.dataset.itemId === id);
+        if (option) selectItem(id);
+    });
 </script>
 {% endblock %}

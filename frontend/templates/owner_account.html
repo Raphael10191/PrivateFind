@@ -16,19 +16,19 @@
     }
 
     .account-heading h1 {
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
         margin: 0 0 8px;
     }
 
     .account-heading p {
-        color: #666670;
+        color: var(--muted);
         margin: 0;
         line-height: 1.5;
     }
 
     .account-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 30px;
     }
@@ -37,8 +37,8 @@
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -52,14 +52,14 @@
 
     .account-field label {
         display: block;
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         margin-bottom: 8px;
     }
 
     .account-value {
-        background: #FAFAF8;
-        border: 1px solid #ECECF0;
+        background: var(--paper);
+        border: 1px solid var(--line);
         border-radius: 10px;
         padding: 14px;
         overflow-wrap: anywhere;
@@ -67,7 +67,7 @@
 
     .account-divider {
         border: none;
-        border-top: 1px solid #ECECF0;
+        border-top: 1px solid var(--line);
         margin: 8px 0 24px;
     }
 
@@ -76,10 +76,10 @@
         display: block;
         width: 100%;
         padding: 14px;
-        border: 1px solid #E4E2EB;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        background: white;
-        color: #1A1A1F;
+        background: var(--surface);
+        color: var(--ink);
         font: inherit;
         font-weight: 600;
         text-align: left;
@@ -92,13 +92,13 @@
 
     .account-link:hover,
     .account-signout-button:hover {
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
     }
 
     .account-link:focus-visible,
     .account-signout-button:focus-visible {
-        outline: 2px solid #6D5BD0;
+        outline: 2px solid var(--ink);
         outline-offset: 2px;
     }
 
@@ -113,7 +113,7 @@
         }
 
         .account-heading h1 {
-            font-size: 26px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .account-card {

@@ -12,19 +12,19 @@
     }
 
     .login-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 32px;
     }
 
     .login-card h1 {
         margin: 0 0 8px;
-        font-size: 28px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .login-subtitle {
-        color: #666670;
+        color: var(--muted);
         font-size: 14px;
         margin-bottom: 28px;
         line-height: 1.5;
@@ -45,15 +45,15 @@
         display: block;
         width: 100%;
         padding: 13px;
-        border: 1px solid #DCDCE4;
+        border: 1px solid var(--field-border);
         border-radius: 10px;
-        background: #FAFAF8;
-        color: #1A1A1F;
+        background: var(--paper);
+        color: var(--ink);
         font: inherit;
     }
 
     .login-field input:focus {
-        outline: 2px solid #6D5BD0;
+        outline: 2px solid var(--ink);
         outline-offset: 1px;
     }
 
@@ -63,7 +63,7 @@
         padding: 14px;
         border: 0;
         border-radius: 10px;
-        background: #6D5BD0;
+        background: var(--ink);
         color: white;
         font: inherit;
         font-weight: 600;
@@ -71,7 +71,7 @@
     }
 
     .login-button:hover {
-        background: #5846B8;
+        background: var(--green);
     }
 
     .login-button:disabled {
@@ -83,8 +83,8 @@
         margin: 0 0 16px;
         padding: 12px;
         border-radius: 10px;
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
         font-size: 14px;
     }
 
@@ -96,11 +96,11 @@
         margin: 24px 0 0;
         text-align: center;
         font-size: 14px;
-        color: #666670;
+        color: var(--muted);
     }
 
     .register-link a {
-        color: #6D5BD0;
+        color: var(--ink);
         font-weight: 600;
     }
 
@@ -217,7 +217,8 @@
             }
 
             if (user.role === "owner") {
-                window.location.replace("/owner");
+                const next = new URLSearchParams(window.location.search).get("next");
+                window.location.replace(next === "/owner/report/new" ? next : "/owner");
                 return;
             }
 

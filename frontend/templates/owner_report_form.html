@@ -11,26 +11,26 @@
     }
 
     .step-label {
-        color: #6D5BD0;
+        color: var(--ink);
         font-size: 13px;
         font-weight: 700;
         margin-bottom: 10px;
     }
 
     .details-heading h1 {
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
         margin: 0 0 10px;
     }
 
     .details-heading p {
-        color: #666670;
+        color: var(--muted);
         line-height: 1.5;
         margin: 0 0 26px;
     }
 
     .details-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 32px;
     }
@@ -52,10 +52,10 @@
         display: block;
         width: 100%;
         padding: 14px;
-        border: 1px solid #DCDCE4;
+        border: 1px solid var(--field-border);
         border-radius: 10px;
-        background: #FAFAF8;
-        color: #1A1A1F;
+        background: var(--paper);
+        color: var(--ink);
         font: inherit;
     }
 
@@ -67,13 +67,13 @@
     .details-field input:focus,
     .details-field select:focus,
     .details-field textarea:focus {
-        outline: 2px solid #6D5BD0;
+        outline: 2px solid var(--ink);
         outline-offset: 1px;
     }
 
     .field-help {
         margin: 7px 0 0;
-        color: #666670;
+        color: var(--muted);
         font-size: 12px;
         line-height: 1.5;
     }
@@ -83,7 +83,7 @@
         justify-content: space-between;
         gap: 12px;
         padding-top: 24px;
-        border-top: 1px solid #ECECF0;
+        border-top: 1px solid var(--line);
     }
 
     .back-action,
@@ -96,19 +96,19 @@
     }
 
     .back-action {
-        background: white;
-        border: 1px solid #DCDCE4;
-        color: #1A1A1F;
+        background: var(--surface);
+        border: 1px solid var(--field-border);
+        color: var(--ink);
     }
 
     .submit-action {
-        background: #6D5BD0;
-        border: 1px solid #6D5BD0;
+        background: var(--ink);
+        border: 1px solid var(--ink);
         color: white;
     }
 
     .submit-action:hover {
-        background: #5846B8;
+        background: var(--green);
     }
 
     .submit-action:disabled,
@@ -121,8 +121,8 @@
         margin-top: 20px;
         padding: 14px;
         border-radius: 10px;
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
         font-size: 14px;
         line-height: 1.5;
     }
@@ -133,7 +133,7 @@
 
     @media (max-width: 600px) {
         .details-heading h1 {
-            font-size: 25px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .details-card {

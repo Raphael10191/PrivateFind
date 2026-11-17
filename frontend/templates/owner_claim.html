@@ -12,7 +12,7 @@
 
     .claim-back {
         display: inline-block;
-        color: #6D5BD0;
+        color: var(--ink);
         font-size: 14px;
         font-weight: 600;
         margin-bottom: 24px;
@@ -20,18 +20,18 @@
 
     .claim-heading h1 {
         margin: 0 0 10px;
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .claim-heading p {
-        color: #666670;
+        color: var(--muted);
         line-height: 1.6;
         margin: 0 0 26px;
     }
 
     .claim-card {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 30px;
         margin-bottom: 20px;
@@ -43,7 +43,7 @@
     }
 
     .claim-hint {
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         line-height: 1.6;
     }
@@ -62,10 +62,10 @@
     .claim-field textarea {
         width: 100%;
         padding: 13px;
-        border: 1px solid #DCDCE4;
+        border: 1px solid var(--field-border);
         border-radius: 10px;
-        background: #FAFAF8;
-        color: #1A1A1F;
+        background: var(--paper);
+        color: var(--ink);
         font: inherit;
     }
 
@@ -76,21 +76,21 @@
     }
 
     .claim-field textarea::placeholder {
-        color: #666670;
+        color: var(--muted);
         opacity: 1;
     }
 
     .claim-field textarea:focus {
-        outline: 2px solid #6D5BD0;
+        outline: 2px solid var(--ink);
         outline-offset: 1px;
     }
 
     .secondary-button {
         padding: 11px 15px;
-        border: 1px solid #DCDCE4;
+        border: 1px solid var(--field-border);
         border-radius: 10px;
-        background: white;
-        color: #1A1A1F;
+        background: var(--surface);
+        color: var(--ink);
         font: inherit;
         font-weight: 600;
         cursor: pointer;
@@ -101,7 +101,7 @@
         padding: 14px;
         border: none;
         border-radius: 10px;
-        background: #6D5BD0;
+        background: var(--ink);
         color: white;
         font: inherit;
         font-weight: 600;
@@ -110,7 +110,7 @@
     }
 
     .primary-button:hover {
-        background: #5846B8;
+        background: var(--green);
     }
 
     button:disabled {
@@ -121,14 +121,14 @@
     .error-box {
         padding: 14px;
         border-radius: 10px;
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
         line-height: 1.5;
         margin-bottom: 18px;
     }
 
     .result-box {
-        background: #EFEBFA;
+        background: var(--sage);
         border-radius: 12px;
         padding: 20px;
         margin-top: 16px;
@@ -143,7 +143,7 @@
         font-size: 30px;
         letter-spacing: 4px;
         font-weight: 700;
-        color: #6D5BD0;
+        color: var(--ink);
         overflow-wrap: anywhere;
     }
 
@@ -160,7 +160,7 @@
 
     @media (max-width: 600px) {
         .claim-heading h1 {
-            font-size: 25px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .claim-card {

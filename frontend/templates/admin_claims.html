@@ -20,22 +20,22 @@
 
     .reviews-heading h1 {
         margin: 0 0 8px;
-        font-size: 30px;
+        font-size: clamp(2.25rem, 5vw, 3.3rem);
     }
 
     .reviews-heading p {
         margin: 0;
-        color: #666670;
+        color: var(--muted);
         line-height: 1.5;
     }
 
     .reviews-refresh,
     .review-button {
-        border: 1px solid #E4E2EB;
+        border: 1px solid var(--line);
         border-radius: 10px;
         padding: 12px 16px;
-        background: white;
-        color: #1A1A1F;
+        background: var(--surface);
+        color: var(--ink);
         font: inherit;
         font-weight: 600;
         cursor: pointer;
@@ -43,7 +43,7 @@
 
     .reviews-refresh:hover,
     .review-button:hover {
-        background: #EFEBFA;
+        background: var(--sage);
     }
 
     button:disabled {
@@ -59,8 +59,8 @@
     }
 
     .reviews-panel {
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 18px;
         padding: 24px;
         min-width: 0;
@@ -75,8 +75,8 @@
         display: block;
         width: 100%;
         text-align: left;
-        background: white;
-        border: 1px solid #ECECF0;
+        background: var(--surface);
+        border: 1px solid var(--line);
         border-radius: 12px;
         padding: 15px;
         margin-bottom: 10px;
@@ -86,8 +86,8 @@
 
     .claim-list-item:hover,
     .claim-list-item.selected {
-        background: #EFEBFA;
-        border-color: #6D5BD0;
+        background: var(--sage);
+        border-color: var(--ink);
     }
 
     .claim-list-item strong {
@@ -98,14 +98,14 @@
     .claim-list-item span {
         display: block;
         font-size: 13px;
-        color: #666670;
+        color: var(--muted);
         line-height: 1.5;
     }
 
     .review-status {
         display: inline-block;
-        background: #EFEBFA;
-        color: #6D5BD0;
+        background: var(--sage);
+        color: var(--ink);
         border-radius: 20px;
         padding: 7px 12px;
         font-size: 12px;
@@ -119,7 +119,7 @@
 
     .review-field-label {
         display: block;
-        color: #666670;
+        color: var(--muted);
         font-size: 13px;
         margin-bottom: 6px;
     }
@@ -131,14 +131,14 @@
 
     .review-divider {
         border: 0;
-        border-top: 1px solid #ECECF0;
+        border-top: 1px solid var(--line);
         margin: 22px 0;
     }
 
     .evidence-row {
         padding: 14px;
-        background: #FAFAF8;
-        border: 1px solid #ECECF0;
+        background: var(--paper);
+        border: 1px solid var(--line);
         border-radius: 10px;
         margin-bottom: 10px;
     }
@@ -165,7 +165,7 @@
         width: 100%;
         min-height: 90px;
         padding: 13px;
-        border: 1px solid #DCDCE4;
+        border: 1px solid var(--field-border);
         border-radius: 10px;
         font: inherit;
         resize: vertical;
@@ -179,13 +179,13 @@
     }
 
     .approve-button {
-        background: #6D5BD0;
-        border-color: #6D5BD0;
+        background: var(--ink);
+        border-color: var(--ink);
         color: white;
     }
 
     .approve-button:hover {
-        background: #5846B8;
+        background: var(--green);
         color: white;
     }
 
@@ -197,17 +197,17 @@
     }
 
     .review-error {
-        background: #FFF1F1;
-        color: #A32727;
+        background: var(--danger-bg);
+        color: var(--danger);
     }
 
     .review-success {
-        background: #EFEBFA;
-        color: #42338C;
+        background: var(--sage);
+        color: var(--green);
     }
 
     .review-empty {
-        color: #666670;
+        color: var(--muted);
         line-height: 1.6;
         padding: 18px 0;
     }
@@ -223,7 +223,7 @@
         }
 
         .reviews-heading h1 {
-            font-size: 26px;
+            font-size: clamp(2.25rem, 5vw, 3.3rem);
         }
 
         .reviews-grid {
@@ -283,7 +283,7 @@
                 Select a claim to view its ownership evidence.
             </p>
 
-            <div id="review-details" hidden>
+            <div id="review-details" tabindex="-1" hidden>
 
                 <span class="review-status">
                     In Review
@@ -613,6 +613,7 @@
             noteInput.value = "";
             placeholder.hidden = true;
             reviewDetails.hidden = false;
+            if (window.matchMedia("(max-width: 760px)").matches) reviewDetails.focus();
 
             reviewsList.querySelectorAll(
                 ".claim-list-item"
@@ -855,6 +856,12 @@
         () => submitDecision("reject")
     );
 
-    loadClaims();
+    loadClaims().then(() => {
+        const id = new URLSearchParams(location.search).get("id");
+        if (!id) return;
+        const option = Array.from(reviewsList.querySelectorAll("button"))
+            .find(button => button.dataset.claimId === id);
+        if (option) selectClaim(id);
+    });
 </script>
 {% endblock %}

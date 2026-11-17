@@ -441,6 +441,13 @@ Claims remain `approved` after successful collection. **Use the linked report's 
 
 All require a logged-in admin. Common errors are 401/403; details for a missing item/claim/photo return 404. Use lowercase status values.
 
+### GET `/api/admin/lockers`
+
+Requires an operator session. Returns each configured locker with its `code`, `name`,
+`location`, `device_id`, `last_seen_at` and a list of `{ "number": 1, "state": "free" }`
+compartments. `last_seen_at` is null until a heartbeat is recorded. This is a read of
+the current backend state. Use the separate authorized reset endpoint for maintenance.
+
 ### GET `/api/admin/items`
 
 Optional query fields: `status` and `ai_status` (strings). Omit for all; combine filters with `&`:
