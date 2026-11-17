@@ -11,7 +11,7 @@ from app.modules.found_items.models import FoundItem
 from app.modules.lost_reports.models import LostReport
 from app.modules.matching.models import MatchCandidate
 from app.shared.ai.mock import MockAIProvider
-from app.shared.ai.provider import set_ai_provider
+from app.shared.ai.provider import PhotoFinding, set_ai_provider
 from tests.conftest import deposit_and_store
 
 # ---------- policy ----------
@@ -340,39 +340,136 @@ async def test_photo_verification_rechecks_existing_review_and_issues_code(
     await session.commit()
 
     ai = MockAIProvider()
-    ai.verify_photos = AsyncMock(return_value=[0.95, 0.25])
+    description = (
+        "There is a rde cat stickr below the camera. "
+        "The upper left corner has a deep diagonal scratch. "
+        "I always kept it in my bag on the way to class. The phone is black and the remaining "
+        "details are ordinary. I bought it two years ago and used it every day."
+    )
+    assert len(description) > 200
+    ai.verify_photos = AsyncMock(
+        return_value=[
+            PhotoFinding(
+                quote="a rde cat stickr below the camera",
+                kind="mark",
+                status="confirmed",
+                photo_index=0,
+            ),
+            PhotoFinding(
+                quote="upper left corner has a deep diagonal scratch",
+                kind="damage",
+                status="confirmed",
+                photo_index=0,
+            ),
+        ]
+    )
     set_ai_provider(ai)
-    reply = await claim(owner, report_id, item_id, [{"type": "other", "value": "German Language"}])
+    reply = await owner.post(
+        "/api/claims",
+        json={
+            "lost_report_id": report_id,
+            "found_item_id": item_id,
+            "description": description,
+        },
+    )
     result = reply.json()
     assert result["id"] == first["id"]
     assert result["status"] == "approved" and len(result["pickup_code"]) == 6
     photos, details = ai.verify_photos.call_args.args
     assert len(photos) == 1 and photos[0].data.startswith(b"\xff\xd8")
-    assert details == ["German Language", "Black Samsung phone"]
+    assert details == description
 
 
 @pytest.mark.parametrize(
-    ("match_score", "visual_score", "status"),
-    [(90, 0.5, "rejected"), (90, 0.95, "approved"), (60, 0.95, "in_review")],
+    ("findings_data", "status"),
+    [
+        ([("common", "confirmed")], "rejected"),
+        ([("accessory", "confirmed"), ("accessory", "confirmed")], "in_review"),
+        ([("accessory", "unobservable")], "in_review"),
+        ([("accessory", "ambiguous")], "in_review"),
+        ([("accessory", "confirmed"), ("damage", "confirmed")], "approved"),
+        (
+            [("accessory", "confirmed"), ("damage", "confirmed"), ("mark", "contradicted")],
+            "in_review",
+        ),
+    ],
 )
-def test_visual_decision_uses_visible_proof_and_match_score(match_score, visual_score, status):
-    verdict = policy.verify_photo_evidence(
-        [],
-        [policy.Evidence("other", "German Language")],
-        {0: visual_score},
-        match_score,
-    )
+def test_visual_release_requires_independent_confirmed_details(findings_data, status):
+    findings = [
+        PhotoFinding(quote=f"Detail {i}", kind=kind, status=outcome, photo_index=0)
+        for i, (kind, outcome) in enumerate(findings_data)
+    ]
+    evidence = [policy.Evidence(f.kind, f.quote) for f in findings]
+    verdict = policy.verify_photo_evidence([], evidence, findings, 90)
     assert verdict.decision == status
 
 
 def test_visual_proof_cannot_override_wrong_serial():
-    verdict = policy.verify_photo_evidence(
-        ATTRS,
-        [policy.Evidence("serial_suffix", "1234"), policy.Evidence("other", "cat sticker")],
-        {1: 1.0},
-        100,
-    )
+    findings = [
+        PhotoFinding(quote="cat sticker", kind="mark", status="confirmed", photo_index=0),
+        PhotoFinding(quote="scratch", kind="damage", status="confirmed", photo_index=0),
+    ]
+    evidence = [policy.Evidence("serial_suffix", "1234")] + [
+        policy.Evidence(f.kind, f.quote) for f in findings
+    ]
+    verdict = policy.verify_photo_evidence(ATTRS, evidence, findings, 100)
     assert (verdict.decision, verdict.critical_conflict) == ("rejected", True)
+
+
+def test_a_full_serial_can_verify_with_no_visual_details():
+    stored = policy.Attr(2, "serial_suffix", "ABCD593802", "strong")
+    evidence = [policy.Evidence("serial_suffix", "ABCD593802")]
+    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "approved"
+    evidence[0].value = "593802"
+    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "rejected"
+    stored.value = "3802"
+    evidence[0].value = "ABCD593802"
+    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "in_review"
+
+
+def test_visual_finding_must_quote_owner_and_reference_a_real_photo():
+    photo = dict(kind="mark", status="confirmed", photo_index=0)
+    findings = [
+        PhotoFinding(quote="red star", **photo),
+        PhotoFinding(quote="red star", kind="damage", status="confirmed", photo_index=0),
+        PhotoFinding(quote="cat sticker", **photo),
+        PhotoFinding(quote="big scratch", kind="damage", status="confirmed", photo_index=1),
+    ]
+    assert service._grounded_findings("A red star and a big scratch", findings, 1) == findings[:1]
+
+
+def test_tentative_claim_remains_ambiguous_even_if_model_definitively_scores_it():
+    text = "Maybe a red fox charm or something."
+    finding = PhotoFinding(quote=text, kind="accessory", status="contradicted", photo_index=0)
+    grounded = service._grounded_findings(text, [finding], 1)
+    assert grounded[0].status == "ambiguous"
+    verdict = policy.verify_photo_evidence([], [policy.Evidence("accessory", text)], grounded, 90)
+    assert verdict.decision == "in_review"
+
+
+async def test_review_retries_share_attempt_limit(client, owner, locker):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker)
+    ai = MockAIProvider()
+    ai.verify_photos = AsyncMock(
+        return_value=[
+            PhotoFinding(quote="serial hidden inside", kind="mark", status="unobservable"),
+        ]
+    )
+    set_ai_provider(ai)
+    payload = {
+        "lost_report_id": report_id,
+        "found_item_id": item_id,
+        "description": "A serial hidden inside",
+    }
+    claim_ids = set()
+    for _ in range(3):
+        response = await owner.post("/api/claims", json=payload)
+        assert response.json()["status"] == "in_review"
+        claim_ids.add(response.json()["id"])
+    assert len(claim_ids) == 1
+    response = await owner.post("/api/claims", json=payload)
+    assert response.status_code == 429
+    assert ai.verify_photos.await_count == 3
 
 
 async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker, caplog):

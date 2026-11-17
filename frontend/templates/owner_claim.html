@@ -59,7 +59,6 @@
         margin-bottom: 9px;
     }
 
-    .claim-field select,
     .claim-field textarea {
         width: 100%;
         padding: 13px;
@@ -71,26 +70,21 @@
     }
 
     .claim-field textarea {
-        min-height: 90px;
+        min-height: 155px;
         resize: vertical;
         margin-top: 10px;
     }
 
-    .claim-field select:focus,
+    .claim-field textarea::placeholder {
+        color: #666670;
+        opacity: 1;
+    }
+
     .claim-field textarea:focus {
         outline: 2px solid #6D5BD0;
         outline-offset: 1px;
     }
 
-    .evidence-entry {
-        padding: 16px;
-        border: 1px solid #ECECF0;
-        border-radius: 12px;
-        margin: 16px 0;
-    }
-
-    .add-button,
-    .remove-button,
     .secondary-button {
         padding: 11px 15px;
         border: 1px solid #DCDCE4;
@@ -100,11 +94,6 @@
         font: inherit;
         font-weight: 600;
         cursor: pointer;
-    }
-
-    .remove-button {
-        margin-top: 8px;
-        font-size: 13px;
     }
 
     .primary-button {
@@ -215,19 +204,15 @@
 
         <h2>Ownership Evidence</h2>
 
-        <p class="claim-hint">
-            For example, describe a keyboard layout, a mark, or an engraving.
-            Avoid sharing your full password,
-            PIN, or unnecessary personal information.
-        </p>
-
-        <div id="evidence-list"></div>
-
-        <button type="button"
-                id="add-evidence"
-                class="add-button">
-            + Add Another Detail
-        </button>
+        <div class="claim-field">
+            <label for="ownership-description">What makes your item recognizable?</label>
+            <textarea id="ownership-description" name="description" required maxlength="1000"
+                      aria-describedby="description-hint"
+                      placeholder="For example: One round key has a yellow cap, and there is a small fox charm on the ring.&#10;&#10;You can mention a color, model, serial number, marking, or repair."></textarea>
+            <p id="description-hint" class="claim-hint">
+                Describe the details you remember in your own words. A serial number is optional.
+            </p>
+        </div>
 
         <button type="submit"
                 id="submit-claim"
@@ -317,9 +302,7 @@
         "claim-form"
     );
 
-    const evidenceList = document.getElementById(
-        "evidence-list"
-    );
+    const evidenceInput = document.getElementById("ownership-description");
 
     const claimError = document.getElementById(
         "claim-error"
@@ -352,17 +335,6 @@
     const pickupDetails = document.getElementById(
         "pickup-details"
     );
-
-    const evidenceTypes = {
-        other: "Describe an identifying detail",
-        serial_suffix: "Last digits of a serial number",
-        model: "Exact model",
-        sticker_or_mark: "Unique sticker or mark",
-        damage: "Distinctive damage",
-        contents: "Contents of the item",
-        accessory: "Accessory",
-        engraving: "Engraving"
-    };
 
     let claimId = null;
     let submitting = false;
@@ -406,90 +378,6 @@
         return response.json();
     }
 
-    function addEvidence() {
-        if (evidenceList.children.length >= 8) {
-            return;
-        }
-
-        const entry = document.createElement("div");
-        entry.className = "evidence-entry";
-
-        const typeField = document.createElement("div");
-        typeField.className = "claim-field";
-
-        const typeLabel = document.createElement("label");
-        typeLabel.textContent = "Type of evidence";
-
-        const select = document.createElement("select");
-        select.required = true;
-
-        for (const [value, label] of
-            Object.entries(evidenceTypes)) {
-
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = label;
-            select.appendChild(option);
-        }
-
-        const valueField = document.createElement("div");
-        valueField.className = "claim-field";
-
-        const valueLabel = document.createElement("label");
-        valueLabel.textContent = "Identifying detail";
-
-        const textarea = document.createElement("textarea");
-        textarea.required = true;
-        textarea.maxLength = 200;
-        textarea.placeholder =
-            "Describe what makes this item yours";
-
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "remove-button";
-        remove.textContent = "Remove detail";
-
-        remove.addEventListener("click", () => {
-            entry.remove();
-            updateEvidenceButtons();
-        });
-
-        typeField.append(typeLabel, select);
-        valueField.append(valueLabel, textarea);
-
-        entry.append(typeField, valueField, remove);
-        evidenceList.appendChild(entry);
-
-        updateEvidenceButtons();
-    }
-
-    function updateEvidenceButtons() {
-        document.getElementById(
-            "add-evidence"
-        ).disabled = evidenceList.children.length >= 8;
-
-        const removeButtons =
-            evidenceList.querySelectorAll(
-                ".remove-button"
-            );
-
-        removeButtons.forEach(button => {
-            button.disabled =
-                evidenceList.children.length <= 1;
-        });
-    }
-
-    function getEvidence() {
-        return Array.from(
-            evidenceList.querySelectorAll(
-                ".evidence-entry"
-            )
-        ).map(entry => ({
-            type: entry.querySelector("select").value,
-            value: entry.querySelector("textarea").value.trim()
-        }));
-    }
-
     function showPickup(code, compartment, expiry) {
         // Codes are strings. Never convert them to numbers.
         document.getElementById(
@@ -515,7 +403,7 @@
         claimForm.hidden = false;
         submitButton.disabled = false;
         submitButton.textContent = "Submit Ownership Claim";
-        evidenceList.querySelector("textarea")?.focus();
+        evidenceInput.focus();
     });
 
     function showClaimResult(claim) {
@@ -561,7 +449,7 @@
 
         } else if (claim.status === "in_review") {
             heading.textContent =
-                "Claim Under Admin Review";
+                "More Evidence Needed";
 
             statusButton.hidden = false;
 
@@ -618,7 +506,6 @@
             }
 
             claimForm.hidden = false;
-            addEvidence();
 
         } catch (error) {
             loadingBox.hidden = true;
@@ -628,10 +515,6 @@
             );
         }
     }
-
-    document.getElementById(
-        "add-evidence"
-    ).addEventListener("click", addEvidence);
 
     claimForm.addEventListener(
         "submit",
@@ -648,20 +531,10 @@
                 return;
             }
 
-            const evidence = getEvidence();
-
-            if (
-                evidence.length < 1 ||
-                evidence.length > 8 ||
-                evidence.some(item =>
-                    item.value.length < 1 ||
-                    item.value.length > 200
-                )
-            ) {
-                showError(
-                    "Provide between 1 and 8 valid " +
-                    "identifying details."
-                );
+            const description = evidenceInput.value.trim();
+            if (!description) {
+                showError("Describe an identifying detail.");
+                evidenceInput.focus();
                 return;
             }
 
@@ -681,7 +554,7 @@
                         body: JSON.stringify({
                             lost_report_id: Number(reportId),
                             found_item_id: Number(itemId),
-                            evidence: evidence
+                            description: description
                         })
                     }
                 );

@@ -19,10 +19,11 @@ from app.shared.ai.provider import (
     DetailAttribute,
     DetailScores,
     Photo,
+    PhotoAssessment,
+    PhotoFinding,
     bounded_score,
     detail_input,
     detail_scores,
-    photo_scores,
 )
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType, Strength
@@ -168,14 +169,14 @@ class QwenProvider:
             )
         return result
 
-    async def verify_photos(self, photos: list[Photo], evidence: list[str]) -> list[float]:
+    async def verify_photos(self, photos: list[Photo], description: str) -> list[PhotoFinding]:
         content = self._images(photos)
         content.append(
-            {"type": "text", "text": json.dumps({"evidence": evidence}, ensure_ascii=False)}
+            {"type": "text", "text": json.dumps({"description": description}, ensure_ascii=False)}
         )
         try:
             result = await self._chat(PHOTO_VERIFICATION_SYSTEM, content)
-            return photo_scores(evidence, result["scores"])
+            return PhotoAssessment.model_validate(result).findings
         except RESPONSE_ERRORS as exc:
             raise AIError("Qwen photo verification failed") from exc
 

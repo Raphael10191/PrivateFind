@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.modules.found_items.schemas import AttributeIO
 from app.shared.vocab import EvidenceType
@@ -15,7 +15,17 @@ class EvidenceIn(BaseModel):
 class ClaimIn(BaseModel):
     lost_report_id: int
     found_item_id: int
-    evidence: list[EvidenceIn] = Field(min_length=1, max_length=8)
+    evidence: list[EvidenceIn] | None = Field(default=None, min_length=1, max_length=8)
+    description: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+        | None
+    ) = None
+
+    @model_validator(mode="after")
+    def require_evidence(self):
+        if not self.description and not self.evidence:
+            raise ValueError("Describe an identifying detail.")
+        return self
 
 
 class ClaimOut(BaseModel):

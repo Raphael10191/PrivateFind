@@ -15,9 +15,10 @@ from app.shared.ai.provider import (
     DetailAttribute,
     DetailScores,
     Photo,
+    PhotoAssessment,
+    PhotoFinding,
     detail_input,
     detail_scores,
-    photo_scores,
 )
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType
@@ -95,13 +96,13 @@ class ClaudeProvider:
         content.append({"type": "text", "text": f"Finder's note: {note or '(none)'}"})
         return await self._parse(EXTRACT_SYSTEM, content, Extraction)
 
-    async def verify_photos(self, photos: list[Photo], evidence: list[str]) -> list[float]:
+    async def verify_photos(self, photos: list[Photo], description: str) -> list[PhotoFinding]:
         content = self._images(photos)
         content.append(
-            {"type": "text", "text": json.dumps({"evidence": evidence}, ensure_ascii=False)}
+            {"type": "text", "text": json.dumps({"description": description}, ensure_ascii=False)}
         )
-        result = await self._parse(PHOTO_VERIFICATION_SYSTEM, content, _Similarities)
-        return photo_scores(evidence, result.scores)
+        result = await self._parse(PHOTO_VERIFICATION_SYSTEM, content, PhotoAssessment)
+        return result.findings
 
     async def compare_texts(self, query: str, candidates: list[str]) -> list[float]:
         if not candidates:

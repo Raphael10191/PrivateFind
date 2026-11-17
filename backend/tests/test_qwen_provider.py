@@ -125,9 +125,17 @@ async def test_qwen_does_not_call_api_for_empty_candidates_or_details(monkeypatc
 
 async def test_qwen_verifies_evidence_with_finder_photo_in_same_request(monkeypatch):
     ai = QwenProvider(Settings(qwen_model="test-qwen"))
-    request = Mock(return_value=response({"scores": [0.95, 0.3]}))
+    description = "A round key with a yello cap. It has a crack near the top."
+    finding = {
+        "quote": "round key with a yello cap",
+        "kind": "arrangement",
+        "status": "confirmed",
+        "photo_index": 0,
+    }
+    request = Mock(return_value=response({"findings": [finding]}))
     monkeypatch.setattr(ai, "_request", request)
-    assert await ai.verify_photos([Photo(b"a")], ["German Language", "Apple laptop"]) == [0.95, 0.3]
+    results = await ai.verify_photos([Photo(b"a")], description)
+    assert [entry.model_dump() for entry in results] == [finding]
     content = request.call_args.args[2]["messages"][1]["content"]
     assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,YQ=="
-    assert "German Language" in content[1]["text"]
+    assert json.loads(content[1]["text"])["description"] == description

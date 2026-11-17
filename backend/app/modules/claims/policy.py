@@ -4,13 +4,13 @@ import re
 from dataclasses import dataclass, field
 from itertools import product
 
+from app.shared.ai.provider import PhotoFinding
 from app.shared.vocab import CRITICAL_TYPES, GENERIC_CATEGORIES, STRENGTH_WEIGHT
 
 APPROVE_AT = 75
 REVIEW_AT = 50
 SIMILARITY_MATCH = 0.6
 TOP_N = 2
-VISIBLE_PROOF = 0.85
 
 
 @dataclass
@@ -37,13 +37,13 @@ class Verdict:
     results: dict[int, tuple[str, int | None, float | None]] = field(default_factory=dict)
 
 
-def _digits(s: str) -> str:
-    return re.sub(r"\D", "", s)
+def _serial(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.casefold())
 
 
 def critical_matches(attr_value: str, claimed: str) -> bool:
     """Serial suffix: the claimed digits must end with the stored suffix."""
-    want, got = _digits(attr_value), _digits(claimed)
+    want, got = _serial(attr_value), _serial(claimed)
     return bool(want) and len(got) >= len(want) and got.endswith(want)
 
 
@@ -141,33 +141,52 @@ def verify(
 def verify_photo_evidence(
     attrs: list[Attr],
     evidence: list[Evidence],
-    scores: dict[int, float],
+    findings: list[PhotoFinding],
     match_score: float,
 ) -> Verdict:
     serial_attrs = [attr for attr in attrs if attr.type in CRITICAL_TYPES]
     serial = verify(None, serial_attrs, evidence, {}, match_score)
     results = serial.results
-    for index, similarity in scores.items():
-        results[index] = ("match" if similarity >= VISIBLE_PROOF else "mismatch", None, similarity)
-    confirmed_serial = any(
-        result[0] == "match"
-        for index, result in results.items()
-        if evidence[index].type in CRITICAL_TYPES
-    )
-    best = 1.0 if confirmed_serial else max(scores.values(), default=0.0)
-    score = round(0.6 * match_score + 40 * best)
-    if serial.critical_conflict or best < VISIBLE_PROOF:
+    groups = set()
+    full_serial = False
+    for index, result in results.items():
+        if result[0] == "match" and evidence[index].type in CRITICAL_TYPES:
+            groups.add("serial_suffix")
+            value = _serial(evidence[index].value)
+            full_serial |= len(value) >= 8 and any(
+                _serial(attr.value) == value for attr in serial_attrs
+            )
+
+    contradicted = False
+    needs_evidence = not findings
+    indices = [i for i, entry in enumerate(evidence) if entry.type not in CRITICAL_TYPES]
+    for index, finding in zip(indices, findings, strict=True):
+        if finding.status == "confirmed":
+            results[index] = ("match", None, None)
+            if finding.kind != "common":
+                groups.add(finding.kind)
+        elif finding.status == "contradicted":
+            results[index] = ("mismatch", None, None)
+            contradicted = True
+        elif finding.kind != "common":
+            needs_evidence = True
+
+    detail = 100 if full_serial else min(len(groups), 2) * 50
+    score = round(0.6 * match_score + 0.4 * detail)
+    if serial.critical_conflict:
         decision = "rejected"
-    elif score >= APPROVE_AT:
+    elif detail == 100 and score >= APPROVE_AT and not contradicted:
         decision = "approved"
-    else:
+    elif groups or (needs_evidence and not contradicted):
         decision = "in_review"
-    return Verdict(decision, score, serial.critical_conflict, best * 100, results)
+    else:
+        decision = "rejected"
+    return Verdict(decision, score, serial.critical_conflict, detail, results)
 
 
 MESSAGES = {
     "pending": "Your claim is waiting to be checked.",
     "approved": "Ownership verified. Use the pickup code at the locker.",
-    "in_review": "Thanks. An administrator will review your claim.",
+    "in_review": "More evidence is needed. You can add another detail or wait for a review.",
     "rejected": "We could not verify ownership. Try again with a more specific identifying detail.",
 }

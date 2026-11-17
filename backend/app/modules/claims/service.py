@@ -16,18 +16,42 @@ from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
 from app.modules.matching import service as matching
 from app.shared import audit, storage
-from app.shared.ai.provider import AIError, DetailAttribute, DetailScores, Photo, get_ai_provider
+from app.shared.ai.provider import (
+    AIError,
+    DetailAttribute,
+    DetailScores,
+    Photo,
+    PhotoFinding,
+    get_ai_provider,
+)
 from app.shared.vocab import CRITICAL_TYPES
 
 log = logging.getLogger("uvicorn.error")
 DETAIL_SEPARATOR = re.compile(r"[,;\n]|\b(?:und|and|mit|with)\b", re.IGNORECASE)
 MAX_EVIDENCE = 8
+SERIAL_IN_DESCRIPTION = re.compile(
+    r"\b(?:serial(?:\s+(?:number|no\.?))?|seriennummer|s/n)\s*"
+    r"(?:(?:ends? (?:in|with)|ending (?:in|with)|endet auf|is|ist)\s*)?"
+    r"[:#=]?\s*([a-z0-9][a-z0-9-]{3,39})\b",
+    re.IGNORECASE,
+)
+UNCERTAIN_DETAIL = re.compile(
+    r"\b(?:maybe|perhaps|possibly|probably|not sure|either|or|vielleicht|eventuell|"
+    r"wahrscheinlich|nicht sicher|oder)\b",
+    re.IGNORECASE,
+)
 
 # ---------- owner ----------
 
 
 async def submit(
-    session: AsyncSession, user_id: int, report_id: int, item_id: int, evidence: list[dict]
+    session: AsyncSession,
+    user_id: int,
+    report_id: int,
+    item_id: int,
+    evidence: list[dict],
+    *,
+    description: str | None = None,
 ) -> tuple[Claim, locker_service.IssuedCode | None]:
     report = await reports.get_own(session, report_id, user_id)
     item = await items.get_item(session, item_id)
@@ -37,41 +61,59 @@ async def submit(
     if item.status != "open":
         raise AppError(409, "item_unavailable", "This item is no longer available.")
     visual = getattr(get_ai_provider(), "verify_photos", None)
-    await _check_attempts(session, user_id, item_id, retry_review=callable(visual))
+    photo_workflow = callable(visual) or description is not None
+    await _check_attempts(session, user_id, item_id, retry_review=photo_workflow)
 
     attrs = [policy.Attr(a.id, a.name, a.value, a.strength) for a in item.private_attributes()]
-    ev = _claim_evidence(evidence, report.description)
-    if callable(visual):
-        indices = [i for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
-        try:
-            photos = [Photo(storage.read_photo(p.file_name)) for p in item.photos]
-            if not photos:
-                raise AppError(
-                    409, "photos_unavailable", "Finder photos are unavailable for verification."
-                )
-            scores = await visual(photos, [ev[i].value for i in indices]) if indices else []
-            verdict = policy.verify_photo_evidence(
-                attrs, ev, dict(zip(indices, scores, strict=True)), match.total
+    if photo_workflow:
+        text = "\n".join(
+            filter(
+                None,
+                [description, *(e["value"] for e in evidence if e["type"] not in CRITICAL_TYPES)],
             )
+        )
+        ev = [
+            policy.Evidence(e["type"], e["value"]) for e in evidence if e["type"] in CRITICAL_TYPES
+        ]
+        ev.extend(
+            policy.Evidence("serial_suffix", match.group(1))
+            for line in re.split(r"[!?;\n]", text)
+            if not UNCERTAIN_DETAIL.search(line)
+            for match in SERIAL_IN_DESCRIPTION.finditer(line)
+            if any(char.isdigit() for char in match.group(1))
+        )
+        await session.commit()
+        try:
+            findings = []
+            if callable(visual) and text and item.photos:
+                photos = [
+                    Photo(storage.read_photo(p.file_name))
+                    for p in item.photos[: get_settings().max_photos]
+                ]
+                findings = _grounded_findings(text, await visual(photos, text), len(photos))
         except (AIError, OSError, ValueError) as exc:
             raise AppError(
                 503,
                 "verification_unavailable",
                 "Photo verification is unavailable. Please try again.",
             ) from exc
+        ev.extend(policy.Evidence(finding.kind, finding.quote) for finding in findings)
+        verdict = policy.verify_photo_evidence(attrs, ev, findings, match.total)
     else:
+        ev = _claim_evidence(evidence, report.description)
         verdict = policy.verify(
             item.category, attrs, ev, await _similarities(attrs, ev), match.total
         )
 
     claim = None
-    if callable(visual):
+    if photo_workflow:
         await locker_service.compartment_for_item(session, item.id, lock=True)
         current_status = await session.scalar(
             select(type(item).status).where(type(item).id == item.id).with_for_update()
         )
         if current_status != "open":
             raise AppError(409, "item_unavailable", "This item is no longer available.")
+        await _check_attempts(session, user_id, item_id, retry_review=True)
         claim = await session.scalar(
             select(Claim)
             .where(
@@ -101,6 +143,11 @@ async def submit(
         )
         for i, e in enumerate(ev)
     ]
+    if description:
+        claim.evidence.extend(
+            OwnershipEvidence(type="description", value=description[start : start + 250])
+            for start in range(0, len(description), 250)
+        )
     await session.flush()
 
     issued = None
@@ -126,6 +173,27 @@ async def submit(
         verdict.decision,
     )
     return claim, issued
+
+
+def _grounded_findings(
+    text: str, findings: list[PhotoFinding], photo_count: int
+) -> list[PhotoFinding]:
+    normalized = " ".join(text.casefold().split())
+    seen: set[str] = set()
+    grounded = []
+    for finding in findings:
+        quote = " ".join(finding.quote.casefold().split())
+        if not quote or quote not in normalized or quote in seen:
+            continue
+        if UNCERTAIN_DETAIL.search(quote):
+            finding = finding.model_copy(update={"status": "ambiguous", "photo_index": None})
+        if finding.status in {"confirmed", "contradicted"} and (
+            finding.photo_index is None or not 0 <= finding.photo_index < photo_count
+        ):
+            continue
+        grounded.append(finding)
+        seen.add(quote)
+    return grounded
 
 
 def _claim_evidence(explicit: list[dict], description: str | None) -> list[policy.Evidence]:
@@ -185,14 +253,29 @@ async def _check_attempts(
     if open_claim:
         raise AppError(409, "claim_exists", "You already have an open claim for this item.")
     since = utcnow() - timedelta(hours=settings.claim_cooldown_h)
-    failed = await session.scalar(
-        select(func.count()).where(
-            Claim.user_id == user_id,
-            Claim.found_item_id == item_id,
-            Claim.status == "rejected",
-            Claim.created_at >= since,
+    if retry_review:
+        # Review retries update the claim, while the audit retains each attempt.
+        failed = await session.scalar(
+            select(func.count())
+            .select_from(audit.AuditLog)
+            .join(Claim, audit.AuditLog.entity_id == Claim.id)
+            .where(
+                audit.AuditLog.action == "claim_submitted",
+                audit.AuditLog.entity_type == "claim",
+                audit.AuditLog.at >= since,
+                Claim.user_id == user_id,
+                Claim.found_item_id == item_id,
+            )
         )
-    )
+    else:
+        failed = await session.scalar(
+            select(func.count()).where(
+                Claim.user_id == user_id,
+                Claim.found_item_id == item_id,
+                Claim.status == "rejected",
+                Claim.created_at >= since,
+            )
+        )
     if failed >= settings.max_failed_claims:
         raise AppError(429, "claim_cooldown", "Too many failed attempts. Please try again later.")
 

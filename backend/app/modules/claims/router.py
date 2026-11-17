@@ -39,7 +39,8 @@ async def submit(body: ClaimIn, user: CurrentUser, session: SessionDep):
         user.id,
         body.lost_report_id,
         body.found_item_id,
-        [e.model_dump() for e in body.evidence],
+        [e.model_dump() for e in body.evidence or []],
+        description=body.description,
     )
     return _out(claim, issued)
 
