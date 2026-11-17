@@ -1,11 +1,12 @@
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import select
 
 from app.core.db import utcnow
-from app.modules.claims import policy
+from app.modules.claims import policy, service
 from app.modules.found_items.models import FoundItem
 from app.modules.lost_reports.models import LostReport
 from app.shared.ai.mock import MockAIProvider
@@ -53,12 +54,87 @@ def test_generic_item_never_auto_approved():
         match_score=100,
     )
     assert (v.decision, v.score) == ("in_review", 100)
-    assert verify([("other", "plain")], category="umbrella", attrs=[]).decision == "in_review"
+    assert verify([("other", "plain")], category="umbrella", attrs=[]).decision == "rejected"
 
 
 def test_low_similarity_does_not_count():
     v = verify([("serial_suffix", "4821"), ("sticker_or_mark", "dog")], {(2, 1): 0.2})
     assert v.score == 72 and v.results[1][0] == "mismatch"
+
+
+@pytest.mark.parametrize(
+    ("text", "match_score", "similarity", "expected"),
+    [
+        ("schwarzes Handy", 70, 0.4, ("rejected", 42, 0)),
+        ("Auto als Hintergrund", 92, 0.95, ("approved", 75, 50)),
+    ],
+)
+def test_specific_wallpaper_can_verify_where_generic_text_cannot(
+    text, match_score, similarity, expected
+):
+    attrs = [
+        policy.Attr(1, "sticker_or_mark", "rally car wallpaper", "distinctive"),
+        policy.Attr(2, "damage", "scratched back", "distinctive"),
+    ]
+    verdict = verify([("other", text)], {(1, 0): similarity}, attrs=attrs, match_score=match_score)
+    assert (verdict.decision, verdict.score, verdict.detail_score) == expected
+
+
+def test_a_lower_weight_detail_cannot_substitute_for_a_top_attribute():
+    attrs = [
+        policy.Attr(1, "engraving", "engraved initials", "strong"),
+        policy.Attr(2, "damage", "scratched back", "distinctive"),
+        policy.Attr(3, "accessory", "hard case", "generic"),
+    ]
+    verdict = verify([("other", "hard case")], {(3, 0): 1}, attrs=attrs, match_score=92)
+    assert (verdict.decision, verdict.score, verdict.detail_score) == ("in_review", 55, 0)
+
+
+def test_top_attributes_can_use_different_evidence_when_best_match_overlaps():
+    attrs = [
+        policy.Attr(1, "damage", "scratched screen", "distinctive"),
+        policy.Attr(2, "damage", "scratched back", "distinctive"),
+    ]
+    verdict = verify(
+        [("other", "scratch on back"), ("other", "screen damage")],
+        {(1, 0): 0.97, (1, 1): 0.8, (2, 0): 0.9},
+        attrs=attrs,
+    )
+    assert (verdict.decision, verdict.detail_score) == ("approved", 100)
+    assert verdict.results == {0: ("match", 2, 0.9), 1: ("match", 1, 0.8)}
+
+
+def test_split_free_text_and_report_to_eight_details_with_typed_serial_preserved():
+    evidence = service._claim_evidence(
+        [
+            {"type": "other", "value": "Auto; Kratzer\nGravur und Band, Aufkleber"},
+            {"type": "serial_suffix", "value": "4821"},
+        ],
+        "Auto mit Hülle and Display with Name",
+    )
+    assert [e.value for e in evidence] == [
+        "4821",
+        "Auto",
+        "Kratzer",
+        "Gravur",
+        "Band",
+        "Aufkleber",
+        "Hülle",
+        "Display",
+    ]
+    assert [e.type for e in evidence] == ["serial_suffix"] + ["other"] * 7
+
+
+async def test_provider_without_batch_method_uses_compare_texts_with_correct_indices():
+    compare = AsyncMock(return_value=[0.9, 0.2])
+    set_ai_provider(SimpleNamespace(compare_texts=compare))
+    evidence = [
+        policy.Evidence("other", "Auto"),
+        policy.Evidence("serial_suffix", "4821"),
+        policy.Evidence("damage", "Cracked glass"),
+    ]
+    assert await service._similarities(ATTRS, evidence) == {(2, 0): 0.9, (2, 2): 0.2}
+    compare.assert_awaited_once_with("cat sticker", ["Auto", "Cracked glass"])
 
 
 @pytest.mark.parametrize(
@@ -243,18 +319,30 @@ async def test_admin_only(owner):
     assert (await owner.get("/api/admin/claims")).status_code == 403
 
 
-async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker):
+async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker, caplog):
     item_id, report_id, _ = await setup_candidate(client, owner, locker)
     ai = MockAIProvider()
     ai.verify_details = AsyncMock(wraps=ai.verify_details)
     set_ai_provider(ai)
 
-    response = await claim(owner, report_id, item_id, [{"type": "serial_suffix", "value": "4821"}])
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        response = await claim(
+            owner,
+            report_id,
+            item_id,
+            [
+                {"type": "serial_suffix", "value": "4821"},
+                {"type": "other", "value": "blauer Rand; matte Rückseite"},
+            ],
+        )
     assert response.json()["status"] == "approved"
     args = ai.verify_details.call_args.args
     assert ai.verify_details.await_count == 1
-    assert [row[1] for row in args[0]] == ["sticker_or_mark"]
-    assert args[1] == [(1, "other", "Black Samsung phone"), (2, "other", "a cat sticker")]
+    assert [row["type"] for row in args[0]] == ["sticker_or_mark"]
+    assert args[1] == ["blauer Rand", "matte Rückseite", "Black Samsung phone", "a cat sticker"]
+    assert (
+        caplog.messages.count("[VERIFY] Matching 100 | Details 100 -> Gesamt 100 -> approved") == 1
+    )
     admin_claim = await admin.get(f"/api/admin/claims/{response.json()['id']}")
     evidence = admin_claim.json()["evidence"]
     assert any(row["value"] == "a cat sticker" and row["result"] == "match" for row in evidence)

@@ -59,12 +59,15 @@ async def test_compare_texts_validates_length_and_clamps():
 
 async def test_verify_details_compares_all_pairs_in_one_call():
     p, messages = provider(_DetailSimilarities(scores=[[0.8, 0.2], [0.1, 0.9]]))
-    attrs = [(20, "damage", "cracked screen"), (21, "other", "car wallpaper")]
-    evidence = [(0, "other", "Riss"), (2, "accessory", "Auto")]
+    attrs = [
+        {"id": 20, "type": "damage", "value": "cracked screen"},
+        {"id": 21, "type": "other", "value": "car wallpaper"},
+    ]
+    evidence = ["Riss", "Auto"]
     assert await p.verify_details(attrs, evidence) == {
         (20, 0): 0.8,
-        (20, 2): 0.2,
+        (20, 1): 0.2,
         (21, 0): 0.1,
-        (21, 2): 0.9,
+        (21, 1): 0.9,
     }
     assert len(messages.calls) == 1

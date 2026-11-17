@@ -206,20 +206,10 @@ async def get_item(session: AsyncSession, item_id: int) -> FoundItem:
 async def stored_items(
     session: AsyncSession, category: str, found_after: datetime
 ) -> list[FoundItem]:
-    category_filter = (
-        FoundItem.category.is_not(None)
-        if category == "other"
-        else FoundItem.category.in_([category, "other"])
-    )
-    return list(
-        await session.scalars(
-            select(FoundItem).where(
-                FoundItem.status == "open",
-                category_filter,
-                FoundItem.found_at >= found_after,
-            )
-        )
-    )
+    query = select(FoundItem).where(FoundItem.status == "open", FoundItem.found_at >= found_after)
+    if category != "other":
+        query = query.where(FoundItem.category.in_([category, "other"]))
+    return list(await session.scalars(query))
 
 
 # ---------- admin ----------

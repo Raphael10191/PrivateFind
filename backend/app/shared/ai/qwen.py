@@ -15,7 +15,7 @@ from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import (
     DETAIL_SYSTEM,
     AIError,
-    Detail,
+    DetailAttribute,
     DetailScores,
     Photo,
     bounded_score,
@@ -38,9 +38,6 @@ Return one JSON object with category, color, brand, public_summary, description,
 and private_attributes. Each attribute has type, value, strength and confidence."""
 
 COMPARE_HINT = """
-Allow short descriptions in German or English. Generic facts such as "black iPhone" score
-0.3-0.5. Agreement on specific details like wallpaper, damage or an engraving scores 0.75-1.0.
-A clear contradiction scores 0.0-0.2. Ignore details the owner did not mention.
 Return JSON with a "scores" list containing one number per candidate, in order."""
 
 
@@ -171,7 +168,9 @@ class QwenProvider:
             log.warning("Qwen text comparison failed (%s); using mock", type(exc).__name__)
             return await self.mock.compare_texts(query, candidates)
 
-    async def verify_details(self, attrs: list[Detail], evidence: list[Detail]) -> DetailScores:
+    async def verify_details(
+        self, attrs: list[DetailAttribute], evidence: list[str]
+    ) -> DetailScores:
         if not attrs or not evidence:
             return {}
         try:

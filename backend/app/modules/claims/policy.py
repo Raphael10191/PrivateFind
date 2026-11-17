@@ -2,13 +2,14 @@
 
 import re
 from dataclasses import dataclass, field
+from itertools import product
 
 from app.shared.vocab import CRITICAL_TYPES, GENERIC_CATEGORIES, STRENGTH_WEIGHT
 
 APPROVE_AT = 75
 REVIEW_AT = 50
 SIMILARITY_MATCH = 0.6
-DETAIL_COUNT = 2
+TOP_N = 2
 
 
 @dataclass
@@ -30,6 +31,7 @@ class Verdict:
     decision: str  # APPROVED | IN_REVIEW | REJECTED
     score: int
     critical_conflict: bool
+    detail_score: float
     # evidence index -> (result, matched attribute id, similarity)
     results: dict[int, tuple[str, int | None, float | None]] = field(default_factory=dict)
 
@@ -61,9 +63,11 @@ def verify(
     similarity: dict[tuple[int, int], float],
     match_score: float,
 ) -> Verdict:
-    """Compare exact identifiers and score the two strongest confirmed details."""
-    strongest = sorted(attrs, key=_weight, reverse=True)
-    possible = sum(map(_weight, strongest[:DETAIL_COUNT]))
+    """Compare exact identifiers and score only the two strongest stored attributes."""
+    strongest = sorted(attrs, key=lambda attr: (-_weight(attr), attr.id))
+    top = strongest[:TOP_N]
+    possible = sum(map(_weight, top))
+    values = [" ".join(ev.value.casefold().split()) for ev in evidence]
     conflict = False
     used_attrs: set[int] = set()
     used_values: set[str] = set()
@@ -71,15 +75,18 @@ def verify(
         i: ("unmatched", None, None) for i in range(len(evidence))
     }
 
+    def record_match(attr: Attr, index: int, sim: float) -> None:
+        results[index] = ("match", attr.id, sim)
+        used_attrs.add(attr.id)
+        used_values.add(values[index])
+
     for i, ev in enumerate(evidence):
         if ev.type not in CRITICAL_TYPES:
             continue
         candidates = [attr for attr in strongest if comparable(attr, ev)]
         match = next((attr for attr in candidates if critical_matches(attr.value, ev.value)), None)
         if match is not None:
-            results[i] = ("match", match.id, 1.0)
-            used_attrs.add(match.id)
-            used_values.add(" ".join(ev.value.casefold().split()))
+            record_match(match, i, 1.0)
         elif candidates:
             results[i] = ("conflict", candidates[0].id, 0.0)
             conflict = True
@@ -91,31 +98,43 @@ def verify(
         for i, ev in enumerate(evidence)
         if comparable(attr, ev) and (sim := similarity.get((attr.id, i))) is not None
     ]
-    for attr, i, sim in sorted(pairs, key=lambda pair: (_weight(pair[0]), pair[2]), reverse=True):
-        value = " ".join(evidence[i].value.casefold().split())
-        if sim >= SIMILARITY_MATCH and attr.id not in used_attrs and value not in used_values:
-            results[i] = ("match", attr.id, sim)
-            used_attrs.add(attr.id)
-            used_values.add(value)
+    # Check both top attributes together so a shared candidate cannot hide a valid pair.
+    options: dict[int, list[tuple[Attr, int, float] | None]] = {
+        attr.id: [None] for attr in top if attr.type not in CRITICAL_TYPES
+    }
+    for attr, i, sim in pairs:
+        if attr.id in options and sim >= SIMILARITY_MATCH and values[i] not in used_values:
+            options[attr.id].append((attr, i, sim))
+    best = []
+    best_rank = (0, 0.0)
+    for choice in product(*options.values()):
+        matches = [pair for pair in choice if pair is not None]
+        if len({values[index] for _, index, _ in matches}) != len(matches):
+            continue
+        rank = (sum(_weight(attr) for attr, _, _ in matches), sum(sim for _, _, sim in matches))
+        if rank > best_rank:
+            best, best_rank = matches, rank
+    for attr, i, sim in best:
+        record_match(attr, i, sim)
 
     for attr, i, sim in sorted(pairs, key=lambda pair: pair[2], reverse=True):
-        if results[i][0] == "unmatched" and sim < SIMILARITY_MATCH:
+        if results[i][0] != "unmatched":
+            continue
+        if sim < SIMILARITY_MATCH:
             results[i] = ("mismatch", attr.id, sim)
+        elif attr.id not in used_attrs and values[i] not in used_values:
+            record_match(attr, i, sim)
 
-    matched = [_weight(attr) for attr in strongest if attr.id in used_attrs][:DETAIL_COUNT]
-    detail_score = 100 * sum(matched) / possible if possible else 0
+    matched = sum(_weight(attr) for attr in top if attr.id in used_attrs)
+    detail_score = 100 * matched / possible if possible else 0
     score = round(0.6 * match_score + 0.4 * detail_score)
-    if conflict:
+    if conflict or score < REVIEW_AT:
         decision = "rejected"
-    elif category in GENERIC_CATEGORIES:
-        decision = "in_review"
-    elif score >= APPROVE_AT:
+    elif score >= APPROVE_AT and category not in GENERIC_CATEGORIES:
         decision = "approved"
-    elif score >= REVIEW_AT:
-        decision = "in_review"
     else:
-        decision = "rejected"
-    return Verdict(decision, score, conflict, results)
+        decision = "in_review"
+    return Verdict(decision, score, conflict, detail_score, results)
 
 
 MESSAGES = {

@@ -81,24 +81,27 @@ def _tokens(value: str | None) -> set[str]:
     return set(re.findall(r"[^\W_]+", (value or "").casefold()))
 
 
-def _brand(brand: str | None, model: str | None) -> str | None:
-    explicit = (brand or "").strip().casefold()
-    text = explicit or (model or "").casefold()
+def norm_brand(brand: str | None, model: str | None = None) -> str | None:
+    words = re.findall(r"[^\W_]+", (brand or "").casefold())
+    explicit = " ".join(word for word in words if word not in {"the", "inc", "co"})
+    text = explicit or " ".join(re.findall(r"[^\W_]+", (model or "").casefold()))
     for alias, manufacturer in BRAND_ALIASES.items():
         if re.search(rf"\b{alias}\b", text):
             return manufacturer
     return explicit or None
 
 
+def same_brand(left: str, right: str) -> bool:
+    left_words, right_words = ((norm_brand(brand) or "").split() for brand in (left, right))
+    a, b = set(left_words), set(right_words)
+    return bool(a and b and (a <= b or b <= a or "".join(left_words) == "".join(right_words)))
+
+
 def _brand_similarity(lost: LostFacts, found: FoundFacts) -> float | None:
-    left, right = _brand(lost.brand, lost.model), _brand(found.brand, found.model)
+    left, right = norm_brand(lost.brand, lost.model), norm_brand(found.brand, found.model)
     if not left or not right:
         return None
-    a, b = (_tokens(brand) - {"the", "inc", "co"} for brand in (left, right))
-    if not a or not b:
-        return None
-    left_compact, right_compact = (re.sub(r"[\W_]+", "", brand) for brand in (left, right))
-    return float(a <= b or b <= a or left_compact == right_compact)
+    return float(same_brand(left, right))
 
 
 def _different_model_numbers(left: str | None, right: str | None) -> bool:
@@ -106,7 +109,7 @@ def _different_model_numbers(left: str | None, right: str | None) -> bool:
     return bool(a and b and not (a <= b or b <= a))
 
 
-def _model_similarity(left: str | None, right: str | None) -> float | None:
+def model_similarity(left: str | None, right: str | None) -> float | None:
     a, b = _tokens(left), _tokens(right)
     if not a or not b:
         return None
@@ -119,7 +122,7 @@ def _model_similarity(left: str | None, right: str | None) -> float | None:
     return len(a & b) / len(a | b)
 
 
-def _color_similarity(left: str | None, right: str | None) -> float | None:
+def color_similarity(left: str | None, right: str | None) -> float | None:
     a, b = ((color or "").strip().casefold().replace("grey", "gray") for color in (left, right))
     if not a or not b:
         return None
@@ -133,9 +136,9 @@ def _color_similarity(left: str | None, right: str | None) -> float | None:
 def attribute_score(lost: LostFacts, found: FoundFacts) -> float:
     """Average the similarities for attributes known on both sides."""
     similarities = (
-        _color_similarity(lost.color, found.color),
+        color_similarity(lost.color, found.color),
         _brand_similarity(lost, found),
-        _model_similarity(lost.model, found.model),
+        model_similarity(lost.model, found.model),
     )
     comparable = [value for value in similarities if value is not None]
     return sum(comparable) / len(comparable) if comparable else 0.5
@@ -156,7 +159,7 @@ def score(lost: LostFacts, found: FoundFacts, semantic: float) -> dict[str, floa
         total = min(total, 45)
     if _different_model_numbers(lost.model, found.model):
         total -= 10
-    if _color_similarity(lost.color, found.color) == 0.0:
+    if color_similarity(lost.color, found.color) == 0.0:
         total = min(total - 15, 55)
     points["total"] = max(0, round(total))
     return points

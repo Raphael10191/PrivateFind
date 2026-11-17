@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import select
 
 from app.core.db import utcnow
-from app.modules.found_items.models import FoundItem
+from app.modules.found_items.models import FoundItem, ItemAttribute
 from app.modules.matching import policy
+from app.shared.ai.mock import MockAIProvider
+from app.shared.ai.provider import set_ai_provider
 from tests.conftest import deposit_and_store
 
 T0 = datetime(2026, 10, 14, 9, 0)
@@ -75,6 +78,26 @@ def test_component_scores():
             100,
             id="iphone-brand-alias",
         ),
+        pytest.param({"lost_brand": "AirPods", "found_brand": "Apple"}, 1.0, 100, id="airpods"),
+        pytest.param(
+            {
+                "lost_category": "jewelry",
+                "found_category": "jewelry",
+                "lost_brand": "Rolex",
+                "found_brand": "rolex",
+                "lost_color": "gold",
+                "found_color": "gold",
+            },
+            0.5,
+            80,
+            id="gold-rolex",
+        ),
+        pytest.param(
+            {"lost_brand": "Samsung", "found_brand": "Apple"},
+            1.0,
+            45,
+            id="samsung-vs-apple",
+        ),
         pytest.param(
             {"lost_brand": None, "lost_model": "Galaxy S25", "found_brand": "Samsung"},
             1.0,
@@ -88,7 +111,7 @@ def test_component_scores():
             id="brand-article",
         ),
         pytest.param(
-            {"lost_brand": "Ray-Ban", "found_brand": "RayBan"},
+            {"lost_brand": "Ray-Ban Inc.", "found_brand": "RayBan Co."},
             1.0,
             100,
             id="brand-punctuation",
@@ -110,6 +133,7 @@ def test_component_scores():
             95,
             id="related-shades",
         ),
+        pytest.param({"found_color": "gray"}, 1.0, 95, id="black-and-gray"),
         pytest.param({"found_color": "white"}, 1.0, 55, id="clear-color-conflict"),
         pytest.param({"found_color": "multicolor"}, 1.0, 94, id="multicolor"),
         pytest.param({"found_category": "other"}, 1.0, 91, id="uncertain-found-category"),
@@ -119,6 +143,14 @@ def test_component_scores():
 )
 def test_matching_edge_cases(overrides, semantic, expected):
     assert policy.score(*facts(**overrides), semantic=semantic)["total"] == expected
+
+
+def test_different_iphone_model_is_penalized_but_can_still_rank():
+    overrides = {"lost_brand": "iPhone", "found_brand": "Apple", "lost_model": "iPhone 12"}
+    exact = policy.score(*facts(**overrides, found_model="iPhone 12"), semantic=0.9)
+    different = policy.score(*facts(**overrides, found_model="iPhone 13"), semantic=0.9)
+    assert 60 <= different["total"] < exact["total"]
+    assert [i for i, _ in policy.top_candidates([(2, different), (1, exact)], 60, 3)] == [1, 2]
 
 
 def test_time_score():
@@ -198,3 +230,51 @@ async def test_candidates_include_category_other(
     candidates = await owner.get(f"/api/lost-reports/{response.json()['id']}/candidates")
     assert [c["found_item_id"] for c in candidates.json()] == [item_id]
     assert candidates.json()[0]["breakdown"]["category"] == 6
+
+
+async def test_five_casio_candidates_rank_by_description_and_show_only_top_three(owner, session):
+    descriptions = {
+        "blue triangle sticker": 0.75,
+        "white paint on strap": 0.45,
+        "scratch beside the date": 1.0,
+        "scratch under the case": 0.9,
+        "no distinctive damage": 0.55,
+    }
+    found_at = utcnow()
+    items = [
+        FoundItem(
+            category="jewelry",
+            location="library",
+            status="open",
+            found_at=found_at,
+            description=description,
+            attributes=[
+                ItemAttribute(name=name, value=value, visibility="public")
+                for name, value in {"brand": "Casio", "color": "black", "model": "F-91W"}.items()
+            ],
+        )
+        for description in descriptions
+    ]
+    session.add_all(items)
+    await session.commit()
+
+    ai = MockAIProvider()
+    ai.compare_texts = AsyncMock(
+        side_effect=lambda query, candidates: [descriptions[text] for text in candidates]
+    )
+    set_ai_provider(ai)
+    response = await owner.post(
+        "/api/lost-reports",
+        json=report(
+            category="jewelry",
+            brand="Casio",
+            model="F-91W",
+            description="Kratzer neben dem Datum",
+        ),
+    )
+    candidates = await owner.get(f"/api/lost-reports/{response.json()['id']}/candidates")
+    assert candidates.status_code == 200
+    assert [c["found_item_id"] for c in candidates.json()] == [items[i].id for i in (2, 3, 0)]
+    assert [c["breakdown"]["semantic"] for c in candidates.json()] == [40, 36, 30]
+    assert ai.compare_texts.await_count == 1
+    assert set(ai.compare_texts.call_args.args[1]) == descriptions.keys()

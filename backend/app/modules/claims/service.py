@@ -1,5 +1,7 @@
+import logging
 import re
 from datetime import timedelta
+from itertools import chain
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +16,12 @@ from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
 from app.modules.matching import service as matching
 from app.shared import audit
-from app.shared.ai.provider import DetailScores, get_ai_provider
+from app.shared.ai.provider import DetailAttribute, DetailScores, get_ai_provider
 from app.shared.vocab import CRITICAL_TYPES
+
+log = logging.getLogger("uvicorn.error")
+DETAIL_SEPARATOR = re.compile(r"[,;\n]|\b(?:und|and|mit|with)\b", re.IGNORECASE)
+MAX_EVIDENCE = 8
 
 # ---------- owner ----------
 
@@ -75,31 +81,53 @@ async def submit(
         conflict=verdict.critical_conflict,
     )
     await session.commit()
+    log.info(
+        "[VERIFY] Matching %.0f | Details %.0f -> Gesamt %d -> %s",
+        match.total,
+        verdict.detail_score,
+        verdict.score,
+        verdict.decision,
+    )
     return claim, issued
 
 
 def _claim_evidence(explicit: list[dict], description: str | None) -> list[policy.Evidence]:
-    evidence = [policy.Evidence(e["type"], e["value"]) for e in explicit]
+    # Reserve space for typed evidence, including serial suffixes, before expanding free text.
+    evidence = [policy.Evidence(e["type"], e["value"]) for e in explicit if e["type"] != "other"]
     seen = {" ".join(e.value.casefold().split()) for e in evidence}
-    parts = re.split(r"[,;\n]|\b(?:und|and|mit|with)\b", description or "", flags=re.I)
-    report_evidence = []
-    for part in parts:
-        value = part.strip(" .")[:200]
-        key = " ".join(value.casefold().split())
-        if len(key) >= 3 and key not in seen:
-            report_evidence.append(policy.Evidence("other", value))
-            seen.add(key)
-            if len(report_evidence) == 8:
-                break
-    return evidence + report_evidence
+    free_text = (e["value"] for e in explicit if e["type"] == "other")
+    for text in chain(free_text, [description or ""]):
+        for part in DETAIL_SEPARATOR.split(text):
+            if len(evidence) >= MAX_EVIDENCE:
+                return evidence
+            value = part.strip(" .\t\r")[:200]
+            key = " ".join(value.casefold().split())
+            if key and key not in seen:
+                evidence.append(policy.Evidence("other", value))
+                seen.add(key)
+    return evidence
 
 
 async def _similarities(attrs: list[policy.Attr], ev: list[policy.Evidence]) -> DetailScores:
-    private = [(a.id, a.type, a.value) for a in attrs if a.type not in CRITICAL_TYPES]
-    submitted = [(i, e.type, e.value) for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
-    if not private or not submitted:
+    private: list[DetailAttribute] = [
+        {"id": a.id, "type": a.type, "value": a.value}
+        for a in attrs
+        if a.type not in CRITICAL_TYPES
+    ]
+    indices = [i for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
+    if not private or not indices:
         return {}
-    return await get_ai_provider().verify_details(private, submitted)
+    texts = [ev[i].value for i in indices]
+    ai = get_ai_provider()
+    verify_details = getattr(ai, "verify_details", None)
+    if callable(verify_details):
+        scores = await verify_details(private, texts)
+        return {(attr_id, indices[i]): sim for (attr_id, i), sim in scores.items()}
+    scores = {}
+    for attr in private:
+        similarities = await ai.compare_texts(attr["value"], texts)
+        scores.update({(attr["id"], i): sim for i, sim in zip(indices, similarities, strict=True)})
+    return scores
 
 
 async def _check_attempts(session: AsyncSession, user_id: int, item_id: int) -> None:

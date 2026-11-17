@@ -72,15 +72,18 @@ async def test_qwen_compatibility_retry_and_scores(monkeypatch):
 
 async def test_qwen_detail_matrix_maps_original_ids_in_one_request(monkeypatch):
     ai = QwenProvider(Settings(qwen_model="test-qwen"))
-    attrs = [(51, "damage", "cracked screen"), (79, "other", "car wallpaper")]
-    evidence = [(2, "other", "Riss"), (8, "accessory", "Auto")]
+    attrs = [
+        {"id": 51, "type": "damage", "value": "cracked screen"},
+        {"id": 79, "type": "other", "value": "car wallpaper"},
+    ]
+    evidence = ["Riss", "Auto"]
     request = Mock(return_value=response({"scores": [[0.92, 0.1], [0.05, 0.88]]}))
     monkeypatch.setattr(ai, "_request", request)
     assert await ai.verify_details(attrs, evidence) == {
-        (51, 2): 0.92,
-        (51, 8): 0.1,
-        (79, 2): 0.05,
-        (79, 8): 0.88,
+        (51, 0): 0.92,
+        (51, 1): 0.1,
+        (79, 0): 0.05,
+        (79, 1): 0.88,
     }
     assert request.call_count == 1
 
@@ -97,8 +100,10 @@ async def test_qwen_falls_back_on_bad_or_unavailable_responses(monkeypatch):
     monkeypatch.setattr(ai, "_request", request)
     assert (await ai.extract_attributes([], "black phone")).category == "phone"
     assert await ai.compare_texts("cat sticker", ["cat sticker", "new tablet"]) == [1.0, 0.0]
-    assert await ai.verify_details([(1, "damage", "scratch")], [(7, "other", "scratch")]) == {
-        (1, 7): 1.0,
+    assert await ai.verify_details(
+        [{"id": 1, "type": "damage", "value": "scratch"}], ["scratch"]
+    ) == {
+        (1, 0): 1.0,
     }
 
 
@@ -107,5 +112,5 @@ async def test_qwen_does_not_call_api_for_empty_candidates_or_details(monkeypatc
     request = Mock()
     monkeypatch.setattr(ai, "_request", request)
     assert await ai.compare_texts("query", []) == []
-    assert await ai.verify_details([], [(0, "other", "value")]) == {}
+    assert await ai.verify_details([], ["value"]) == {}
     request.assert_not_called()
