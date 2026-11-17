@@ -65,6 +65,8 @@ class FoundFacts:
     material: str | None = None
 
     reliability: dict[str, float] | None = None
+    model_candidates: tuple[str, ...] = ()
+    less_likely_models: tuple[str, ...] = ()
 
 
 def category_score(lost: LostFacts, found: FoundFacts) -> float:
@@ -138,6 +140,15 @@ def model_similarity(left: str | None, right: str | None) -> float | None:
     return len(a & b) / len(a | b)
 
 
+def model_fit(lost: LostFacts, found: FoundFacts) -> float | None:
+    if found.model:
+        return model_similarity(lost.model, found.model)
+    for options, support in ((found.model_candidates, 0.7), (found.less_likely_models, 0.58)):
+        if any((model_similarity(lost.model, option) or 0.0) >= 0.85 for option in options):
+            return support
+    return None
+
+
 def color_similarity(left: str | None, right: str | None) -> float | None:
     a, b = ((color or "").strip().casefold().replace("grey", "gray") for color in (left, right))
     if not a or not b:
@@ -156,7 +167,7 @@ def attribute_score(
     # Model and inferred brand share a signal, so do not count the inference twice.
     similarities = {
         "brand": _brand_similarity(lost, found) if lost.brand and found.brand else None,
-        "model": model_similarity(lost.model, found.model),
+        "model": model_fit(lost, found),
         "color": color_similarity(lost.color, found.color),
         "material": model_similarity(lost.material, found.material),
     }

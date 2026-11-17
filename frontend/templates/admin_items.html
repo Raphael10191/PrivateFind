@@ -556,7 +556,10 @@
             row.className = "item-attribute";
 
             row.appendChild(
-                createText("strong", humanize(attribute.name))
+                createText("strong", humanize({
+                    model_candidate: "Possible model",
+                    model_candidate_less_likely: "Less likely model"
+                }[attribute.name] || attribute.name))
             );
 
             row.appendChild(
@@ -574,8 +577,9 @@
             row.appendChild(
                 createText(
                     "p",
-                    "Strength: " +
-                    humanize(attribute.strength || "generic")
+                    attribute.observation_state === "estimated"
+                        ? "Estimated from photos"
+                        : "Strength: " + humanize(attribute.strength || "generic")
                 )
             );
 

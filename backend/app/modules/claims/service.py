@@ -87,7 +87,12 @@ async def submit(
             for text, findings in ((initial, original), (supplementary, additional)):
                 if text:
                     findings.extend(
-                        _grounded_findings(text, await visual(photos, text), len(photos))
+                        _grounded_findings(
+                            text,
+                            await visual(photos, text),
+                            len(photos),
+                            model_observed=item.observed_model() is not None,
+                        )
                     )
         except (AIError, OSError, ValueError):
             log.warning("[VERIFY] Photo check unavailable for item %s", item.id)
@@ -226,7 +231,7 @@ async def _open_claim(
 
 
 def _grounded_findings(
-    text: str, findings: list[PhotoFinding], photo_count: int
+    text: str, findings: list[PhotoFinding], photo_count: int, *, model_observed: bool = False
 ) -> list[PhotoFinding]:
     normalized = " ".join(text.casefold().split())
     uncertain_segments = [
@@ -247,6 +252,14 @@ def _grounded_findings(
             raise AIError("The photo result references an invalid photo")
         if UNCERTAIN_DETAIL.search(quote) or any(quoted.search(s) for s in uncertain_segments):
             finding = finding.model_copy(update={"status": "ambiguous", "photo_index": None})
+        if finding.kind == "model" and not model_observed:
+            finding = finding.model_copy(
+                update={
+                    "status": "unobservable",
+                    "photo_index": None,
+                    "observation": None,
+                }
+            )
         key = (quote, finding.status)
         if key not in seen:
             grounded.append(finding)

@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import Counter
 from datetime import timedelta
 from typing import get_args
@@ -30,6 +31,23 @@ def _lost_text(r) -> str:
     return " ".join(
         p for p in [r.color, r.brand, r.model, r.material, r.description, r.unique_marks] if p
     )
+
+
+def _found_text(item: FoundItem) -> str:
+    description = (item.description or item.note or "")[:1000]
+    if item.observed_model():
+        return description
+    estimates = [*item.model_candidates(), *item.model_candidates(less_likely=True)]
+    if model := item.attr("model"):
+        estimates.append(model)
+    for estimate in sorted(set(estimates), key=len, reverse=True):
+        description = re.sub(
+            rf"(?<!\w){re.escape(estimate)}(?!\w)",
+            "device of uncertain model",
+            description,
+            flags=re.IGNORECASE,
+        )
+    return description
 
 
 def _pool_snapshot(pool: list[FoundItem]) -> list[tuple]:
@@ -72,9 +90,7 @@ async def candidates(
     for start in range(0, len(pool), SEMANTIC_BATCH):
         batch = pool[start : start + SEMANTIC_BATCH]
         try:
-            values = await provider.compare_texts(
-                query, [(item.description or item.note or "")[:1000] for item in batch]
-            )
+            values = await provider.compare_texts(query, [_found_text(item) for item in batch])
             if len(values) != len(batch):
                 raise AIError("Incomplete similarity scores")
             semantic.extend(
@@ -95,15 +111,24 @@ async def candidates(
         reliability = {
             attr.name: attr.confidence for attr in item.attributes if attr.confidence is not None
         }
+        confirmed_model = item.observed_model()
+        candidates = item.model_candidates()
+        less_likely = item.model_candidates(less_likely=True)
+        legacy_guess = item.attr("model")
+        if legacy_guess and not confirmed_model and not (candidates or less_likely):
+            candidates = (legacy_guess,)
+        reliability.pop("model", None)
         found = policy.FoundFacts(
             item.category,
             item.location,
             item.found_at,
             item.attr("color"),
             item.attr("brand"),
-            item.attr("model"),
+            confirmed_model,
             item.attr("material"),
             reliability,
+            model_candidates=candidates,
+            less_likely_models=less_likely,
         )
         frequency = colors[found.color] / color_count if color_count >= 5 else None
         scored.append((item.id, policy.score(lost, found, sem, frequency)))

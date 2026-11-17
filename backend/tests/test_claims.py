@@ -359,3 +359,19 @@ async def test_post_listing_details_alone_cannot_authorize_pickup(client, owner,
     first = (await claim(owner, report_id, item_id, description=BACK + ". " + FRONT)).json()
     assert first["next_action"] == "device_record"
     assert first["pickup_code"] is None
+
+
+@pytest.mark.parametrize("status", ["confirmed", "contradicted"])
+def test_exact_model_guess_is_not_a_verified_finding(status):
+    reported = "black iPhone 14 with a magnetic ring"
+    visual = service._grounded_findings(
+        reported,
+        [
+            finding("iPhone 14", status=status, kind="model"),
+            finding("magnetic ring", kind="common", distinctive=False),
+        ],
+        1,
+    )
+    assert visual[0].status == "unobservable"
+    assert visual[1].status == "confirmed"
+    assert policy.assess(visual, [], category="phone").action == "device_record"

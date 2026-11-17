@@ -335,6 +335,7 @@
                 <div id="detail-evidence"></div>
 
                 <h3>Private Item Attributes</h3>
+                <p>Recorded from the finder’s submission.</p>
                 <div id="detail-attributes"></div>
 
                 <hr class="review-divider">
@@ -515,7 +516,10 @@
                 createText(
                     "strong",
                     humanize(
-                        isAttribute ? value.name : value.type
+                        isAttribute ? ({
+                        model_candidate: "Possible model",
+                        model_candidate_less_likely: "Less likely model"
+                    }[value.name] || value.name) : value.type
                     )
                 )
             );
@@ -528,14 +532,18 @@
                 row.appendChild(
                     createText(
                         "p",
-                        "Visibility: " + humanize(value.visibility)
+                        value.observation_state === "estimated"
+                            ? "Estimated from photos"
+                            : "Visibility: " + humanize(value.visibility)
                     )
                 );
             } else {
                 row.appendChild(
                     createText(
                         "p",
-                        "Result: " + humanize(value.result)
+                        value.type === "common" && value.result === "match"
+                            ? "Matches photo · common feature"
+                            : "Result: " + humanize(value.result)
                     )
                 );
             }

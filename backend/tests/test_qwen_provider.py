@@ -140,3 +140,25 @@ async def test_qwen_verifies_evidence_with_finder_photo_in_same_request(monkeypa
     content = request.call_args.args[2]["messages"][1]["content"]
     assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,YQ=="
     assert json.loads(content[1]["text"])["description"] == description
+
+
+async def test_qwen_recognizes_model_alternatives_separately(monkeypatch):
+    ai = QwenProvider(Settings(qwen_model="test-qwen"))
+    request = Mock(
+        return_value=response(
+            {
+                "category": "phone",
+                "model": None,
+                "model_candidates": ["iPhone 13", "iPhone 14"],
+                "less_likely_models": ["iPhone 12"],
+                "observations": {"model": "estimated"},
+                "description": "Black iPhone in a magnetic-ring case.",
+            }
+        )
+    )
+    monkeypatch.setattr(ai, "_request", request)
+    result = await ai.extract_attributes([Photo(b"a")], "")
+    assert result.model is None
+    assert result.model_candidates == ["iPhone 13", "iPhone 14"]
+    assert result.less_likely_models == ["iPhone 12"]
+    assert result.observations["model"] == "estimated"

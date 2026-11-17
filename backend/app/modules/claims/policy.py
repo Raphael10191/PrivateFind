@@ -59,7 +59,7 @@ def distinct_parts(findings: list[PhotoFinding]) -> set[str]:
     for f in findings:
         if (
             f.status != "confirmed"
-            or f.kind == "common"
+            or f.kind in {"common", "model"}
             or not (f.part and f.distinctive and f.observation)
         ):
             continue

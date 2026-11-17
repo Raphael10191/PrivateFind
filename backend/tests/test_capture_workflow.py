@@ -94,3 +94,29 @@ async def test_expired_draft_cannot_be_confirmed(client, locker, session):
     new = await start_capture(client)
     assert new.status_code == 201, new.text
     assert await session.get(FoundItem, new.json()["item_id"]) is not None
+
+
+async def test_finder_model_alternatives_stay_private(client, locker, session):
+    ai = MockAIProvider()
+    ai.extract_attributes = AsyncMock(
+        return_value=Extraction(
+            category="phone",
+            public_summary="Phone",
+            description="Black phone.",
+            model="iPhone 13",
+            model_candidates=["iPhone 13", "iPhone 14"],
+            less_likely_models=["iPhone 12"],
+            observations={"model": "estimated"},
+            confidence=0.8,
+        )
+    )
+    set_ai_provider(ai)
+    draft = await start_capture(client)
+    url, headers = open_draft(draft)
+    review = await client.get(url, headers=headers)
+    assert "iPhone" not in review.text
+    item = await session.get(FoundItem, draft.json()["item_id"])
+    assert item.attr("model") is None
+    assert item.model_candidates() == ("iPhone 13", "iPhone 14")
+    assert item.model_candidates(less_likely=True) == ("iPhone 12",)
+    assert all(a.visibility == "private" for a in item.attributes if a.name.startswith("model"))

@@ -207,3 +207,49 @@ async def test_existing_report_gets_matches_when_locker_confirms_deposit(client,
     assert (await owner.get(url)).json() == []
     item_id = await deposit_and_store(client, locker[1])
     assert [item["found_item_id"] for item in (await owner.get(url)).json()] == [item_id]
+
+
+def test_model_options_are_graded_and_omission_is_neutral():
+    lost, neutral = facts(lost_model="14")
+    neutral.model = None
+    _, plausible = facts()
+    plausible.model_candidates = ("iPhone 13", "iPhone 14")
+    _, less_likely = facts()
+    less_likely.less_likely_models = ("iPhone 14",)
+    _, different_estimate = facts()
+    different_estimate.model_candidates = ("iPhone 13",)
+    _, observed = facts(found_model="iPhone 14")
+    _, observed_conflict = facts(found_model="iPhone 13")
+
+    def rank(found):
+        return policy.score(lost, found, 0.8)["total"]
+
+    assert rank(observed) > rank(plausible) > rank(less_likely) > rank(neutral)
+    assert rank(different_estimate) == rank(neutral) > rank(observed_conflict)
+
+
+async def test_estimated_model_cannot_penalize_candidate_in_matching(
+    client, owner, locker, session
+):
+    ai = MockAIProvider()
+    ai.compare_texts = AsyncMock(return_value=[0.8])
+    set_ai_provider(ai)
+    item_id = await deposit_and_store(client, locker[1])
+    item = await session.get(FoundItem, item_id)
+    item.description = "Black iPhone 13 in a case with a magnetic ring."
+    item.attributes.append(
+        ItemAttribute(
+            name="model",
+            value="iPhone 13",
+            visibility="private",
+            observation_state="estimated",
+            confidence=0.4,
+        )
+    )
+    await session.commit()
+
+    saved = await owner.post("/api/lost-reports", json=report(model="14"))
+    response = await owner.get(f"/api/lost-reports/{saved.json()['id']}/candidates")
+    assert [item["found_item_id"] for item in response.json()] == [item_id]
+    text = ai.compare_texts.await_args.args[1][0]
+    assert "13" not in text and "magnetic ring" in text

@@ -56,6 +56,24 @@ class FoundItem(Base):
         names = {name, "colour"} if name == "color" else {name}
         return next((a.value for a in self.attributes if a.name in names), None)
 
+    def observed_model(self) -> str | None:
+        return next(
+            (
+                attribute.value
+                for attribute in self.attributes
+                if attribute.name == "model"
+                and (
+                    attribute.observation_state == "observed"
+                    or (attribute.source == "admin" and attribute.observation_state is None)
+                )
+            ),
+            None,
+        )
+
+    def model_candidates(self, *, less_likely: bool = False) -> tuple[str, ...]:
+        name = "model_candidate_less_likely" if less_likely else "model_candidate"
+        return tuple(attribute.value for attribute in self.attributes if attribute.name == name)
+
     def private_attributes(self) -> list["ItemAttribute"]:
         return [
             a

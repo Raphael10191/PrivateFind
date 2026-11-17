@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.shared.vocab import Category, Color, EvidenceType, Strength
 
@@ -13,6 +13,7 @@ class PrivateAttribute(BaseModel):
 
 
 ObservationState = Literal["observed", "estimated", "unreadable"]
+ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 CaptureField = Literal["category", "color", "brand", "model", "material"]
 
 
@@ -22,7 +23,9 @@ class Extraction(BaseModel):
     category: Category
     color: Color | None = None
     brand: str | None = None
-    model: str | None = None
+    model: ModelName | None = None
+    model_candidates: list[ModelName] = Field(default_factory=list, max_length=5)
+    less_likely_models: list[ModelName] = Field(default_factory=list, max_length=3)
     material: str | None = None
     observations: dict[CaptureField, ObservationState] = Field(default_factory=dict)
     public_summary: str = Field(

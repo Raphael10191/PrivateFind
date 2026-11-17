@@ -253,7 +253,7 @@ def _apply_extraction(item: FoundItem, ex: Extraction) -> None:
     item.public_summary = item.category
     item.description = ex.description
     attrs = []
-    for name in ("category", "color", "brand", "model", "material"):
+    for name in ("category", "color", "brand", "material"):
         value = getattr(ex, name)
         state = ex.observations.get(name) or ("estimated" if value else "unreadable")
         if not value or state == "unreadable":
@@ -267,6 +267,42 @@ def _apply_extraction(item: FoundItem, ex: Extraction) -> None:
                 confidence=1.0 if state == "observed" else 0.4,
             )
         )
+    if ex.model and ex.observations.get("model") == "observed":
+        attrs.append(
+            ItemAttribute(
+                name="model",
+                value=ex.model,
+                visibility="private",
+                observation_state="observed",
+                confidence=1.0,
+            )
+        )
+    else:
+        plausible = ex.model_candidates
+        less_likely = ex.less_likely_models
+        if not plausible and not less_likely and ex.observations.get("model") != "unreadable":
+            single_guess = ex.model or next(
+                (a.value[:100] for a in ex.private_attributes if a.type == "model"), None
+            )
+            plausible = [single_guess] if single_guess else []
+        seen = set()
+        for name, options in (
+            ("model_candidate", plausible),
+            ("model_candidate_less_likely", less_likely),
+        ):
+            for option in options:
+                key = option.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                attrs.append(
+                    ItemAttribute(
+                        name=name,
+                        value=option,
+                        visibility="private",
+                        observation_state="estimated",
+                    )
+                )
     attrs += [
         ItemAttribute(
             name=a.type,
@@ -276,7 +312,7 @@ def _apply_extraction(item: FoundItem, ex: Extraction) -> None:
             confidence=a.confidence,
         )
         for a in ex.private_attributes
-        if a.type != "model" or not ex.model
+        if a.type != "model"
     ]
     item.attributes = [a for a in item.attributes if a.source != "ai"] + attrs
     item.ai_status = "done"
