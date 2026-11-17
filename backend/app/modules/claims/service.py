@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from sqlalchemy import func, select
@@ -12,9 +13,8 @@ from app.modules.found_items import service as items
 from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
 from app.modules.matching import service as matching
-from app.modules.matching.models import MatchCandidate
 from app.shared import audit
-from app.shared.ai.provider import get_ai_provider
+from app.shared.ai.provider import DetailScores, get_ai_provider
 from app.shared.vocab import CRITICAL_TYPES
 
 # ---------- owner ----------
@@ -25,21 +25,20 @@ async def submit(
 ) -> tuple[Claim, locker_service.IssuedCode | None]:
     report = await reports.get_own(session, report_id, user_id)
     item = await items.get_item(session, item_id)
-    if not await matching.was_shown(session, report.id, item.id):
+    match = await matching.shown_match(session, report.id, item.id)
+    if match is None:
         raise AppError(409, "not_a_candidate", "This item is not a candidate for your report.")
     if item.status != "open":
         raise AppError(409, "item_unavailable", "This item is no longer available.")
     await _check_attempts(session, user_id, item_id)
 
     attrs = [policy.Attr(a.id, a.name, a.value, a.strength) for a in item.private_attributes()]
-    ev = [policy.Evidence(e["type"], e["value"]) for e in evidence]
-    verdict = policy.verify(item.category, attrs, ev, await _similarities(attrs, ev))
+    ev = _claim_evidence(evidence, report.description)
+    verdict = policy.verify(item.category, attrs, ev, await _similarities(attrs, ev), match.total)
 
     claim = Claim(
         user_id=user_id,
-        match_candidate=await session.get(
-            MatchCandidate, await matching.shown_match_id(session, report.id, item.id)
-        ),
+        match_candidate=match,
         status=verdict.decision,
         ownership_score=verdict.score,
         critical_conflict=verdict.critical_conflict,
@@ -79,18 +78,28 @@ async def submit(
     return claim, issued
 
 
-async def _similarities(attrs: list[policy.Attr], ev: list[policy.Evidence]) -> dict:
-    """AI similarity for each non-critical (attribute, evidence) pair of the same type."""
-    ai = get_ai_provider()
-    sims = {}
-    for attr in attrs:
-        if attr.type in CRITICAL_TYPES:
-            continue
-        idx = [i for i, e in enumerate(ev) if policy.comparable(attr, e)]
-        if idx:
-            scores = await ai.compare_texts(attr.value, [ev[i].value for i in idx])
-            sims.update({(attr.id, i): s for i, s in zip(idx, scores, strict=True)})
-    return sims
+def _claim_evidence(explicit: list[dict], description: str | None) -> list[policy.Evidence]:
+    evidence = [policy.Evidence(e["type"], e["value"]) for e in explicit]
+    seen = {" ".join(e.value.casefold().split()) for e in evidence}
+    parts = re.split(r"[,;\n]|\b(?:und|and|mit|with)\b", description or "", flags=re.I)
+    report_evidence = []
+    for part in parts:
+        value = part.strip(" .")[:200]
+        key = " ".join(value.casefold().split())
+        if len(key) >= 3 and key not in seen:
+            report_evidence.append(policy.Evidence("other", value))
+            seen.add(key)
+            if len(report_evidence) == 8:
+                break
+    return evidence + report_evidence
+
+
+async def _similarities(attrs: list[policy.Attr], ev: list[policy.Evidence]) -> DetailScores:
+    private = [(a.id, a.type, a.value) for a in attrs if a.type not in CRITICAL_TYPES]
+    submitted = [(i, e.type, e.value) for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
+    if not private or not submitted:
+        return {}
+    return await get_ai_provider().verify_details(private, submitted)
 
 
 async def _check_attempts(session: AsyncSession, user_id: int, item_id: int) -> None:
@@ -119,6 +128,7 @@ async def _check_attempts(session: AsyncSession, user_id: int, item_id: int) -> 
 
 async def _approve(session: AsyncSession, claim: Claim) -> locker_service.IssuedCode:
     """Reserve the item (first approval wins), close competing claims, issue the pickup code."""
+    await locker_service.compartment_for_item(session, claim.found_item_id, lock=True)
     if not await items.try_reserve(session, claim.found_item_id):
         await session.rollback()
         raise AppError(409, "item_unavailable", "This item is no longer available.")

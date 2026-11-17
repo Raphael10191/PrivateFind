@@ -95,6 +95,12 @@ async def retry_ai(
     return {"ok": True}
 
 
+@router.post("/api/admin/items/{item_id}/remove", tags=["admin"])
+async def remove_item(item_id: int, admin: AdminUser, session: SessionDep):
+    await service.remove_item(session, item_id, admin.id)
+    return {"ok": True}
+
+
 @router.get("/api/admin/items/{item_id}/photos/{photo_id}", tags=["admin"])
 async def photo(item_id: int, photo_id: int, _: AdminUser, session: SessionDep):
     return FileResponse(

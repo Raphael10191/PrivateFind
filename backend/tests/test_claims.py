@@ -1,10 +1,15 @@
 from datetime import timedelta
+from unittest.mock import AsyncMock
 
+import pytest
 from sqlalchemy import select
 
 from app.core.db import utcnow
 from app.modules.claims import policy
 from app.modules.found_items.models import FoundItem
+from app.modules.lost_reports.models import LostReport
+from app.shared.ai.mock import MockAIProvider
+from app.shared.ai.provider import set_ai_provider
 from tests.conftest import deposit_and_store
 
 # ---------- policy ----------
@@ -15,20 +20,21 @@ ATTRS = [
 ]
 
 
-def verify(evidence, sims=None, category="phone", attrs=ATTRS):
+def verify(evidence, sims=None, category="phone", attrs=ATTRS, match_score=80):
     ev = [policy.Evidence(t, v) for t, v in evidence]
-    return policy.verify(category, attrs, ev, sims or {})
+    return policy.verify(category, attrs, ev, sims or {}, match_score)
 
 
 def test_strong_evidence_approved():
     v = verify([("serial_suffix", "SN-99214821"), ("sticker_or_mark", "cat")], {(2, 1): 0.9})
-    assert (v.decision, v.score) == ("approved", 100)
+    assert (v.decision, v.score) == ("approved", 88)
 
 
 def test_partial_evidence_goes_to_review_or_rejected():
-    assert verify([("serial_suffix", "4821")]).decision == "in_review"  # 60
-    v = verify([("sticker_or_mark", "cat")], {(2, 0): 0.9})
-    assert (v.decision, v.score) == ("rejected", 40)
+    v = verify([("serial_suffix", "4821")])
+    assert (v.decision, v.score) == ("in_review", 72)
+    v = verify([("sticker_or_mark", "cat")], {(2, 0): 0.9}, match_score=50)
+    assert (v.decision, v.score) == ("rejected", 46)
 
 
 def test_wrong_serial_is_critical_conflict():
@@ -39,14 +45,61 @@ def test_wrong_serial_is_critical_conflict():
 
 def test_generic_item_never_auto_approved():
     attrs = [policy.Attr(1, "damage", "bent handle", "distinctive")]
-    v = verify([("damage", "bent handle")], {(1, 0): 1.0}, category="umbrella", attrs=attrs)
+    v = verify(
+        [("damage", "bent handle")],
+        {(1, 0): 1.0},
+        category="umbrella",
+        attrs=attrs,
+        match_score=100,
+    )
     assert (v.decision, v.score) == ("in_review", 100)
     assert verify([("other", "plain")], category="umbrella", attrs=[]).decision == "in_review"
 
 
 def test_low_similarity_does_not_count():
     v = verify([("serial_suffix", "4821"), ("sticker_or_mark", "dog")], {(2, 1): 0.2})
-    assert v.score == 60 and v.results[1][0] == "mismatch"
+    assert v.score == 72 and v.results[1][0] == "mismatch"
+
+
+@pytest.mark.parametrize(
+    ("match_score", "expected_score", "decision"),
+    [(58, 75, "approved"), (57, 74, "in_review"), (16, 50, "in_review"), (15, 49, "rejected")],
+)
+def test_combined_score_thresholds(match_score, expected_score, decision):
+    attrs = [
+        policy.Attr(1, "damage", "cracked back", "distinctive"),
+        policy.Attr(2, "sticker_or_mark", "car wallpaper", "distinctive"),
+        policy.Attr(3, "accessory", "black case", "distinctive"),
+    ]
+    v = verify(
+        [("other", "Kratzer hinten"), ("accessory", "Auto als Hintergrund")],
+        {(1, 0): 0.9, (2, 1): 0.9},
+        attrs=attrs,
+        match_score=match_score,
+    )
+    assert (v.decision, v.score) == (decision, expected_score)
+
+
+def test_repeated_evidence_can_only_confirm_one_detail():
+    attrs = [
+        policy.Attr(1, "damage", "scratched screen", "distinctive"),
+        policy.Attr(2, "damage", "scratched back", "distinctive"),
+    ]
+    v = verify(
+        [("damage", "scratch"), ("other", " Scratch ")],
+        {(1, 0): 0.9, (2, 1): 0.9},
+        attrs=attrs,
+    )
+    assert (v.decision, v.score) == ("in_review", 68)
+
+
+def test_wrong_serial_remains_a_conflict_alongside_correct_evidence():
+    v = verify(
+        [("serial_suffix", "4821"), ("serial_suffix", "1234"), ("other", "cat")],
+        {(2, 2): 1.0},
+        match_score=100,
+    )
+    assert v.decision == "rejected" and v.critical_conflict
 
 
 # ---------- API ----------
@@ -57,7 +110,9 @@ GOOD = [
 ]
 
 
-async def setup_candidate(client, owner, locker):
+async def setup_candidate(
+    client, owner, locker, description="Black Samsung phone with a cat sticker"
+):
     """Stored phone + the owner's lost report that lists it as a candidate."""
     _, h = locker
     item_id = await deposit_and_store(client, h)
@@ -67,7 +122,7 @@ async def setup_candidate(client, owner, locker):
         "lost_at": (utcnow() - timedelta(hours=2)).isoformat(),
         "color": "black",
         "brand": "Samsung",
-        "description": "Black Samsung phone with a cat sticker",
+        "description": description,
     }
     report_id = (await owner.post("/api/lost-reports", json=report)).json()["id"]
     cands = (await owner.get(f"/api/lost-reports/{report_id}/candidates")).json()
@@ -142,8 +197,8 @@ async def test_claim_requires_candidate(client, owner, other_owner, locker):
 
 
 async def test_review_then_admin_approve_and_pickup_code(client, owner, admin, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    r = await claim(owner, report_id, item_id, [{"type": "serial_suffix", "value": "4821"}])
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Black Samsung phone")
+    r = await claim(owner, report_id, item_id, [{"type": "other", "value": "plain case"}])
     claim_id = r.json()["id"]
     assert r.json()["status"] == "in_review"
 
@@ -166,12 +221,12 @@ async def test_first_approval_wins(client, owner, other_owner, admin, locker):
         "category": "phone",
         "location": "library",
         "lost_at": (utcnow() - timedelta(hours=1)).isoformat(),
-        "description": "Black Samsung phone with a cat sticker",
+        "description": "Black Samsung phone",
     }
     other_report = (await other_owner.post("/api/lost-reports", json=report)).json()["id"]
     await other_owner.get(f"/api/lost-reports/{other_report}/candidates")
     review = await claim(
-        other_owner, other_report, item_id, [{"type": "serial_suffix", "value": "4821"}]
+        other_owner, other_report, item_id, [{"type": "other", "value": "plain case"}]
     )
     assert review.json()["status"] == "in_review"
 
@@ -186,6 +241,35 @@ async def test_first_approval_wins(client, owner, other_owner, admin, locker):
 
 async def test_admin_only(owner):
     assert (await owner.get("/api/admin/claims")).status_code == 403
+
+
+async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker)
+    ai = MockAIProvider()
+    ai.verify_details = AsyncMock(wraps=ai.verify_details)
+    set_ai_provider(ai)
+
+    response = await claim(owner, report_id, item_id, [{"type": "serial_suffix", "value": "4821"}])
+    assert response.json()["status"] == "approved"
+    args = ai.verify_details.call_args.args
+    assert ai.verify_details.await_count == 1
+    assert [row[1] for row in args[0]] == ["sticker_or_mark"]
+    assert args[1] == [(1, "other", "Black Samsung phone"), (2, "other", "a cat sticker")]
+    admin_claim = await admin.get(f"/api/admin/claims/{response.json()['id']}")
+    evidence = admin_claim.json()["evidence"]
+    assert any(row["value"] == "a cat sticker" and row["result"] == "match" for row in evidence)
+
+
+async def test_claim_still_works_for_legacy_report_without_description(
+    client, owner, locker, session
+):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker)
+    report = await session.get(LostReport, report_id)
+    report.description = None
+    await session.commit()
+
+    response = await claim(owner, report_id, item_id, GOOD)
+    assert response.status_code == 201 and response.json()["status"] == "approved"
 
 
 async def test_audit_log_records_flow(client, owner, admin, locker):

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import db
 from app.core.config import get_settings
 from app.core.errors import AppError, not_found
-from app.modules.found_items.models import FoundItem, ItemAttribute, ItemPhoto
+from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem, ItemAttribute, ItemPhoto
 from app.modules.locker import service as locker_service
 from app.shared import audit, storage
 from app.shared.ai.provider import Photo, get_ai_provider
@@ -80,7 +80,10 @@ async def run_extraction(item_id: int) -> None:
             item.ai_attempts += 1
             try:
                 extraction = await asyncio.wait_for(
-                    ai.extract_attributes(photos, item.note), AI_TIMEOUT_S
+                    ai.extract_attributes(photos, item.note or ""),
+                    max(AI_TIMEOUT_S, settings.qwen_timeout + 1)
+                    if settings.ai_provider == "qwen"
+                    else AI_TIMEOUT_S,
                 )
             except Exception as exc:  # noqa: BLE001 - any provider failure is retried
                 log.warning(
@@ -203,11 +206,16 @@ async def get_item(session: AsyncSession, item_id: int) -> FoundItem:
 async def stored_items(
     session: AsyncSession, category: str, found_after: datetime
 ) -> list[FoundItem]:
+    category_filter = (
+        FoundItem.category.is_not(None)
+        if category == "other"
+        else FoundItem.category.in_([category, "other"])
+    )
     return list(
         await session.scalars(
             select(FoundItem).where(
                 FoundItem.status == "open",
-                FoundItem.category == category,
+                category_filter,
                 FoundItem.found_at >= found_after,
             )
         )
@@ -215,6 +223,19 @@ async def stored_items(
 
 
 # ---------- admin ----------
+
+
+async def remove_item(session: AsyncSession, item_id: int, admin_id: int) -> None:
+    item = await _get(session, item_id)
+    compartment = await locker_service.compartment_for_item(session, item_id, lock=True)
+    await session.refresh(item, ["status"], with_for_update=True)
+    was_active = item.status in ACTIVE_ITEM_STATUSES
+    item.status = "expired"
+    await locker_service.clear_item_access(session, item_id, compartment if was_active else None)
+    audit.log(
+        session, "admin_item_removed", "found_item", item_id, actor_type="admin", actor_id=admin_id
+    )
+    await session.commit()
 
 
 async def list_items(

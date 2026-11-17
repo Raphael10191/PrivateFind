@@ -1,6 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,8 +18,12 @@ class Settings(BaseSettings):
     max_photo_bytes: int = 5 * 1024 * 1024
     max_photos: int = 3
 
-    ai_provider: str = "mock"  # "mock" | "claude"
+    ai_provider: Literal["mock", "claude", "qwen"] = "mock"
     claude_model: str = "claude-opus-5-5"
+    qwen_base_url: str = ""
+    qwen_api_key: SecretStr = SecretStr("")
+    qwen_model: str = ""
+    qwen_timeout: float = Field(default=25, gt=0)
     ai_max_attempts: int = 3
     ai_retry_base_delay_s: float = 1.0  # backoff: 1s, 4s, 16s
 

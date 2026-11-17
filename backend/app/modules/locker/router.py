@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.modules.identity.deps import SessionDep
+from app.modules.identity.deps import AdminUser, SessionDep
 from app.modules.locker import service
 from app.modules.locker.models import Locker
 from app.modules.locker.schemas import (
@@ -44,6 +44,12 @@ async def locker_info(locker_code: str, session: SessionDep):
         free_compartments=free,
         locations=get_settings().locations,
     )
+
+
+@router.post("/api/admin/lockers/{code}/reset", tags=["admin"])
+async def reset_locker(code: str, admin: AdminUser, session: SessionDep):
+    await service.reset_locker(session, code, admin.id)
+    return {"ok": True}
 
 
 @router.post("/api/device/codes/validate", response_model=CodeResult, tags=["device"])

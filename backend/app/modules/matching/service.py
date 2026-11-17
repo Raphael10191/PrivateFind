@@ -27,7 +27,7 @@ async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> li
     pool = await items.stored_items(session, report.category, report.lost_at - timedelta(days=1))
     semantic = (
         await get_ai_provider().compare_texts(
-            _lost_text(report), [i.description or i.note for i in pool]
+            _lost_text(report), [i.description or i.note or "" for i in pool]
         )
         if pool
         else []
@@ -95,22 +95,10 @@ async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> li
     ]
 
 
-async def was_shown(session: AsyncSession, report_id: int, item_id: int) -> bool:
-    """True if the item was in this report's candidate list (claims require it)."""
-    return bool(
-        await session.scalar(
-            select(MatchCandidate.id).where(
-                MatchCandidate.lost_report_id == report_id,
-                MatchCandidate.found_item_id == item_id,
-                MatchCandidate.shown.is_(True),
-            )
-        )
-    )
-
-
-async def shown_match_id(session: AsyncSession, report_id: int, item_id: int) -> int | None:
+async def shown_match(session: AsyncSession, report_id: int, item_id: int) -> MatchCandidate | None:
+    """Return the candidate that the owner was shown, including its stored score."""
     return await session.scalar(
-        select(MatchCandidate.id).where(
+        select(MatchCandidate).where(
             MatchCandidate.lost_report_id == report_id,
             MatchCandidate.found_item_id == item_id,
             MatchCandidate.shown.is_(True),

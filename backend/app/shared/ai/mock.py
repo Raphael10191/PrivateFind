@@ -3,7 +3,7 @@
 import re
 from typing import get_args
 
-from app.shared.ai.provider import Photo
+from app.shared.ai.provider import Detail, DetailScores, Photo
 from app.shared.ai.schemas import Extraction, PrivateAttribute
 from app.shared.vocab import Category, Color
 
@@ -30,6 +30,10 @@ _STOPWORDS = {"the", "and", "with", "has", "have", "for", "near", "found", "lost
 
 def _words(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 2} - _STOPWORDS
+
+
+def _similarity(left: set[str], right: set[str]) -> float:
+    return round(len(left & right) / min(len(left), len(right)), 3) if left and right else 0.0
 
 
 class MockAIProvider:
@@ -88,8 +92,14 @@ class MockAIProvider:
 
     async def compare_texts(self, query: str, candidates: list[str]) -> list[float]:
         q = _words(query)
-        scores = []
-        for c in candidates:
-            w = _words(c)
-            scores.append(round(len(q & w) / min(len(q), len(w)), 3) if q and w else 0.0)
+        return [_similarity(q, _words(candidate)) for candidate in candidates]
+
+    async def verify_details(self, attrs: list[Detail], evidence: list[Detail]) -> DetailScores:
+        evidence_words = [(index, _words(value)) for index, _, value in evidence]
+        scores = {}
+        for attr_id, _, value in attrs:
+            words = _words(value)
+            scores.update(
+                {(attr_id, index): _similarity(words, claimed) for index, claimed in evidence_words}
+            )
         return scores

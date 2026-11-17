@@ -1,13 +1,38 @@
-"""Hybrid Match Score (pure functions, no I/O).
+"""Rank candidates by category, location, time, attributes and description similarity."""
 
-Match Score = 25% category + 15% location + 15% time + 25% structured attributes + 20% semantic.
-The score only ranks candidates; it never proves ownership.
-"""
-
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
-WEIGHTS = {"category": 25, "location": 15, "time": 15, "attributes": 25, "semantic": 20}
+WEIGHTS = {"category": 15, "location": 10, "time": 10, "attributes": 25, "semantic": 40}
+BRAND_ALIASES = {
+    "iphone": "apple",
+    "ipad": "apple",
+    "macbook": "apple",
+    "airpods": "apple",
+    "imac": "apple",
+    "apple watch": "apple",
+    "galaxy": "samsung",
+    "pixel": "google",
+    "redmi": "xiaomi",
+    "poco": "xiaomi",
+    "xperia": "sony",
+    "thinkpad": "lenovo",
+    "surface": "microsoft",
+    "jordan": "nike",
+    "beats": "apple",
+}
+COLOR_GROUPS = (
+    {"black", "gray"},
+    {"gray", "silver"},
+    {"blue", "black"},
+    {"gold", "yellow", "beige"},
+    {"beige", "brown"},
+    {"red", "pink"},
+    {"pink", "purple"},
+    {"blue", "purple"},
+    {"white", "silver"},
+)
 
 
 @dataclass
@@ -31,13 +56,15 @@ class FoundFacts:
 
 
 def category_score(lost: LostFacts, found: FoundFacts) -> float:
-    return 1.0 if lost.category == found.category else 0.0
+    if lost.category == found.category:
+        return 1.0
+    return 0.4 if "other" in (lost.category, found.category) else 0.0
 
 
 def location_score(lost: LostFacts, found: FoundFacts) -> float:
     if lost.location == found.location:
         return 1.0
-    return 0.5 if "other" in (lost.location, found.location) else 0.0
+    return 0.5 if "other" in (lost.location, found.location) else 0.15
 
 
 def time_score(lost: LostFacts, found: FoundFacts) -> float:
@@ -50,18 +77,68 @@ def time_score(lost: LostFacts, found: FoundFacts) -> float:
     return 0.1
 
 
-def _same(a: str, b: str) -> bool:
-    a, b = a.strip().lower(), b.strip().lower()
-    return a == b or a in b or b in a
+def _tokens(value: str | None) -> set[str]:
+    return set(re.findall(r"[^\W_]+", (value or "").casefold()))
+
+
+def _brand(brand: str | None, model: str | None) -> str | None:
+    explicit = (brand or "").strip().casefold()
+    text = explicit or (model or "").casefold()
+    for alias, manufacturer in BRAND_ALIASES.items():
+        if re.search(rf"\b{alias}\b", text):
+            return manufacturer
+    return explicit or None
+
+
+def _brand_similarity(lost: LostFacts, found: FoundFacts) -> float | None:
+    left, right = _brand(lost.brand, lost.model), _brand(found.brand, found.model)
+    if not left or not right:
+        return None
+    a, b = (_tokens(brand) - {"the", "inc", "co"} for brand in (left, right))
+    if not a or not b:
+        return None
+    left_compact, right_compact = (re.sub(r"[\W_]+", "", brand) for brand in (left, right))
+    return float(a <= b or b <= a or left_compact == right_compact)
+
+
+def _different_model_numbers(left: str | None, right: str | None) -> bool:
+    a, b = (set(re.findall(r"\d+", model or "")) for model in (left, right))
+    return bool(a and b and not (a <= b or b <= a))
+
+
+def _model_similarity(left: str | None, right: str | None) -> float | None:
+    a, b = _tokens(left), _tokens(right)
+    if not a or not b:
+        return None
+    if _different_model_numbers(left, right):
+        return 0.2
+    if a == b:
+        return 1.0
+    if a <= b or b <= a:
+        return 0.85
+    return len(a & b) / len(a | b)
+
+
+def _color_similarity(left: str | None, right: str | None) -> float | None:
+    a, b = ((color or "").strip().casefold().replace("grey", "gray") for color in (left, right))
+    if not a or not b:
+        return None
+    if a == b:
+        return 1.0
+    if "multicolor" in (a, b):
+        return 0.5
+    return 0.6 if any(a in group and b in group for group in COLOR_GROUPS) else 0.0
 
 
 def attribute_score(lost: LostFacts, found: FoundFacts) -> float:
-    """Share of attributes known on both sides that agree; 0.5 (neutral) if nothing to compare."""
-    pairs = [(getattr(lost, f), getattr(found, f)) for f in ("color", "brand", "model")]
-    comparable = [(a, b) for a, b in pairs if a and b]
-    if not comparable:
-        return 0.5
-    return sum(_same(a, b) for a, b in comparable) / len(comparable)
+    """Average the similarities for attributes known on both sides."""
+    similarities = (
+        _color_similarity(lost.color, found.color),
+        _brand_similarity(lost, found),
+        _model_similarity(lost.model, found.model),
+    )
+    comparable = [value for value in similarities if value is not None]
+    return sum(comparable) / len(comparable) if comparable else 0.5
 
 
 def score(lost: LostFacts, found: FoundFacts, semantic: float) -> dict[str, float]:
@@ -74,7 +151,14 @@ def score(lost: LostFacts, found: FoundFacts, semantic: float) -> dict[str, floa
         "semantic": max(0.0, min(1.0, semantic)),
     }
     points = {k: round(v * WEIGHTS[k], 1) for k, v in parts.items()}
-    points["total"] = round(sum(points.values()))
+    total = sum(points.values())
+    if _brand_similarity(lost, found) == 0.0:
+        total = min(total, 45)
+    if _different_model_numbers(lost.model, found.model):
+        total -= 10
+    if _color_similarity(lost.color, found.color) == 0.0:
+        total = min(total - 15, 55)
+    points["total"] = max(0, round(total))
     return points
 
 

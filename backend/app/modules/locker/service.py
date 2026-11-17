@@ -4,7 +4,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -43,6 +43,8 @@ async def create_locker(
     location: str,
     compartments: int = 1,
     device_id: str = "locker_01",
+    *,
+    commit: bool = True,
 ) -> tuple[Locker, str]:
     """Create a locker with its compartments. Returns the locker and its plain device key."""
     device_key = secrets.token_urlsafe(24)
@@ -56,7 +58,8 @@ async def create_locker(
     session.add(locker)
     await session.flush()
     session.add_all(Compartment(locker_id=locker.id, number=n) for n in range(1, compartments + 1))
-    await session.commit()
+    if commit:
+        await session.commit()
     return locker, device_key
 
 
@@ -77,19 +80,36 @@ async def locker_by_device_key(session: AsyncSession, device_key: str) -> Locker
 
 async def free_compartments(session: AsyncSession, locker_id: int) -> int:
     await release_expired(session, locker_id)
-    return await session.scalar(
-        select(func.count()).where(Compartment.locker_id == locker_id, Compartment.state == "free")
+    free = await session.scalars(
+        select(Compartment.id)
+        .where(Compartment.locker_id == locker_id, Compartment.state == "free")
+        .with_for_update()
     )
+    return len(free.all())
 
 
-async def compartment_for_item(session: AsyncSession, found_item_id: int) -> Compartment | None:
+async def _lock_locker(session: AsyncSession, locker_id: int) -> None:
+    """Serialize compartment and code changes within one locker until commit."""
+    await session.scalar(select(Locker.id).where(Locker.id == locker_id).with_for_update())
+
+
+async def compartment_for_item(
+    session: AsyncSession, found_item_id: int, *, lock: bool = False
+) -> Compartment | None:
     from app.modules.found_items.models import FoundItem
 
-    return await session.scalar(
+    query = (
         select(Compartment)
         .join(FoundItem, FoundItem.compartment_id == Compartment.id)
         .where(FoundItem.id == found_item_id)
     )
+    if lock:
+        locker_id = await session.scalar(query.with_only_columns(Compartment.locker_id))
+        if locker_id is None:
+            return None
+        await _lock_locker(session, locker_id)
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return await session.scalar(query)
 
 
 # ---------- codes ----------
@@ -136,6 +156,7 @@ async def reserve_for_deposit(session: AsyncSession, locker: Locker, item_id: in
         select(Compartment)
         .where(Compartment.locker_id == locker.id, Compartment.state == "free")
         .order_by(Compartment.number)
+        .with_for_update()
     )
     for compartment in free:
         # Conditional update: a concurrent deposit cannot take the same compartment.
@@ -162,8 +183,17 @@ async def issue_pickup_code(
     session: AsyncSession, item_id: int, claim_id: int | None = None
 ) -> IssuedCode:
     """Issue a pickup code for a stored item; older pickup codes stop working (caller commits)."""
-    compartment = await compartment_for_item(session, item_id)
-    if compartment is None or compartment.state not in ("occupied", "pickup_reserved"):
+    from app.modules.found_items.models import FoundItem
+
+    compartment = await compartment_for_item(session, item_id, lock=True)
+    status = await session.scalar(
+        select(FoundItem.status).where(FoundItem.id == item_id).with_for_update()
+    )
+    if (
+        status != "reserved"
+        or compartment is None
+        or compartment.state not in ("occupied", "pickup_reserved")
+    ):
         raise AppError(409, "item_not_in_locker", "The item is not available in the locker.")
     await session.execute(
         update(AccessCode)
@@ -183,6 +213,7 @@ async def release_expired(session: AsyncSession, locker_id: int) -> None:
     """Free compartments whose deposit code expired before the item was put in."""
     from app.modules.found_items.models import FoundItem
 
+    await _lock_locker(session, locker_id)
     rows = await session.execute(
         select(AccessCode, Compartment)
         .join(Compartment, AccessCode.compartment_id == Compartment.id)
@@ -195,6 +226,8 @@ async def release_expired(session: AsyncSession, locker_id: int) -> None:
             AccessCode.expires_at < utcnow(),
             FoundItem.status == "awaiting_deposit",
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     for _code, compartment in rows.all():
         await _cancel_deposit(session, compartment, reason="code_expired")
@@ -218,6 +251,8 @@ async def validate_code(session: AsyncSession, locker: Locker, code: str) -> dic
             AccessCode.used_at.is_(None),
             AccessCode.expires_at >= utcnow(),
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     found = row.first()
     if found is None:
@@ -258,8 +293,12 @@ async def validate_code(session: AsyncSession, locker: Locker, code: str) -> dic
 async def report_state(session: AsyncSession, locker: Locker, number: int, occupied: bool) -> dict:
     from app.modules.found_items import service as items  # lazy: found_items also uses locker
 
+    await _lock_locker(session, locker.id)
     compartment = await session.scalar(
-        select(Compartment).where(Compartment.locker_id == locker.id, Compartment.number == number)
+        select(Compartment)
+        .where(Compartment.locker_id == locker.id, Compartment.number == number)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if compartment is None:
         raise not_found("Compartment")
@@ -306,11 +345,67 @@ async def _cancel_deposit(session: AsyncSession, compartment: Compartment, reaso
 
 
 async def _current_item_id(session: AsyncSession, compartment_id: int) -> int | None:
-    from app.modules.found_items.models import FoundItem
+    from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem
 
     return await session.scalar(
-        select(FoundItem.id).where(
+        select(FoundItem.id)
+        .where(
             FoundItem.compartment_id == compartment_id,
-            FoundItem.status.in_(["awaiting_deposit", "open", "reserved"]),
+            FoundItem.status.in_(ACTIVE_ITEM_STATUSES),
         )
+        .with_for_update()
     )
+
+
+# ---------- admin ----------
+
+
+async def clear_item_access(
+    session: AsyncSession, item_id: int, compartment: Compartment | None
+) -> None:
+    """Revoke an expired item's codes and release its compartment if now empty."""
+    await session.execute(
+        update(AccessCode)
+        .where(AccessCode.found_item_id == item_id, AccessCode.used_at.is_(None))
+        .values(used_at=utcnow())
+    )
+    if compartment is not None and await _current_item_id(session, compartment.id) is None:
+        compartment.state = "free"
+
+
+async def reset_locker(session: AsyncSession, code: str, admin_id: int) -> None:
+    from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem
+
+    locker = await get_locker(session, code)
+    await _lock_locker(session, locker.id)
+    compartments = (
+        await session.scalars(
+            select(Compartment.id).where(Compartment.locker_id == locker.id).with_for_update()
+        )
+    ).all()
+    expired = await session.execute(
+        update(FoundItem)
+        .where(
+            FoundItem.compartment_id.in_(compartments),
+            FoundItem.status.in_(ACTIVE_ITEM_STATUSES),
+        )
+        .values(status="expired")
+    )
+    await session.execute(
+        update(AccessCode)
+        .where(AccessCode.compartment_id.in_(compartments), AccessCode.used_at.is_(None))
+        .values(used_at=utcnow())
+    )
+    await session.execute(
+        update(Compartment).where(Compartment.id.in_(compartments)).values(state="free")
+    )
+    audit.log(
+        session,
+        "admin_locker_reset",
+        "locker",
+        locker.id,
+        actor_type="admin",
+        actor_id=admin_id,
+        items=expired.rowcount,
+    )
+    await session.commit()

@@ -7,7 +7,15 @@ import anthropic
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.shared.ai.provider import AIError, Photo
+from app.shared.ai.provider import (
+    DETAIL_SYSTEM,
+    AIError,
+    Detail,
+    DetailScores,
+    Photo,
+    detail_input,
+    detail_scores,
+)
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType
 
@@ -33,6 +41,10 @@ from 0 (unrelated) to 1 (clearly the same), allowing for different wording and s
 
 class _Similarities(BaseModel):
     scores: list[float] = Field(description="One score per candidate, in the given order")
+
+
+class _DetailSimilarities(BaseModel):
+    scores: list[list[float]]
 
 
 class ClaudeProvider:
@@ -82,3 +94,10 @@ class ClaudeProvider:
         if len(result.scores) != len(candidates):
             raise AIError("Similarity count does not match candidates")
         return [max(0.0, min(1.0, s)) for s in result.scores]
+
+    async def verify_details(self, attrs: list[Detail], evidence: list[Detail]) -> DetailScores:
+        if not attrs or not evidence:
+            return {}
+        content = [{"type": "text", "text": detail_input(attrs, evidence)}]
+        result = await self._parse(DETAIL_SYSTEM, content, _DetailSimilarities)
+        return detail_scores(attrs, evidence, result.scores)

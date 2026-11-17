@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base, utcnow
 from app.core.schema import db_enum
 
+ACTIVE_ITEM_STATUSES = ("awaiting_deposit", "open", "reserved")
+
 
 class DepositSession(Base):
     __tablename__ = "deposit_session"

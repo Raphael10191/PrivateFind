@@ -1,23 +1,14 @@
-"""Ownership Verification Engine (pure functions, no I/O).
-
-Ownership Score = matched evidence weight / total private-attribute weight x 100,
-weights strong 3, distinctive 2, generic 1. Decision:
-  critical conflict (e.g. wrong serial suffix) -> REJECTED
-  generic item                                -> IN_REVIEW (never auto-approved)
-  score >= 80                                 -> APPROVED
-  50..79                                      -> IN_REVIEW
-  below 50                                    -> REJECTED
-The AI only supplies text similarity; this module makes the decision.
-"""
+"""Decide claims from the match score and the owner's evidence for private details."""
 
 import re
 from dataclasses import dataclass, field
 
 from app.shared.vocab import CRITICAL_TYPES, GENERIC_CATEGORIES, STRENGTH_WEIGHT
 
-APPROVE_AT = 80
+APPROVE_AT = 75
 REVIEW_AT = 50
 SIMILARITY_MATCH = 0.6
+DETAIL_COUNT = 2
 
 
 @dataclass
@@ -54,7 +45,13 @@ def critical_matches(attr_value: str, claimed: str) -> bool:
 
 
 def comparable(attr: Attr, ev: Evidence) -> bool:
-    return ev.type == attr.type or (ev.type == "other" and attr.type not in CRITICAL_TYPES)
+    return (
+        attr.type == ev.type if attr.type in CRITICAL_TYPES or ev.type in CRITICAL_TYPES else True
+    )
+
+
+def _weight(attr: Attr) -> int:
+    return STRENGTH_WEIGHT[attr.strength or "generic"]
 
 
 def verify(
@@ -62,43 +59,55 @@ def verify(
     attrs: list[Attr],
     evidence: list[Evidence],
     similarity: dict[tuple[int, int], float],
+    match_score: float,
 ) -> Verdict:
-    """`similarity[(attr.id, evidence index)]` holds AI text similarity for non-critical pairs."""
-    total = sum(STRENGTH_WEIGHT[a.strength or "generic"] for a in attrs)
-    matched = 0
+    """Compare exact identifiers and score the two strongest confirmed details."""
+    strongest = sorted(attrs, key=_weight, reverse=True)
+    possible = sum(map(_weight, strongest[:DETAIL_COUNT]))
     conflict = False
+    used_attrs: set[int] = set()
+    used_values: set[str] = set()
     results: dict[int, tuple[str, int | None, float | None]] = {
         i: ("unmatched", None, None) for i in range(len(evidence))
     }
 
-    for attr in attrs:
-        weight = STRENGTH_WEIGHT[attr.strength or "generic"]
-        candidates = [i for i, ev in enumerate(evidence) if comparable(attr, ev)]
-        if attr.type in CRITICAL_TYPES:
-            for i in candidates:
-                if critical_matches(attr.value, evidence[i].value):
-                    results[i] = ("match", attr.id, 1.0)
-                    matched += weight
-                    break
-                results[i] = ("conflict", attr.id, 0.0)
-                conflict = True
+    for i, ev in enumerate(evidence):
+        if ev.type not in CRITICAL_TYPES:
             continue
-        best = max(candidates, key=lambda i: similarity.get((attr.id, i), 0.0), default=None)
-        if best is not None:
-            sim = similarity.get((attr.id, best), 0.0)
-            if sim >= SIMILARITY_MATCH:
-                results[best] = ("match", attr.id, sim)
-                matched += weight
-            elif results[best][0] == "unmatched":
-                results[best] = ("mismatch", attr.id, sim)
+        candidates = [attr for attr in strongest if comparable(attr, ev)]
+        match = next((attr for attr in candidates if critical_matches(attr.value, ev.value)), None)
+        if match is not None:
+            results[i] = ("match", match.id, 1.0)
+            used_attrs.add(match.id)
+            used_values.add(" ".join(ev.value.casefold().split()))
+        elif candidates:
+            results[i] = ("conflict", candidates[0].id, 0.0)
+            conflict = True
 
-    score = round(100 * matched / total) if total else 0
-    generic = category in GENERIC_CATEGORIES or all(
-        (a.strength or "generic") == "generic" for a in attrs
-    )
+    pairs = [
+        (attr, i, sim)
+        for attr in strongest
+        if attr.type not in CRITICAL_TYPES
+        for i, ev in enumerate(evidence)
+        if comparable(attr, ev) and (sim := similarity.get((attr.id, i))) is not None
+    ]
+    for attr, i, sim in sorted(pairs, key=lambda pair: (_weight(pair[0]), pair[2]), reverse=True):
+        value = " ".join(evidence[i].value.casefold().split())
+        if sim >= SIMILARITY_MATCH and attr.id not in used_attrs and value not in used_values:
+            results[i] = ("match", attr.id, sim)
+            used_attrs.add(attr.id)
+            used_values.add(value)
+
+    for attr, i, sim in sorted(pairs, key=lambda pair: pair[2], reverse=True):
+        if results[i][0] == "unmatched" and sim < SIMILARITY_MATCH:
+            results[i] = ("mismatch", attr.id, sim)
+
+    matched = [_weight(attr) for attr in strongest if attr.id in used_attrs][:DETAIL_COUNT]
+    detail_score = 100 * sum(matched) / possible if possible else 0
+    score = round(0.6 * match_score + 0.4 * detail_score)
     if conflict:
         decision = "rejected"
-    elif generic:
+    elif category in GENERIC_CATEGORIES:
         decision = "in_review"
     elif score >= APPROVE_AT:
         decision = "approved"
