@@ -9,6 +9,7 @@ from app.core.db import utcnow
 from app.modules.claims import policy, service
 from app.modules.found_items.models import FoundItem
 from app.modules.lost_reports.models import LostReport
+from app.modules.matching.models import MatchCandidate
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import set_ai_provider
 from tests.conftest import deposit_and_store
@@ -261,13 +262,13 @@ async def test_cooldown_after_three_failures(client, owner, locker):
 async def test_claim_requires_candidate(client, owner, other_owner, locker):
     item_id, report_id, _ = await setup_candidate(client, owner, locker)
     report = {
-        "category": "phone",
+        "category": "wallet",
         "location": "library",
         "lost_at": utcnow().isoformat(),
-        "description": "my phone",
+        "description": "my wallet",
     }
     other_report = (await other_owner.post("/api/lost-reports", json=report)).json()["id"]
-    r = await claim(other_owner, other_report, item_id, GOOD)  # never saw candidates
+    r = await claim(other_owner, other_report, item_id, GOOD)  # item did not qualify
     assert r.json()["error"]["code"] == "not_a_candidate"
     assert (await claim(other_owner, report_id, item_id, GOOD)).status_code == 404  # not theirs
 
@@ -317,6 +318,61 @@ async def test_first_approval_wins(client, owner, other_owner, admin, locker):
 
 async def test_admin_only(owner):
     assert (await owner.get("/api/admin/claims")).status_code == 403
+
+
+async def test_photo_verification_rechecks_existing_review_and_issues_code(
+    client,
+    owner,
+    locker,
+    session,
+):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Black Samsung phone")
+    weak = [{"type": "other", "value": "generic description"}]
+    first = (await claim(owner, report_id, item_id, weak)).json()
+    assert first["status"] == "in_review"
+    match = await session.scalar(
+        select(MatchCandidate).where(
+            MatchCandidate.lost_report_id == report_id,
+            MatchCandidate.found_item_id == item_id,
+        )
+    )
+    match.total = 90
+    await session.commit()
+
+    ai = MockAIProvider()
+    ai.verify_photos = AsyncMock(return_value=[0.95, 0.25])
+    set_ai_provider(ai)
+    reply = await claim(owner, report_id, item_id, [{"type": "other", "value": "German Language"}])
+    result = reply.json()
+    assert result["id"] == first["id"]
+    assert result["status"] == "approved" and len(result["pickup_code"]) == 6
+    photos, details = ai.verify_photos.call_args.args
+    assert len(photos) == 1 and photos[0].data.startswith(b"\xff\xd8")
+    assert details == ["German Language", "Black Samsung phone"]
+
+
+@pytest.mark.parametrize(
+    ("match_score", "visual_score", "status"),
+    [(90, 0.5, "rejected"), (90, 0.95, "approved"), (60, 0.95, "in_review")],
+)
+def test_visual_decision_uses_visible_proof_and_match_score(match_score, visual_score, status):
+    verdict = policy.verify_photo_evidence(
+        [],
+        [policy.Evidence("other", "German Language")],
+        {0: visual_score},
+        match_score,
+    )
+    assert verdict.decision == status
+
+
+def test_visual_proof_cannot_override_wrong_serial():
+    verdict = policy.verify_photo_evidence(
+        ATTRS,
+        [policy.Evidence("serial_suffix", "1234"), policy.Evidence("other", "cat sticker")],
+        {1: 1.0},
+        100,
+    )
+    assert (verdict.decision, verdict.critical_conflict) == ("rejected", True)
 
 
 async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker, caplog):

@@ -68,6 +68,8 @@ _tasks: set[asyncio.Task] = set()
 
 async def run_extraction(item_id: int) -> None:
     """Extract attributes with up to N attempts and exponential backoff. Uses its own session."""
+    from app.modules.matching.service import refresh_for_item
+
     settings = get_settings()
     ai = get_ai_provider()
     async with db.SessionLocal() as session:
@@ -99,6 +101,7 @@ async def run_extraction(item_id: int) -> None:
                 session, "ai_extracted", "found_item", item.id, confidence=extraction.confidence
             )
             await session.commit()
+            await refresh_for_item(item_id)
             return
 
         item.ai_status = "failed"

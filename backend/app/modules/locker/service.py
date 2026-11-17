@@ -326,7 +326,11 @@ async def report_state(session: AsyncSession, locker: Locker, number: int, occup
         found_item_id=item_id,
     )
     await session.commit()
-    return {"compartment": number, "state": compartment.state}
+    return {
+        "compartment": number,
+        "state": compartment.state,
+        "stored_item_id": item_id if event == "deposited" else None,
+    }
 
 
 async def heartbeat(session: AsyncSession, locker: Locker) -> datetime:

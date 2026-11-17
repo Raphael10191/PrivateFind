@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, BackgroundTasks, Depends, Header
 
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -15,6 +15,7 @@ from app.modules.locker.schemas import (
     StateIn,
     StateResult,
 )
+from app.modules.matching.service import refresh_for_item
 
 router = APIRouter(tags=["locker"])
 
@@ -60,9 +61,18 @@ async def validate_code(body: CodeIn, locker: DeviceLocker, session: SessionDep)
 
 
 @router.post("/api/device/compartments/{number}/state", response_model=StateResult, tags=["device"])
-async def report_state(number: int, body: StateIn, locker: DeviceLocker, session: SessionDep):
+async def report_state(
+    number: int,
+    body: StateIn,
+    locker: DeviceLocker,
+    session: SessionDep,
+    background: BackgroundTasks,
+):
     _check_device_id(locker, body.device_id)
-    return await service.report_state(session, locker, number, body.occupied)
+    result = await service.report_state(session, locker, number, body.occupied)
+    if (item_id := result.pop("stored_item_id", None)) is not None:
+        background.add_task(refresh_for_item, item_id)
+    return result
 
 
 @router.post("/api/device/heartbeat", tags=["device"])

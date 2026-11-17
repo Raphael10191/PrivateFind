@@ -193,9 +193,8 @@
     <div class="claim-heading">
         <h1>Verify Your Ownership</h1>
         <p>
-            Provide details that only the real owner
-            is likely to know. Your evidence is
-            submitted privately for verification.
+            Describe a detail you would recognize on your item.
+            PrivateFind checks it against the finder's photos.
         </p>
     </div>
 
@@ -217,8 +216,7 @@
         <h2>Ownership Evidence</h2>
 
         <p class="claim-hint">
-            Add at least one identifying detail.
-            You can provide up to eight.
+            For example, describe a keyboard layout, a mark, or an engraving.
             Avoid sharing your full password,
             PIN, or unnecessary personal information.
         </p>
@@ -279,6 +277,9 @@
         </div>
 
         <div class="result-actions">
+            <button type="button" id="retry-claim" class="secondary-button" hidden>
+                Add More Detail
+            </button>
             <button type="button"
                     id="check-status"
                     class="secondary-button"
@@ -353,14 +354,14 @@
     );
 
     const evidenceTypes = {
+        other: "Describe an identifying detail",
         serial_suffix: "Last digits of a serial number",
         model: "Exact model",
         sticker_or_mark: "Unique sticker or mark",
         damage: "Distinctive damage",
         contents: "Contents of the item",
         accessory: "Accessory",
-        engraving: "Engraving",
-        other: "Other identifying detail"
+        engraving: "Engraving"
     };
 
     let claimId = null;
@@ -507,6 +508,16 @@
         pickupButton.hidden = true;
     }
 
+    const retryButton = document.getElementById("retry-claim");
+    retryButton.addEventListener("click", () => {
+        claimCreated = false;
+        resultBox.hidden = true;
+        claimForm.hidden = false;
+        submitButton.disabled = false;
+        submitButton.textContent = "Submit Ownership Claim";
+        evidenceList.querySelector("textarea")?.focus();
+    });
+
     function showClaimResult(claim) {
         claimId = claim.id;
         claimCreated = true;
@@ -519,6 +530,7 @@
         pickupDetails.hidden = true;
         statusButton.hidden = true;
         pickupButton.hidden = true;
+        retryButton.hidden = !["rejected", "in_review"].includes(claim.status);
 
         const heading = document.getElementById(
             "result-heading"
@@ -578,12 +590,10 @@
                  encodeURIComponent(reportId);
 
         try {
-            // The backend records candidates shown to the
-            // Owner. This request must precede a claim.
             const candidates = await api(
                 "/api/lost-reports/" +
                 encodeURIComponent(reportId) +
-                "/candidates"
+                "/candidates?refresh=false"
             );
 
             if (!Array.isArray(candidates)) {
@@ -602,8 +612,7 @@
             if (!selected) {
                 showError(
                     "This item is no longer an available " +
-                    "match. Return to Report Details " +
-                    "and check for matches again."
+                    "match. Return to Report Details for the latest matches."
                 );
                 return;
             }
@@ -658,7 +667,7 @@
 
             submitting = true;
             submitButton.disabled = true;
-            submitButton.textContent = "Submitting...";
+            submitButton.textContent = "Checking the Finder Photos…";
 
             try {
                 const claim = await api(

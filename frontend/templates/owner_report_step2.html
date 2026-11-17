@@ -127,32 +127,6 @@
         line-height: 1.5;
     }
 
-    .form-success {
-        margin-top: 20px;
-        border: 1px solid #DCDCE4;
-        border-radius: 12px;
-        padding: 20px;
-        background: #EFEBFA;
-        overflow-wrap: anywhere;
-    }
-
-    .form-success h2 {
-        margin: 0 0 10px;
-        font-size: 20px;
-    }
-
-    .form-success p {
-        margin: 8px 0;
-        line-height: 1.5;
-    }
-
-    .home-link {
-        display: inline-block;
-        margin-top: 12px;
-        color: #6D5BD0;
-        font-weight: 600;
-    }
-
     [hidden] {
         display: none !important;
     }
@@ -280,30 +254,6 @@
             hidden
         ></p>
 
-        <div
-            id="form-success"
-            class="form-success"
-            role="status"
-            hidden
-        >
-            <h2>Report submitted successfully</h2>
-
-            <p>
-                Your lost-item report was saved.
-                Possible matches will be available
-                when matching items are found.
-            </p>
-
-            <p>
-                Report ID:
-                <strong id="saved-report-id"></strong>
-            </p>
-
-            <a href="/owner" class="home-link">
-                Back to Home
-            </a>
-        </div>
-
     </form>
 </section>
 {% endblock %}
@@ -324,10 +274,6 @@
 
     const errorBox = document.getElementById(
         "form-error"
-    );
-
-    const successBox = document.getElementById(
-        "form-success"
     );
 
     const storageKey =
@@ -602,20 +548,7 @@
                     storageKey
                 );
 
-                document.getElementById(
-                    "saved-report-id"
-                ).textContent =
-                    String(savedReport.id);
-
-                successBox.hidden = false;
-
-                submitButton.textContent =
-                    "Report Submitted";
-
-                successBox.scrollIntoView({
-                    behavior: "smooth",
-                    block: "nearest"
-                });
+                window.location.assign("/owner/report/view?id=" + encodeURIComponent(savedReport.id));
 
             } catch (error) {
                 errorBox.textContent =

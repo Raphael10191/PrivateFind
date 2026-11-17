@@ -14,6 +14,7 @@ from app.shared.ai.claude import COMPARE_SYSTEM, EXTRACT_SYSTEM
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import (
     DETAIL_SYSTEM,
+    PHOTO_VERIFICATION_SYSTEM,
     AIError,
     DetailAttribute,
     DetailScores,
@@ -21,6 +22,7 @@ from app.shared.ai.provider import (
     bounded_score,
     detail_input,
     detail_scores,
+    photo_scores,
 )
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType, Strength
@@ -137,22 +139,36 @@ class QwenProvider:
             asyncio.to_thread(self._chat_sync, system, content), timeout=self.timeout
         )
 
+    def _images(self, photos: list[Photo]) -> list[dict]:
+        return [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{photo.media_type};base64,{base64.b64encode(photo.data).decode()}"
+                },
+            }
+            for photo in photos[: self.max_photos]
+        ]
+
     async def extract_attributes(self, photos: list[Photo], note: str) -> Extraction:
-        content = []
-        for photo in photos[: self.max_photos]:
-            image = base64.standard_b64encode(photo.data).decode()
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{photo.media_type};base64,{image}"},
-                }
-            )
+        content = self._images(photos)
         content.append({"type": "text", "text": f"Finder's note: {note or '(none)'}"})
         try:
             return _clean_extraction(await self._chat(EXTRACT_SYSTEM + EXTRACT_HINT, content), note)
         except RESPONSE_ERRORS as exc:
             log.warning("Qwen extraction failed (%s); using mock", type(exc).__name__)
             return await self.mock.extract_attributes(photos, note)
+
+    async def verify_photos(self, photos: list[Photo], evidence: list[str]) -> list[float]:
+        content = self._images(photos)
+        content.append(
+            {"type": "text", "text": json.dumps({"evidence": evidence}, ensure_ascii=False)}
+        )
+        try:
+            result = await self._chat(PHOTO_VERIFICATION_SYSTEM, content)
+            return photo_scores(evidence, result["scores"])
+        except RESPONSE_ERRORS as exc:
+            raise AIError("Qwen photo verification failed") from exc
 
     async def compare_texts(self, query: str, candidates: list[str]) -> list[float]:
         if not candidates:

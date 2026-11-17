@@ -1,6 +1,7 @@
 """Claude API provider: photo attribute extraction and text similarity (D5: no embeddings)."""
 
 import base64
+import json
 from typing import get_args
 
 import anthropic
@@ -9,12 +10,14 @@ from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.shared.ai.provider import (
     DETAIL_SYSTEM,
+    PHOTO_VERIFICATION_SYSTEM,
     AIError,
     DetailAttribute,
     DetailScores,
     Photo,
     detail_input,
     detail_scores,
+    photo_scores,
 )
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType
@@ -74,8 +77,8 @@ class ClaudeProvider:
             raise AIError(f"No structured output (stop_reason={response.stop_reason})")
         return response.parsed_output
 
-    async def extract_attributes(self, photos: list[Photo], note: str) -> Extraction:
-        content: list[dict] = [
+    def _images(self, photos: list[Photo]) -> list[dict]:
+        return [
             {
                 "type": "image",
                 "source": {
@@ -86,8 +89,19 @@ class ClaudeProvider:
             }
             for p in photos
         ]
+
+    async def extract_attributes(self, photos: list[Photo], note: str) -> Extraction:
+        content = self._images(photos)
         content.append({"type": "text", "text": f"Finder's note: {note or '(none)'}"})
         return await self._parse(EXTRACT_SYSTEM, content, Extraction)
+
+    async def verify_photos(self, photos: list[Photo], evidence: list[str]) -> list[float]:
+        content = self._images(photos)
+        content.append(
+            {"type": "text", "text": json.dumps({"evidence": evidence}, ensure_ascii=False)}
+        )
+        result = await self._parse(PHOTO_VERIFICATION_SYSTEM, content, _Similarities)
+        return photo_scores(evidence, result.scores)
 
     async def compare_texts(self, query: str, candidates: list[str]) -> list[float]:
         if not candidates:

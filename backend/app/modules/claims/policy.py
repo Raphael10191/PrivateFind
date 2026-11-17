@@ -10,6 +10,7 @@ APPROVE_AT = 75
 REVIEW_AT = 50
 SIMILARITY_MATCH = 0.6
 TOP_N = 2
+VISIBLE_PROOF = 0.85
 
 
 @dataclass
@@ -137,9 +138,36 @@ def verify(
     return Verdict(decision, score, conflict, detail_score, results)
 
 
+def verify_photo_evidence(
+    attrs: list[Attr],
+    evidence: list[Evidence],
+    scores: dict[int, float],
+    match_score: float,
+) -> Verdict:
+    serial_attrs = [attr for attr in attrs if attr.type in CRITICAL_TYPES]
+    serial = verify(None, serial_attrs, evidence, {}, match_score)
+    results = serial.results
+    for index, similarity in scores.items():
+        results[index] = ("match" if similarity >= VISIBLE_PROOF else "mismatch", None, similarity)
+    confirmed_serial = any(
+        result[0] == "match"
+        for index, result in results.items()
+        if evidence[index].type in CRITICAL_TYPES
+    )
+    best = 1.0 if confirmed_serial else max(scores.values(), default=0.0)
+    score = round(0.6 * match_score + 40 * best)
+    if serial.critical_conflict or best < VISIBLE_PROOF:
+        decision = "rejected"
+    elif score >= APPROVE_AT:
+        decision = "approved"
+    else:
+        decision = "in_review"
+    return Verdict(decision, score, serial.critical_conflict, best * 100, results)
+
+
 MESSAGES = {
     "pending": "Your claim is waiting to be checked.",
     "approved": "Ownership verified. Use the pickup code at the locker.",
     "in_review": "Thanks. An administrator will review your claim.",
-    "rejected": "We could not verify that this item is yours.",  # never says which detail
+    "rejected": "We could not verify ownership. Try again with a more specific identifying detail.",
 }

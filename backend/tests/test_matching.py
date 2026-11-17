@@ -227,7 +227,9 @@ async def test_candidates_include_category_other(
     await session.commit()
 
     response = await owner.post("/api/lost-reports", json=report(category=report_category))
-    candidates = await owner.get(f"/api/lost-reports/{response.json()['id']}/candidates")
+    candidates = await owner.get(
+        f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false"
+    )
     assert [c["found_item_id"] for c in candidates.json()] == [item_id]
     assert candidates.json()[0]["breakdown"]["category"] == 6
 
@@ -272,9 +274,19 @@ async def test_five_casio_candidates_rank_by_description_and_show_only_top_three
             description="Kratzer neben dem Datum",
         ),
     )
-    candidates = await owner.get(f"/api/lost-reports/{response.json()['id']}/candidates")
+    candidates = await owner.get(
+        f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false"
+    )
     assert candidates.status_code == 200
     assert [c["found_item_id"] for c in candidates.json()] == [items[i].id for i in (2, 3, 0)]
     assert [c["breakdown"]["semantic"] for c in candidates.json()] == [40, 36, 30]
     assert ai.compare_texts.await_count == 1
     assert set(ai.compare_texts.call_args.args[1]) == descriptions.keys()
+
+
+async def test_existing_report_gets_matches_when_locker_confirms_deposit(client, owner, locker):
+    response = await owner.post("/api/lost-reports", json=report())
+    url = f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false"
+    assert (await owner.get(url)).json() == []
+    item_id = await deposit_and_store(client, locker[1])
+    assert [item["found_item_id"] for item in (await owner.get(url)).json()] == [item_id]

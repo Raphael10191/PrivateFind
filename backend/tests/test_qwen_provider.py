@@ -114,3 +114,13 @@ async def test_qwen_does_not_call_api_for_empty_candidates_or_details(monkeypatc
     assert await ai.compare_texts("query", []) == []
     assert await ai.verify_details([], ["value"]) == {}
     request.assert_not_called()
+
+
+async def test_qwen_verifies_evidence_with_finder_photo_in_same_request(monkeypatch):
+    ai = QwenProvider(Settings(qwen_model="test-qwen"))
+    request = Mock(return_value=response({"scores": [0.95, 0.3]}))
+    monkeypatch.setattr(ai, "_request", request)
+    assert await ai.verify_photos([Photo(b"a")], ["German Language", "Apple laptop"]) == [0.95, 0.3]
+    content = request.call_args.args[2]["messages"][1]["content"]
+    assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,YQ=="
+    assert "German Language" in content[1]["text"]

@@ -274,17 +274,6 @@
         <section class="detail-card">
             <h2>Possible Matches</h2>
 
-            <p class="match-message">
-                Check whether any found items
-                match your lost-item report.
-            </p>
-
-            <button type="button"
-                    id="check-matches"
-                    class="check-button">
-                Check for Matches
-            </button>
-
             <p id="matches-message"
                class="match-message"
                role="status"
@@ -312,10 +301,6 @@
 
     const reportContent = document.getElementById(
         "report-content"
-    );
-
-    const checkButton = document.getElementById(
-        "check-matches"
     );
 
     const matchesMessage = document.getElementById(
@@ -448,11 +433,11 @@
 
             reportContent.hidden = false;
 
-            if (report.status !== "open") {
-                checkButton.disabled = true;
-
-                matchesMessage.textContent =
-                    "Matching is available for open reports.";
+            if (report.status === "open") {
+                matchesMessage.textContent = "Looking for possible matches…";
+                refreshMatches();
+            } else {
+                matchesMessage.textContent = "Matching is available for open reports.";
             }
 
         } catch (error) {
@@ -530,63 +515,36 @@
         return card;
     }
 
-    checkButton.addEventListener(
-        "click",
-        async () => {
-            if (!validId(reportId)) {
+    let displayedMatches;
+
+    async function refreshMatches() {
+        try {
+            if (document.hidden) {
                 return;
             }
 
-            checkButton.disabled = true;
-            checkButton.textContent = "Checking...";
-
-            matchesMessage.textContent =
-                "Looking for possible matches...";
-
-            matchesList.replaceChildren();
-
-            try {
-                const matches = await requestJson(
-                    "/api/lost-reports/" +
-                    encodeURIComponent(reportId) +
-                    "/candidates"
-                );
-
-                if (!Array.isArray(matches)) {
-                    throw new Error(
-                        "Unexpected matching response."
-                    );
-                }
-
-                if (matches.length === 0) {
-                    matchesMessage.textContent =
-                        "No possible matches found yet. " +
-                        "You can check again later.";
-                    return;
-                }
-
-                matchesMessage.textContent =
-                    matches.length +
-                    " possible match(es) found.";
-
-                matches.forEach(match => {
-                    matchesList.appendChild(
-                        createMatchCard(match)
-                    );
-                });
-
-            } catch (error) {
-                matchesMessage.textContent =
-                    error.message ||
-                    "Could not check for matches.";
-
-            } finally {
-                checkButton.disabled = false;
-                checkButton.textContent =
-                    "Check for Matches";
+            const matches = await requestJson(
+                "/api/lost-reports/" + encodeURIComponent(reportId) + "/candidates?refresh=false"
+            );
+            if (!Array.isArray(matches)) {
+                throw new Error("Unexpected matching response.");
             }
+
+            matchesMessage.textContent = matches.length
+                ? matches.length + " possible match(es) found."
+                : "No matches yet. New matches will appear here automatically.";
+
+            const result = JSON.stringify(matches);
+            if (result !== displayedMatches) {
+                matchesList.replaceChildren(...matches.map(createMatchCard));
+                displayedMatches = result;
+            }
+        } catch (error) {
+            matchesMessage.textContent = error.message || "Could not load matches. Retrying…";
+        } finally {
+            setTimeout(refreshMatches, 5000);
         }
-    );
+    }
 
     loadReport();
 </script>

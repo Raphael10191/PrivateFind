@@ -15,8 +15,8 @@ from app.modules.found_items import service as items
 from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
 from app.modules.matching import service as matching
-from app.shared import audit
-from app.shared.ai.provider import DetailAttribute, DetailScores, get_ai_provider
+from app.shared import audit, storage
+from app.shared.ai.provider import AIError, DetailAttribute, DetailScores, Photo, get_ai_provider
 from app.shared.vocab import CRITICAL_TYPES
 
 log = logging.getLogger("uvicorn.error")
@@ -36,34 +36,71 @@ async def submit(
         raise AppError(409, "not_a_candidate", "This item is not a candidate for your report.")
     if item.status != "open":
         raise AppError(409, "item_unavailable", "This item is no longer available.")
-    await _check_attempts(session, user_id, item_id)
+    visual = getattr(get_ai_provider(), "verify_photos", None)
+    await _check_attempts(session, user_id, item_id, retry_review=callable(visual))
 
     attrs = [policy.Attr(a.id, a.name, a.value, a.strength) for a in item.private_attributes()]
     ev = _claim_evidence(evidence, report.description)
-    verdict = policy.verify(item.category, attrs, ev, await _similarities(attrs, ev), match.total)
-
-    claim = Claim(
-        user_id=user_id,
-        match_candidate=match,
-        status=verdict.decision,
-        ownership_score=verdict.score,
-        critical_conflict=verdict.critical_conflict,
-        decided_at=utcnow() if verdict.decision != "in_review" else None,
-        evidence=[
-            OwnershipEvidence(
-                type=e.type,
-                value=e.value,
-                result={"unmatched": "not_verifiable", "conflict": "mismatch"}.get(
-                    verdict.results[i][0], verdict.results[i][0]
-                ),
-                is_critical=e.type in CRITICAL_TYPES,
-                item_attribute_id=verdict.results[i][1],
-                similarity=verdict.results[i][2],
+    if callable(visual):
+        indices = [i for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
+        try:
+            photos = [Photo(storage.read_photo(p.file_name)) for p in item.photos]
+            if not photos:
+                raise AppError(
+                    409, "photos_unavailable", "Finder photos are unavailable for verification."
+                )
+            scores = await visual(photos, [ev[i].value for i in indices]) if indices else []
+            verdict = policy.verify_photo_evidence(
+                attrs, ev, dict(zip(indices, scores, strict=True)), match.total
             )
-            for i, e in enumerate(ev)
-        ],
-    )
-    session.add(claim)
+        except (AIError, OSError, ValueError) as exc:
+            raise AppError(
+                503,
+                "verification_unavailable",
+                "Photo verification is unavailable. Please try again.",
+            ) from exc
+    else:
+        verdict = policy.verify(
+            item.category, attrs, ev, await _similarities(attrs, ev), match.total
+        )
+
+    claim = None
+    if callable(visual):
+        await locker_service.compartment_for_item(session, item.id, lock=True)
+        current_status = await session.scalar(
+            select(type(item).status).where(type(item).id == item.id).with_for_update()
+        )
+        if current_status != "open":
+            raise AppError(409, "item_unavailable", "This item is no longer available.")
+        claim = await session.scalar(
+            select(Claim)
+            .where(
+                Claim.user_id == user_id, Claim.match_id == match.id, Claim.status == "in_review"
+            )
+            .order_by(Claim.id.desc())
+            .limit(1)
+            .with_for_update()
+        )
+    if claim is None:
+        claim = Claim(user_id=user_id, match_candidate=match)
+        session.add(claim)
+    claim.status = verdict.decision
+    claim.ownership_score = verdict.score
+    claim.critical_conflict = verdict.critical_conflict
+    claim.decided_at = utcnow() if verdict.decision != "in_review" else None
+    claim.evidence = [
+        OwnershipEvidence(
+            type=e.type,
+            value=e.value,
+            result={"unmatched": "not_verifiable", "conflict": "mismatch"}.get(
+                verdict.results[i][0], verdict.results[i][0]
+            ),
+            is_critical=e.type in CRITICAL_TYPES,
+            item_attribute_id=verdict.results[i][1],
+            similarity=verdict.results[i][2],
+        )
+        for i, e in enumerate(ev)
+    ]
     await session.flush()
 
     issued = None
@@ -130,13 +167,19 @@ async def _similarities(attrs: list[policy.Attr], ev: list[policy.Evidence]) -> 
     return scores
 
 
-async def _check_attempts(session: AsyncSession, user_id: int, item_id: int) -> None:
+async def _check_attempts(
+    session: AsyncSession,
+    user_id: int,
+    item_id: int,
+    *,
+    retry_review: bool = False,
+) -> None:
     settings = get_settings()
     open_claim = await session.scalar(
         select(Claim.id).where(
             Claim.user_id == user_id,
             Claim.found_item_id == item_id,
-            Claim.status.in_(["in_review", "approved"]),
+            Claim.status.in_(["approved"] if retry_review else ["in_review", "approved"]),
         )
     )
     if open_claim:
