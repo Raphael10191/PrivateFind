@@ -349,17 +349,16 @@
         <fieldset class="finder-field photo-field" aria-describedby="photo-hint photo-error">
             <legend>Item photos *</legend>
             <div class="photo-actions">
-                <button type="button" id="take-photo">Foto aufnehmen</button>
-                <button type="button" id="choose-photos">Aus Galerie wählen</button>
+                <button type="button" id="take-photo">Take photo</button>
+                <button type="button" id="choose-photos">Choose photos</button>
             </div>
             <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
             <input type="file" id="gallery-input" accept="image/*" multiple hidden>
             <p id="photo-hint" class="field-hint">
-                Mindestens 1 Foto, optional bis zu 3 – am besten aus verschiedenen
-                Blickwinkeln und Nahaufnahmen von Details (Kratzer, Gravuren, Aufkleber).
+                Add 1–3 photos. Include another angle or a close-up of a distinguishing detail when useful.
             </p>
-            <p id="photo-count" class="field-hint" role="status">0/3 Fotos</p>
-            <ul id="photo-grid" class="photo-grid" aria-label="Ausgewählte Fotos" hidden></ul>
+            <p id="photo-count" class="field-hint" role="status">0/3 photos</p>
+            <ul id="photo-grid" class="photo-grid" aria-label="Selected photos" hidden></ul>
             <p id="photo-error" class="photo-error" role="alert" hidden></p>
         </fieldset>
 
@@ -385,10 +384,31 @@
             type="submit"
             class="submit-button"
             id="deposit-button">
-            Continue to Locker Instructions
+            Check Photos
         </button>
     </form>
 
+    <section id="photo-review" class="finder-card" hidden>
+        <h2>Check the item type</h2>
+        <p id="review-status" role="status"></p>
+        <div id="review-fields" class="finder-field" hidden>
+            <label for="review-category">Item type</label>
+            <select id="review-category">
+                <option value="other">Other or unsure</option>
+                <option value="phone">Phone</option><option value="wallet">Wallet</option>
+                <option value="keys">Keys</option><option value="bag">Bag</option>
+                <option value="laptop">Laptop</option><option value="tablet">Tablet</option>
+                <option value="headphones">Headphones</option><option value="bottle">Bottle</option>
+                <option value="umbrella">Umbrella</option><option value="clothing">Clothing</option>
+                <option value="id_card">ID card</option><option value="glasses">Glasses</option>
+                <option value="book">Book</option><option value="jewelry">Jewelry</option>
+                <option value="watch">Watch</option><option value="electronics">Electronics</option>
+            </select>
+            <button type="button" id="confirm-draft" class="submit-button">Get Deposit Code</button>
+        </div>
+        <button type="button" id="retry-draft" hidden>Retry Photo Check</button>
+        <button type="button" id="edit-photos">Edit Photos</button>
+    </section>
     <section id="deposit-success"
              class="finder-card"
              role="status"
@@ -623,8 +643,8 @@
             button.disabled = busy;
         }
         photoCount.textContent = processingPhotos
-            ? "Fotos werden vorbereitet …"
-            : selectedPhotos.length + "/" + maxPhotos + " Fotos";
+            ? "Preparing photos…"
+            : selectedPhotos.length + "/" + maxPhotos + " photos";
     }
 
     function renderPhotos() {
@@ -634,13 +654,13 @@
             const item = document.createElement("li");
             const image = document.createElement("img");
             image.src = previewUrl;
-            image.alt = "Foto " + (index + 1);
+            image.alt = "Photo " + (index + 1);
 
             const remove = document.createElement("button");
             remove.type = "button";
             remove.className = "photo-remove";
             remove.textContent = "✕";
-            remove.setAttribute("aria-label", image.alt + " entfernen");
+            remove.setAttribute("aria-label", "Remove " + image.alt);
             remove.addEventListener("click", () => {
                 URL.revokeObjectURL(previewUrl);
                 selectedPhotos.splice(index, 1);
@@ -673,7 +693,7 @@
 
             const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
             if (!blob || blob.type !== "image/jpeg" || blob.size > 5 * 1024 * 1024) {
-                throw new Error("Das Foto konnte nicht als JPEG unter 5 MB gespeichert werden.");
+                throw new Error("This photo could not be saved as a JPEG under 5 MB.");
             }
             return blob;
         } finally {
@@ -696,14 +716,14 @@
         try {
             for (const file of files) {
                 if (selectedPhotos.length >= maxPhotos) {
-                    errors.push("Du kannst bis zu 3 Fotos hinzufügen.");
+                    errors.push("You can add up to 3 photos.");
                     break;
                 }
                 try {
                     const blob = await resizePhoto(file);
                     selectedPhotos.push({ blob, previewUrl: URL.createObjectURL(blob) });
                 } catch {
-                    errors.push("Ein Foto ließ sich nicht öffnen oder verkleinern. Bitte wähle ein JPEG oder PNG.");
+                    errors.push("A photo could not be opened. Choose a JPEG or PNG.");
                 }
             }
         } finally {
@@ -722,139 +742,140 @@
         input.addEventListener("change", addPhotos);
     }
 
-    form.addEventListener(
-        "submit",
-        async (event) => {
-            event.preventDefault();
+    const review = document.getElementById("photo-review");
+    const reviewStatus = document.getElementById("review-status");
+    const fields = document.getElementById("review-fields");
+    const category = document.getElementById("review-category");
+    const confirmDraft = document.getElementById("confirm-draft");
+    const retryDraft = document.getElementById("retry-draft");
+    const editPhotos = document.getElementById("edit-photos");
+    let draft;
+    let pollTimer;
 
-            if (submitting || submitted || processingPhotos) {
+    async function getDraft(path = "", options = {}) {
+        const response = await fetch("/api/deposit-drafts/" + draft.item_id + path, {
+            ...options,
+            headers: {"X-Deposit-Token": draft.token, ...options.headers},
+            cache: "no-store"
+        });
+        if (!response.ok) throw new Error(await getApiError(response));
+        return response.status === 204 ? null : response.json();
+    }
+
+    async function pollReview() {
+        const current = draft;
+        try {
+            const result = await getDraft();
+            if (current !== draft) return;
+            const pending = result.status === "pending";
+            fields.hidden = pending;
+            retryDraft.hidden = result.status !== "failed";
+            if (pending) {
+                reviewStatus.textContent = "Checking your photos…";
+                pollTimer = setTimeout(pollReview, 1500);
                 return;
             }
-
-            errorBox.hidden = true;
-            showPhotoError();
-
-            if (selectedPhotos.length === 0) {
-                showPhotoError("Bitte füge mindestens ein Foto hinzu.");
-                cameraButton.focus();
-                return;
+            category.value = result.category || "other";
+            if (result.status === "failed") {
+                reviewStatus.textContent = "Photo analysis is unavailable. Retry or select the item type to continue.";
+            } else if (result.suggest_photo) {
+                reviewStatus.textContent = "A close-up of a mark, repair, or label could help identify this device. You can edit the photos or continue.";
+            } else {
+                reviewStatus.textContent = "Confirm the item type or correct it below.";
             }
-
-            if (!form.reportValidity()) {
-                return;
-            }
-
-            const data = new FormData();
-
-            data.append(
-                "locker_code",
-                lockerCode
-            );
-
-            data.append(
-                "location",
-                form.elements.location.value
-            );
-
-            data.append(
-                "note",
-                form.elements.note.value.trim()
-            );
-
-            selectedPhotos.forEach(({ blob }, index) => {
-                data.append("photos", blob, "photo" + (index + 1) + ".jpg");
-            });
-
-            submitting = true;
-            updatePhotoControls();
-            depositButton.textContent = "Submitting...";
-
-            try {
-                const response = await fetch(
-                    "/api/deposits",
-                    {
-                        method: "POST",
-                        credentials: "same-origin",
-                        body: data
-                    }
-                );
-
-                if (!response.ok) {
-                    throw new Error(
-                        await getApiError(response)
-                    );
-                }
-
-                if (response.status !== 201) {
-                    throw new Error(
-                        "Unexpected server response. " +
-                        "Check the locker before trying again."
-                    );
-                }
-
-                const result = await response.json();
-
-                if (
-                    !result.deposit_code ||
-                    result.compartment == null ||
-                    !result.expires_at
-                ) {
-                    throw new Error(
-                        "Deposit request was accepted, " +
-                        "but the instructions are incomplete. " +
-                        "Do not submit again automatically."
-                    );
-                }
-
-                submitted = true;
-                for (const { previewUrl } of selectedPhotos) {
-                    URL.revokeObjectURL(previewUrl);
-                }
-                selectedPhotos.length = 0;
-
-                document.getElementById(
-                    "result-code"
-                ).textContent =
-                    String(result.deposit_code);
-
-                document.getElementById(
-                    "result-compartment"
-                ).textContent =
-                    String(result.compartment);
-
-                // Keep the backend's timestamp text.
-                // Do not assume an unspecified timezone.
-                document.getElementById(
-                    "result-expiry"
-                ).textContent =
-                    String(result.expires_at);
-
-                form.hidden = true;
-                successBox.hidden = false;
-
-                successBox.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-
-            } catch (error) {
-                showError(
-                    error.message ||
-                    "The request failed. Please check " +
-                    "before submitting again."
-                );
-
-            } finally {
-                submitting = false;
-                updatePhotoControls();
-
-                if (!submitted) {
-                    depositButton.textContent =
-                        "Continue to Locker Instructions";
-                }
-            }
+        } catch (error) {
+            if (current !== draft) return;
+            reviewStatus.textContent = error.message;
         }
-    );
+    }
+
+    editPhotos.addEventListener("click", async () => {
+        clearTimeout(pollTimer);
+        if (draft) {
+            try { await getDraft("/discard", {method: "POST"}); } catch { /* The draft expires. */ }
+        }
+        draft = null;
+        review.hidden = true;
+        form.hidden = false;
+    });
+
+    retryDraft.addEventListener("click", async () => {
+        retryDraft.disabled = true;
+        try {
+            await getDraft("/retry", {method: "POST"});
+            await pollReview();
+        } catch (error) {
+            reviewStatus.textContent = error.message;
+        } finally {
+            retryDraft.disabled = false;
+        }
+    });
+
+    confirmDraft.addEventListener("click", async () => {
+        confirmDraft.disabled = true;
+        editPhotos.disabled = true;
+        retryDraft.disabled = true;
+        try {
+            const result = await getDraft("/confirm", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({category: category.value})
+            });
+            submitted = true;
+            for (const {previewUrl} of selectedPhotos) URL.revokeObjectURL(previewUrl);
+            selectedPhotos.length = 0;
+            document.getElementById("result-code").textContent = result.deposit_code;
+            document.getElementById("result-compartment").textContent = result.compartment;
+            document.getElementById("result-expiry").textContent = result.expires_at;
+            review.hidden = true;
+            successBox.hidden = false;
+            successBox.scrollIntoView({behavior: "smooth", block: "start"});
+        } catch (error) {
+            reviewStatus.textContent = error.message;
+        } finally {
+            confirmDraft.disabled = false;
+            editPhotos.disabled = false;
+            retryDraft.disabled = false;
+        }
+    });
+
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (submitting || submitted || processingPhotos) return;
+        errorBox.hidden = true;
+        showPhotoError();
+        if (!selectedPhotos.length) {
+            showPhotoError("Add at least one photo.");
+            cameraButton.focus();
+            return;
+        }
+        if (!form.reportValidity()) return;
+        const data = new FormData();
+        data.append("locker_code", lockerCode);
+        data.append("location", form.elements.location.value);
+        data.append("note", form.elements.note.value.trim());
+        selectedPhotos.forEach(({blob}, index) => data.append("photos", blob, `photo${index + 1}.jpg`));
+        submitting = true;
+        updatePhotoControls();
+        depositButton.textContent = "Uploading…";
+        try {
+            const response = await fetch("/api/deposit-drafts", {method: "POST", body: data});
+            if (!response.ok) throw new Error(await getApiError(response));
+            draft = await response.json();
+            fields.hidden = true;
+            retryDraft.hidden = true;
+            reviewStatus.textContent = "Checking your photos…";
+            form.hidden = true;
+            review.hidden = false;
+            await pollReview();
+        } catch (error) {
+            showError(error.message || "Could not upload the photos.");
+        } finally {
+            submitting = false;
+            updatePhotoControls();
+            depositButton.textContent = "Check Photos";
+        }
+    });
 
     loadLocker();
 </script>

@@ -17,6 +17,8 @@ class Claim(Base):
     status: Mapped[str] = mapped_column(
         db_enum("pending", "approved", "in_review", "rejected"), default="pending"
     )
+    verification_state: Mapped[str | None] = mapped_column(String(30))
+    next_action: Mapped[str | None] = mapped_column(String(30))
     ownership_score: Mapped[float | None] = mapped_column(Float)
     attempt_no: Mapped[int] = mapped_column(SmallInteger, default=1)
     decided_by: Mapped[int | None] = mapped_column("reviewed_by", ForeignKey("user.user_id"))
@@ -26,7 +28,7 @@ class Claim(Base):
     decision_note: Mapped[str | None] = mapped_column(String(500))
     match_candidate: Mapped[MatchCandidate] = relationship(lazy="selectin")
     evidence: Mapped[list["OwnershipEvidence"]] = relationship(
-        lazy="selectin", cascade="all, delete-orphan"
+        lazy="selectin", cascade="all, delete-orphan", order_by="OwnershipEvidence.id"
     )
 
     @hybrid_property
@@ -55,6 +57,7 @@ class OwnershipEvidence(Base):
     item_attribute_id: Mapped[int | None] = mapped_column(
         "matched_attribute_id", ForeignKey("item_attribute.attribute_id")
     )
+    attempt_no: Mapped[int | None] = mapped_column(SmallInteger)
     type: Mapped[str] = mapped_column("detail_type", String(40))
     value: Mapped[str] = mapped_column("claimed_value", String(255))
     is_critical: Mapped[bool] = mapped_column(default=False)

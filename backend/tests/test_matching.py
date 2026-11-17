@@ -28,121 +28,37 @@ def facts(**kw):
     return policy.LostFacts(**lost), policy.FoundFacts(**found)
 
 
-def test_perfect_match_scores_100():
-    assert policy.score(*facts(), semantic=1.0)["total"] == 100
-
-
-def test_component_scores():
-    lost, found = facts(found_location="gym", found_color="blue")
-    points = policy.score(lost, found, semantic=0.5)
-    assert points == {
-        "category": 15,
-        "location": 1.5,
-        "time": 10,
-        "attributes": 20,
-        "semantic": 20,
-        "total": 66,
-    }
-
-
 @pytest.mark.parametrize(
-    ("overrides", "semantic", "expected"),
+    ("left", "right"),
     [
-        pytest.param(
-            {
-                "lost_category": "jewelry",
-                "found_category": "jewelry",
-                "lost_brand": "Rolex",
-                "found_brand": "Casio",
-            },
-            1.0,
-            45,
-            id="rolex-vs-casio",
-        ),
-        pytest.param(
-            {
-                "lost_category": "jewelry",
-                "found_category": "jewelry",
-                "lost_brand": "Casio",
-                "found_brand": "Casio",
-                "lost_model": "F-91W",
-                "found_model": "F105W",
-            },
-            0.4,
-            59,
-            id="different-casio-model-numbers",
-        ),
-        pytest.param(
-            {"lost_brand": "iPhone", "found_brand": "Apple"},
-            1.0,
-            100,
-            id="iphone-brand-alias",
-        ),
-        pytest.param({"lost_brand": "AirPods", "found_brand": "Apple"}, 1.0, 100, id="airpods"),
-        pytest.param(
-            {
-                "lost_category": "jewelry",
-                "found_category": "jewelry",
-                "lost_brand": "Rolex",
-                "found_brand": "rolex",
-                "lost_color": "gold",
-                "found_color": "gold",
-            },
-            0.5,
-            80,
-            id="gold-rolex",
-        ),
-        pytest.param(
-            {"lost_brand": "Samsung", "found_brand": "Apple"},
-            1.0,
-            45,
-            id="samsung-vs-apple",
-        ),
-        pytest.param(
-            {"lost_brand": None, "lost_model": "Galaxy S25", "found_brand": "Samsung"},
-            1.0,
-            100,
-            id="infer-brand-from-model",
-        ),
-        pytest.param(
-            {"lost_brand": "The North Face", "found_brand": "North Face"},
-            1.0,
-            100,
-            id="brand-article",
-        ),
-        pytest.param(
-            {"lost_brand": "Ray-Ban Inc.", "found_brand": "RayBan Co."},
-            1.0,
-            100,
-            id="brand-punctuation",
-        ),
-        pytest.param(
-            {
-                "lost_brand": "Apple",
-                "found_brand": "Apple",
-                "lost_model": "iPhone 13",
-                "found_model": "iPhone 13 Pro",
-            },
-            1.0,
-            99,
-            id="related-iphone-model",
-        ),
-        pytest.param(
-            {"lost_color": "grey", "found_color": "silver"},
-            1.0,
-            95,
-            id="related-shades",
-        ),
-        pytest.param({"found_color": "gray"}, 1.0, 95, id="black-and-gray"),
-        pytest.param({"found_color": "white"}, 1.0, 55, id="clear-color-conflict"),
-        pytest.param({"found_color": "multicolor"}, 1.0, 94, id="multicolor"),
-        pytest.param({"found_category": "other"}, 1.0, 91, id="uncertain-found-category"),
-        pytest.param({"lost_category": "other"}, 1.0, 91, id="uncertain-report-category"),
-        pytest.param({"found_location": "gym"}, 1.0, 92, id="different-location"),
+        ("iPhone", "Apple"),
+        ("AirPods", "apple"),
+        ("The North Face", "North Face"),
+        ("Ray-Ban Inc.", "RayBan Co."),
     ],
 )
-def test_matching_edge_cases(overrides, semantic, expected):
-    assert policy.score(*facts(**overrides), semantic=semantic)["total"] == expected
+def test_brand_aliases(left, right):
+    assert policy.same_brand(left, right)
+
+
+def test_ranking_tolerates_missing_attributes_and_prefers_specific_agreement():
+    lost, exact = facts(lost_model="iPhone 13", found_model="iPhone 13")
+    _, common = facts(found_model=None)
+    _, conflict = facts(found_model="iPhone 12")
+    ranks = [policy.score(lost, item, 0.7)["total"] for item in (exact, common, conflict)]
+    assert ranks[0] > ranks[1] > ranks[2]
+
+
+def test_common_color_contributes_less_than_rare_color():
+    lost, found = facts()
+    assert policy.attribute_score(lost, found, 0.9) < policy.attribute_score(lost, found, 0.1)
+
+
+def test_guessed_category_has_less_influence_than_an_observation():
+    lost, found = facts(found_category="umbrella")
+    comparison = policy.score(lost, found, None)
+    found.reliability = {"category": 0.4}
+    assert policy.score(lost, found, None)["total"] > comparison["total"]
 
 
 def test_different_iphone_model_is_penalized_but_can_still_rank():
@@ -150,22 +66,26 @@ def test_different_iphone_model_is_penalized_but_can_still_rank():
     exact = policy.score(*facts(**overrides, found_model="iPhone 12"), semantic=0.9)
     different = policy.score(*facts(**overrides, found_model="iPhone 13"), semantic=0.9)
     assert 60 <= different["total"] < exact["total"]
-    assert [i for i, _ in policy.top_candidates([(2, different), (1, exact)], 60, 3)] == [1, 2]
+    assert policy.plausible(*facts(**overrides, found_model="iPhone 13"), semantic=0.9)
 
 
 def test_time_score():
-    assert policy.time_score(*facts(found_found_at=T0 - timedelta(days=2))) == 0.0
-    assert policy.time_score(*facts(found_found_at=T0 + timedelta(days=2))) == 0.6
-    assert policy.time_score(*facts(found_found_at=T0 + timedelta(days=20))) == 0.1
+    assert 0 < policy.time_score(*facts(found_found_at=T0 - timedelta(days=2))) < 0.5
+    assert policy.time_score(*facts(found_found_at=T0 + timedelta(days=2))) == 1
+    assert policy.time_score(*facts(found_found_at=T0 + timedelta(days=20))) < 0.5
+    assert policy.time_score(*facts(lost_lost_at=None)) == 0.5
 
 
 def test_attribute_score_neutral_without_data():
     assert policy.attribute_score(*facts(lost_color=None, lost_brand=None)) == 0.5
 
 
-def test_top_candidates_threshold_and_limit():
-    scored = [(i, {"total": t}) for i, t in enumerate([90, 59, 60, 75, 99])]
-    assert [i for i, _ in policy.top_candidates(scored, 60, 3)] == [4, 0, 3]
+def test_retrieval_requires_corroboration_before_excluding_a_mismatch():
+    lost, item = facts(found_category="umbrella", found_color=None, found_brand=None)
+    assert not policy.plausible(lost, item, semantic=0.1)
+    assert policy.plausible(lost, item, semantic=None)
+    item.reliability = {"category": 0.4}
+    assert policy.plausible(lost, item, semantic=0.1)
 
 
 def report(**kw):
@@ -190,28 +110,22 @@ async def test_candidates_endpoint(client, owner, other_owner, locker):
     r = await owner.get(f"/api/lost-reports/{report_id}/candidates")
     assert r.status_code == 200
     cands = r.json()
-    assert [c["found_item_id"] for c in cands] == [match_id]  # weak phone is below 60
-    c = cands[0]
-    assert c["score"] == 100 and c["breakdown"]["category"] == 15
-    assert set(c) == {
-        "found_item_id",
-        "score",
-        "breakdown",
-        "category",
-        "color",
-        "location",
-        "found_date",
-        "public_summary",
-    }  # nothing private
+    assert cands[0]["found_item_id"] == match_id
+    assert set(cands[0]) == {"found_item_id", "category", "color", "location", "found_date"}
 
     assert (await other_owner.get(f"/api/lost-reports/{report_id}/candidates")).status_code == 404
 
 
-async def test_only_stored_items_of_same_category(client, owner, locker):
-    _, h = locker
-    await deposit_and_store(client, h, note="Black umbrella")
+async def test_wrong_category_does_not_exclude_strong_match(client, owner, locker, session):
+    item_id = await deposit_and_store(client, locker[1])
+    item = await session.get(FoundItem, item_id)
+    item.category = "wallet"
+    item.public_summary = "Secret cat sticker and serial 4821"
+    await session.commit()
     report_id = (await owner.post("/api/lost-reports", json=report())).json()["id"]
-    assert (await owner.get(f"/api/lost-reports/{report_id}/candidates")).json() == []
+    result = await owner.get(f"/api/lost-reports/{report_id}/candidates")
+    assert result.json()[0]["found_item_id"] == item_id
+    assert "4821" not in result.text and "cat sticker" not in result.text
 
 
 @pytest.mark.parametrize(
@@ -231,16 +145,16 @@ async def test_candidates_include_category_other(
         f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false"
     )
     assert [c["found_item_id"] for c in candidates.json()] == [item_id]
-    assert candidates.json()[0]["breakdown"]["category"] == 6
 
 
-async def test_five_casio_candidates_rank_by_description_and_show_only_top_three(owner, session):
+async def test_five_casio_candidates_rank_by_description_and_paginate(owner, session):
     descriptions = {
         "blue triangle sticker": 0.75,
         "white paint on strap": 0.45,
         "scratch beside the date": 1.0,
         "scratch under the case": 0.9,
         "no distinctive damage": 0.55,
+        "black paint under strap": 0.35,
     }
     found_at = utcnow()
     items = [
@@ -278,8 +192,11 @@ async def test_five_casio_candidates_rank_by_description_and_show_only_top_three
         f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false"
     )
     assert candidates.status_code == 200
-    assert [c["found_item_id"] for c in candidates.json()] == [items[i].id for i in (2, 3, 0)]
-    assert [c["breakdown"]["semantic"] for c in candidates.json()] == [40, 36, 30]
+    assert [c["found_item_id"] for c in candidates.json()] == [items[i].id for i in (2, 3, 0, 4, 1)]
+    page = await owner.get(
+        f"/api/lost-reports/{response.json()['id']}/candidates?refresh=false&offset=5"
+    )
+    assert [c["found_item_id"] for c in page.json()] == [items[5].id]
     assert ai.compare_texts.await_count == 1
     assert set(ai.compare_texts.call_args.args[1]) == descriptions.keys()
 

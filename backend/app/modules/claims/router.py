@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 
+from app.core.errors import AppError
 from app.modules.claims import service
 from app.modules.claims.models import Claim
-from app.modules.claims.policy import MESSAGES
+from app.modules.claims.policy import MESSAGES, NEXT_ACTION_MESSAGES
 from app.modules.claims.schemas import (
     AdminClaimOut,
     ClaimIn,
@@ -14,17 +15,21 @@ from app.modules.claims.schemas import (
 from app.modules.found_items import service as items
 from app.modules.found_items.schemas import AttributeIO
 from app.modules.identity.deps import AdminUser, CurrentUser, SessionDep
+from app.shared.ratelimit import claim_limiter
 
 router = APIRouter(tags=["claims"])
 
 
 def _out(claim: Claim, issued=None) -> ClaimOut:
+    status = "handed_over" if claim.verification_state == "handed_over" else claim.status
     return ClaimOut(
         id=claim.id,
         found_item_id=claim.found_item_id,
         lost_report_id=claim.lost_report_id,
-        status=claim.status,
-        message=MESSAGES[claim.status],
+        status=status,
+        verification_state=claim.verification_state,
+        next_action=claim.next_action,
+        message=NEXT_ACTION_MESSAGES.get(claim.next_action, MESSAGES[status]),
         created_at=claim.created_at,
         compartment=issued.compartment if issued else None,
         pickup_code=issued.code if issued else None,
@@ -34,6 +39,8 @@ def _out(claim: Claim, issued=None) -> ClaimOut:
 
 @router.post("/api/claims", response_model=ClaimOut, status_code=201)
 async def submit(body: ClaimIn, user: CurrentUser, session: SessionDep):
+    if not claim_limiter.hit(str(user.id)):
+        raise AppError(429, "claim_cooldown", "Too many attempts. Please try again later.")
     claim, issued = await service.submit(
         session,
         user.id,
@@ -74,6 +81,8 @@ async def _admin_out(session, claim: Claim) -> AdminClaimOut:
         found_item_id=claim.found_item_id,
         lost_report_id=claim.lost_report_id,
         status=claim.status,
+        verification_state=claim.verification_state,
+        next_action=claim.next_action,
         ownership_score=claim.ownership_score,
         critical_conflict=claim.critical_conflict,
         created_at=claim.created_at,
@@ -96,4 +105,6 @@ async def admin_get(claim_id: int, _: AdminUser, session: SessionDep):
 
 @router.post("/api/admin/claims/{claim_id}/decision", response_model=ClaimOut, tags=["admin"])
 async def admin_decide(claim_id: int, body: DecisionIn, admin: AdminUser, session: SessionDep):
-    return _out(await service.decide(session, claim_id, admin.id, body.decision, body.note))
+    return _out(
+        await service.decide(session, claim_id, admin.id, body.decision, body.note, body.proof)
+    )

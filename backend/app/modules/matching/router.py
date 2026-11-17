@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.modules.identity.deps import CurrentUser, SessionDep
 from app.modules.matching import service
@@ -8,7 +8,13 @@ router = APIRouter(tags=["matching"])
 
 
 @router.get("/api/lost-reports/{report_id}/candidates", response_model=list[CandidateOut])
-async def candidates(report_id: int, user: CurrentUser, session: SessionDep, refresh: bool = True):
+async def candidates(
+    report_id: int,
+    user: CurrentUser,
+    session: SessionDep,
+    refresh: bool = True,
+    offset: int = Query(default=0, ge=0),
+):
     if not refresh:
-        return await service.cached_candidates(session, report_id, user.id)
-    return await service.candidates(session, report_id, user.id)
+        return await service.cached_candidates(session, report_id, user.id, offset)
+    return await service.candidates(session, report_id, user.id, offset)

@@ -129,12 +129,7 @@
         font-size: 17px;
     }
 
-    .match-score {
-        color: #6D5BD0;
-        font-size: 14px;
-        font-weight: 600;
-        white-space: nowrap;
-    }
+
 
     .match-card p,
     .match-message {
@@ -280,6 +275,7 @@
                aria-live="polite"></p>
 
             <div id="matches-list"></div>
+            <button type="button" id="more-matches" class="claim-link" hidden>Show more</button>
         </section>
 
     </div>
@@ -407,7 +403,9 @@
             setField(
                 "field-date",
                 report.lost_at
-                    ? report.lost_at.slice(0, 10)
+                    ? new Intl.DateTimeFormat("en", {dateStyle: "medium", timeZone: "UTC"}).format(
+                        new Date(report.lost_at.slice(0, 10) + "T00:00:00Z")
+                    )
                     : null
             );
 
@@ -456,37 +454,15 @@
         top.className = "match-top";
 
         const name = document.createElement("h3");
-        name.textContent =
-            match.public_summary ||
-            humanize(match.category) ||
-            "Found Item";
-
-        const score = document.createElement("span");
-        score.className = "match-score";
-
-        if (
-            Number.isFinite(match.score) &&
-            match.score >= 0 &&
-            match.score <= 100
-        ) {
-            score.textContent =
-                match.score + "% match score";
-        }
-
-        top.append(name, score);
+        name.textContent = [humanize(match.color), humanize(match.category)].filter(Boolean).join(" ");
+        if (!name.textContent || match.category === "other") name.textContent = "Found Item";
+        top.append(name);
 
         const location = document.createElement("p");
-        location.textContent =
-            "Found at " + humanize(match.location);
-
-        const note = document.createElement("p");
-        note.className = "match-note";
-
-        note.textContent =
-            "This is a possible match, not proof of " +
-            "ownership. Verification is required.";
-
-        card.append(top, location, note);
+        const foundDate = new Date(match.found_date + "T00:00:00Z");
+        const date = new Intl.DateTimeFormat("en", {dateStyle: "medium", timeZone: "UTC"}).format(foundDate);
+        location.textContent = `Found at ${humanize(match.location)} · ${date}`;
+        card.append(top, location);
 
         // Claim links use IDs supplied by the
         // backend's candidate response only.
@@ -516,6 +492,29 @@
     }
 
     let displayedMatches;
+    let pages = 1;
+    const moreMatches = document.getElementById("more-matches");
+    const matchesUrl = "/api/lost-reports/" + encodeURIComponent(reportId) + "/candidates?refresh=false";
+    moreMatches.addEventListener("click", () => {
+        pages += 1;
+        updateMatches().catch(error => { matchesMessage.textContent = error.message; });
+    });
+
+    async function updateMatches() {
+        const responses = await Promise.all(Array.from(
+            {length: pages}, (_, page) => requestJson(matchesUrl + "&offset=" + page * 5)
+        ));
+        const matches = [...new Map(responses.flat().map(item => [item.found_item_id, item])).values()];
+        moreMatches.hidden = responses.at(-1).length < 5;
+        matchesMessage.textContent = matches.length
+            ? "Select the item you think is yours."
+            : "No matches yet. New matches will appear here automatically.";
+        const result = JSON.stringify(matches);
+        if (result !== displayedMatches) {
+            matchesList.replaceChildren(...matches.map(createMatchCard));
+            displayedMatches = result;
+        }
+    }
 
     async function refreshMatches() {
         try {
@@ -523,22 +522,7 @@
                 return;
             }
 
-            const matches = await requestJson(
-                "/api/lost-reports/" + encodeURIComponent(reportId) + "/candidates?refresh=false"
-            );
-            if (!Array.isArray(matches)) {
-                throw new Error("Unexpected matching response.");
-            }
-
-            matchesMessage.textContent = matches.length
-                ? matches.length + " possible match(es) found."
-                : "No matches yet. New matches will appear here automatically.";
-
-            const result = JSON.stringify(matches);
-            if (result !== displayedMatches) {
-                matchesList.replaceChildren(...matches.map(createMatchCard));
-                displayedMatches = result;
-            }
+            await updateMatches();
         } catch (error) {
             matchesMessage.textContent = error.message || "Could not load matches. Retrying…";
         } finally {

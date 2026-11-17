@@ -316,6 +316,19 @@ Show compartment, code and expiry. The response means **code issued**, not that 
 
 Errors: 404 unknown locker; 409 no compartment; 422 photo/location/validation; 429 rate limit. Failed AI extraction does not undo an accepted deposit; an admin can retry/correct it.
 
+### Photo review before reservation
+
+Use the same multipart fields as `POST /api/deposits` with `POST /api/deposit-drafts`. This returns
+`item_id` and a temporary `token`. Send the token in `X-Deposit-Token` for the corresponding
+`GET /api/deposit-drafts/{item_id}`. Review includes `status`, `category`, `category_state`
+and `suggest_photo`. States are `observed`, `estimated`, and `unreadable`.
+
+- `POST /api/deposit-drafts/{item_id}/confirm` takes `{"category":"keys"}` or `{}` and issues the
+  deposit code. Requires a completed or failed photo check.
+- `POST /api/deposit-drafts/{item_id}/retry` restarts a failed photo check.
+- `POST /api/deposit-drafts/{item_id}/discard` expires the draft. A replacement starts a new draft.
+- Drafts expire after twenty minutes. A draft reserves no compartment.
+
 ## 6. Lost reports and candidates
 
 All require a session. Access to another user's report returns 404.
@@ -332,15 +345,15 @@ All require a session. Access to another user's report returns 404.
 
 | Field | Required | Validation/default |
 |---|---|---|
-| `category` | Yes | Category vocabulary in section 12. |
-| `location` | Yes | Configured location code; max 50 characters. |
-| `lost_at` | Yes | ISO datetime. Send UTC. Single instant, not a `lost_from/lost_to` range. |
+| `category` | No | Category vocabulary in section 12. Defaults to `other`. |
+| `location` | No | Configured location code, max 50 characters. Defaults to `other`. |
+| `lost_at` | No | ISO timestamp or null. Use midnight UTC for an approximate calendar date. |
 | `description` | Yes | 3–1000 characters. |
 | `color` | No | Color vocabulary or null; default null. |
 | `brand` | No | String max 50 or null; default null. |
 | `model` | No | String max 100 or null; default null. |
 
-Returns **201 LostReport**. Errors: 401, 422 validation/invalid location. `brand_model` and `unique_marks` are not input fields; put additional details in `description` and use separate brand/model inputs.
+Returns **201 LostReport**. Errors 401 and 422. The owner may also provide `material` (50 characters) and `unique_marks` (1,000 characters). These are stored before the candidates are available. Only the report owner can read the report.
 
 ### GET `/api/lost-reports`
 
@@ -352,65 +365,44 @@ Returns **200 LostReport**; 401 or 404 if unavailable. Poll this at a modest int
 
 ### GET `/api/lost-reports/{report_id}/candidates`
 
-Returns **200 Candidate[]**, up to 3 candidates with score at least 60, highest first. `[]` is a successful “no candidates yet” result. No query/body.
-
-This call recalculates matches and records which items were shown. **Call it before submitting a claim.** Only physically stored (`open`) items of the same category are considered. An item may not appear yet if it is not deposited, AI has not assigned its category, its score is too low, or it is reserved/returned.
-
-Candidate summaries contain public data only: no photo URL, finder contact, private description, evidence or serial fragments. Display `score` and optionally `breakdown`; the score ranks matches and is not proof of ownership.
-
-Errors: 401, 404; unexpected AI comparison failure may produce 500. Refresh is a GET but recalculates server-side matching; do not poll rapidly.
-
-**LostReport**:
+Returns a ranked page of up to five candidates. Use `offset=5` for the next page and
+`refresh=false` for normal polling. Retrieval considers stored items across categories and
+allows a reasonable date discrepancy. The server reranks when reports or stored items arrive.
 
 ```json
 {
-  "category":"phone", "location":"library", "lost_at":"2026-11-11T06:00:00",
-  "color":"black", "brand":"Samsung", "model":null,
-  "description":"Black Samsung phone with a cat sticker",
-  "id":2, "status":"open", "created_at":"2026-11-11T08:05:00"
+  "found_item_id":1, "category":"phone", "color":"black", "location":"library",
+  "found_date":"2026-11-11"
 }
 ```
 
-Contains all report input fields, numeric `id`, lowercase `status`, and UTC `created_at`.
-
-**Candidate**:
-
-```json
-{
-  "found_item_id":1, "score":100,
-  "breakdown":{"category":25,"location":15,"time":15,"attributes":25,"semantic":20},
-  "category":"phone", "color":"black", "location":"library",
-  "found_date":"2026-11-11", "public_summary":"Black Samsung phone"
-}
-```
-
-`score` is an integer 0–100. `breakdown` fields are weighted numeric points (maxima 25/15/15/25/20); `color` and `public_summary` can be null. Use `found_item_id` in the claim. No `match_id` is exposed or required.
+Only these allowlisted fields are returned. Color may be null. Use `found_item_id` for claims.
+Scores, photos, generated summaries and identifying attributes stay behind the API.
 
 ## 7. Claims and pickup
 
 ### POST `/api/claims`
 
-Session required. The report must belong to the current user and the item must have been shown by the candidate endpoint.
+The report must belong to the signed-in owner and the item must be eligible for that report.
 
 ```json
-{
-  "lost_report_id":2, "found_item_id":1,
-  "evidence":[
-    {"type":"serial_suffix","value":"4821"},
-    {"type":"sticker_or_mark","value":"cat sticker on the back"}
-  ]
-}
+{"lost_report_id":2,"found_item_id":1}
 ```
 
-Both IDs are required integers. `evidence` is required, **1–8 objects**. Each has a vocabulary `type` and a `value` of 1–200 characters.
+The initial check uses the saved report. A retry can include `description` (up to 1,000
+characters). Existing clients can also send 1–8 structured `evidence` entries. Submitted
+evidence is private and retained across attempts.
 
-Returns **201 Claim even if the verdict is `rejected` or `in_review`**. Check `status`; a fulfilled fetch is not necessarily ownership approval.
+| `verification_state` | `status` | Owner action |
+|---|---|---|
+| `verified` | `approved` | Show pickup code when included. |
+| `needs_more_evidence` | `in_review` | Follow `next_action` and `message`. |
+| `unresolved` | `in_review` | Contact the operator or retry after a photo-check outage. |
+| `refuted` | `rejected` | Show a generic result. |
+| `handed_over` | `handed_over` | The operator has completed an in-person return. |
 
-- `approved`: show pickup code/compartment/expiry when included.
-- `in_review`: show the returned message, then allow checking claim status later.
-- `rejected`: show the generic message and allow a permitted retry. Do not infer which evidence was wrong.
-
-Errors: 401; 404 report/item missing; 409 `not_a_candidate`, `item_unavailable`, `claim_exists`, `item_not_in_locker`; 422; 429 `claim_cooldown`; unexpected comparison failure may produce 500.
+The API returns 201 for a recorded decision, 409 for item/report/claim state conflicts, and 429
+for the attempt limit. Earlier claims may have a null verification state.
 
 ### GET `/api/claims`
 
@@ -507,13 +499,24 @@ Optional `status`, default **`in_review`**. Example: `?status=approved`. To list
 
 ### GET `/api/admin/claims/{claim_id}`
 
-Returns **200 AdminClaim** with evidence, score and private item attributes. Errors 401/403/404/422.
+Returns **200 AdminClaim** with evidence and private item attributes. `ownership_score` is historical and null on new claims. Errors 401/403/404/422.
 
 ### POST `/api/admin/claims/{claim_id}/decision`
 
-JSON: `{"decision":"approve","note":"Reviewed ownership evidence."}`.
+An authorized operator may approve an `in_review` claim with a documented independent check.
 
-`decision` is required, `approve|reject`. `note` is optional, max 500 or null. Only an `in_review` claim can be decided. Returns **200 Claim** without a pickup code. Approval reserves the item and rejects competing review claims; then the owner requests their code. Errors 401/403/404/422, 409 `not_in_review`, `item_unavailable`, or `item_not_in_locker`.
+```json
+{
+  "decision":"approve", "proof":"dated_identifier_record",
+  "note":"Compared the identifier with the claimant's purchase record dated before the find."
+}
+```
+
+Other proof choices are `live_device_control` and `independent_record`. The operator completes
+the check in person. An approved owner can request a pickup code. A documented low-risk return
+completed in person uses `decision: "handed_over"` and `proof: "in_person_low_risk"`. It issues
+no code and is unavailable when another claim is unresolved. Rejection uses `decision: "reject"`.
+Every operator decision is audited with the actor and method.
 
 ### GET `/api/admin/audit`
 
@@ -618,33 +621,22 @@ JSON body `{}` or `{"firmware_version":"1.0"}`. `firmware_version` optional stri
 
 ### Finder screen
 
-1. Read `locker_code` (e.g. `L1`) from the page URL agreed by the frontend team.
-2. GET locker info; render availability and the location options.
-3. Validate 1–3 supported photos, then submit the multipart deposit **once**.
-4. Show the returned compartment, deposit code and expiry, with “Enter this code on the locker; after placing the item and closing it, press #”.
-5. Do not describe the item as stored solely because POST returned 201. There is no finder progress endpoint.
-
-The proposed `/found/new?locker=L1` is a **frontend route**, not an implemented backend page endpoint.
+1. Read the locker code and confirm availability.
+2. Upload 1–3 photos as a draft. Poll review status with the draft token.
+3. Confirm or correct the broad item type. Offer a closer photo when the check suggests it.
+4. Show the deposit code and compartment. The existing device API confirms physical storage.
 
 ### Owner screens
 
-1. GET `/api/auth/me`, or register/login.
-2. POST lost report and keep its `id`.
-3. GET its candidates. Show an empty state if `[]`; allow manual refresh.
-4. Select `found_item_id`; collect private evidence; POST claim with **both** report/item IDs.
-5. Branch on claim `status`: approved → show returned code; review → waiting view; rejected → generic failure message.
-6. After admin approval, request the pickup code explicitly. GET claim does not reveal it.
-7. Show the code as text with leading zeroes, compartment and countdown. A refresh loses an unpersisted code; let the owner request a replacement.
-8. After physical pickup, GET the lost report to detect `resolved`.
+1. Save the description and any private identifying details.
+2. Show the ranked candidates. Let the owner select an item.
+3. POST the claim using the saved report. Guide retries through `next_action`.
+4. Display an authorized pickup code or instructions for visiting the operator.
 
 ### Admin screens
 
-1. Login as the seeded admin; `GET /api/auth/me` confirms `role:admin`.
-2. Item list/details: use item/AI filters; images use authenticated photo paths.
-3. Edit the full attribute list, or retry failed extraction; refresh details afterward.
-4. Review queue defaults to `in_review`. Display evidence and private attributes only here.
-5. Submit approve/reject, then refresh the queue. A competing admin/owner may already have changed it; handle 409.
-6. Audit screen displays the newest array and optional entity filters.
+Use the protected review queue and the operator decision form. Keep private attributes and
+evidence on these screens.
 
 ### Loading and retry behavior
 
@@ -660,7 +652,7 @@ The proposed `/found/new?locker=L1` is a **frontend route**, not an implemented 
 
 | Field | Accepted values |
 |---|---|
-| Category | `phone`, `wallet`, `keys`, `bag`, `laptop`, `tablet`, `headphones`, `bottle`, `umbrella`, `clothing`, `id_card`, `glasses`, `book`, `jewelry`, `other` |
+| Category | `phone`, `wallet`, `keys`, `bag`, `laptop`, `tablet`, `headphones`, `bottle`, `umbrella`, `clothing`, `id_card`, `glasses`, `book`, `jewelry`, `watch`, `electronics`, `other` |
 | Color | `black`, `white`, `gray`, `silver`, `gold`, `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink`, `brown`, `beige`, `multicolor` |
 | Evidence type | `serial_suffix`, `model`, `sticker_or_mark`, `damage`, `contents`, `accessory`, `engraving`, `other` |
 | Attribute visibility | `public`, `private` |
@@ -679,7 +671,7 @@ Locations are configurable; GET locker info is authoritative. Categories/colors/
 | Claim | `pending`, `approved`, `in_review`, `rejected`; normal POST immediately returns one of the last three. |
 | Compartment | `free`, `deposit_reserved`, `deposit_open`, `occupied`, `pickup_reserved`, `pickup_open`. |
 
-Do not send old uppercase values or invent `stored`, `collected`, `out_of_service` filters. Default verification uses approve threshold 80, review threshold 50; critical conflict rejects. Generic categories (`umbrella`, `bottle`, `clothing`, `book`) and generic evidence sets go to admin review instead of auto-approval. The frontend displays the server decision rather than reproducing this policy.
+Do not send old uppercase values or invent `stored`, `collected`, `out_of_service` filters. Use the verdict and next action provided by the API. See the [decision rules](../design/matching-and-ownership.md).
 
 ## 13. Testing and unsupported features
 
@@ -687,16 +679,15 @@ Do not send old uppercase values or invent `stored`, `collected`, `out_of_servic
 
 Start Docker with `docker compose up --build`. Default admin is `admin@example.com` / `changeme123`. Default locker is `L1`, device is `locker_01`, compartment 1. Save the device key from the **first-start backend logs** for a separate device test client. Never put it into frontend source.
 
-1. Register a new owner and retain its browser/session cookie.
-2. Anonymous deposit with a real small JPEG/PNG and note `Black Samsung phone, cat sticker, serial ends 4821`.
-3. In the device test tool, validate the **returned** deposit code, then report `occupied:true`.
-4. Create a phone report for library, black/Samsung, a recent UTC lost time, and description `Black Samsung phone with a cat sticker`.
-5. GET candidates; select the actual returned `found_item_id`.
-6. Submit the two evidence values shown in section 7. With the default mock, this produces approval and a pickup code.
-7. Validate that pickup code in the device tool, then report `occupied:false`.
-8. Confirm the owner's report is resolved and locker free count is 1.
-
-With mock AI, extraction reads the **finder note**, not image content. Uploading a phone photo without the example details does not generate the same mock evidence. Photo upload still validates real image bytes. For review testing, submit only serial evidence or use a generic category, then login as admin in a separate browser profile/test client to decide it.
+1. In a separate test database, capture an item through a finder draft and validate its deposit
+   code with the device test tool. Report the compartment occupied.
+2. Create a report with the ordinary description and two specific, separate visible marks.
+3. Select the candidate and check ownership. With a working visual provider, inspect the
+   resulting state. With mock or an unreadable photo, use the operator flow.
+4. Verify that an unauthorized account cannot decide the claim, cannot retrieve private photos,
+   and cannot obtain a code using only public details.
+5. If approved, validate the pickup code and report the compartment empty. Verify that the
+   report is resolved and the compartment is free.
 
 ### Postman usage
 

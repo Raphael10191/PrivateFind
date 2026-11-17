@@ -1,9 +1,8 @@
 import logging
 import re
 from datetime import timedelta
-from itertools import chain
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -12,14 +11,15 @@ from app.core.errors import AppError, not_found
 from app.modules.claims import policy
 from app.modules.claims.models import Claim, OwnershipEvidence
 from app.modules.found_items import service as items
+from app.modules.identity.models import User
 from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
+from app.modules.lost_reports.models import LostReport
 from app.modules.matching import service as matching
+from app.modules.matching.models import MatchCandidate
 from app.shared import audit, storage
 from app.shared.ai.provider import (
     AIError,
-    DetailAttribute,
-    DetailScores,
     Photo,
     PhotoFinding,
     get_ai_provider,
@@ -27,8 +27,6 @@ from app.shared.ai.provider import (
 from app.shared.vocab import CRITICAL_TYPES
 
 log = logging.getLogger("uvicorn.error")
-DETAIL_SEPARATOR = re.compile(r"[,;\n]|\b(?:und|and|mit|with)\b", re.IGNORECASE)
-MAX_EVIDENCE = 8
 SERIAL_IN_DESCRIPTION = re.compile(
     r"\b(?:serial(?:\s+(?:number|no\.?))?|seriennummer|s/n)\s*"
     r"(?:(?:ends? (?:in|with)|ending (?:in|with)|endet auf|is|ist)\s*)?"
@@ -54,105 +52,139 @@ async def submit(
     description: str | None = None,
 ) -> tuple[Claim, locker_service.IssuedCode | None]:
     report = await reports.get_own(session, report_id, user_id)
+    if report.status != "open":
+        raise AppError(409, "report_closed", "This report is no longer open.")
     item = await items.get_item(session, item_id)
     match = await matching.shown_match(session, report.id, item.id)
     if match is None:
         raise AppError(409, "not_a_candidate", "This item is not a candidate for your report.")
     if item.status != "open":
         raise AppError(409, "item_unavailable", "This item is no longer available.")
+    await _check_attempts(session, user_id, item_id, lock=False)
+    initial = "\n".join(filter(None, (report.description, report.unique_marks)))
+    supplied = "\n".join(filter(None, (description, *(entry["value"] for entry in evidence))))
+    previous = await _open_claim(session, user_id, match.id)
+    revision = (previous.id, previous.attempt_no) if previous else None
+    earlier: dict[int, list[str]] = {}
+    if previous:
+        for entry in previous.evidence:
+            if entry.type == "submission":
+                earlier.setdefault(entry.attempt_no or 1, []).append(entry.value)
+    supplementary = "\n".join(filter(None, [*map("".join, earlier.values()), supplied]))
     visual = getattr(get_ai_provider(), "verify_photos", None)
-    photo_workflow = callable(visual) or description is not None
-    await _check_attempts(session, user_id, item_id, retry_review=photo_workflow)
-
-    attrs = [policy.Attr(a.id, a.name, a.value, a.strength) for a in item.private_attributes()]
-    if photo_workflow:
-        text = "\n".join(
-            filter(
-                None,
-                [description, *(e["value"] for e in evidence if e["type"] not in CRITICAL_TYPES)],
-            )
-        )
-        ev = [
-            policy.Evidence(e["type"], e["value"]) for e in evidence if e["type"] in CRITICAL_TYPES
-        ]
-        ev.extend(
-            policy.Evidence("serial_suffix", match.group(1))
-            for line in re.split(r"[!?;\n]", text)
-            if not UNCERTAIN_DETAIL.search(line)
-            for match in SERIAL_IN_DESCRIPTION.finditer(line)
-            if any(char.isdigit() for char in match.group(1))
-        )
-        await session.commit()
+    original: list[PhotoFinding] = []
+    additional: list[PhotoFinding] = []
+    photo_failure = False
+    await session.commit()
+    if callable(visual) and item.photos:
         try:
-            findings = []
-            if callable(visual) and text and item.photos:
-                photos = [
-                    Photo(storage.read_photo(p.file_name))
-                    for p in item.photos[: get_settings().max_photos]
+            photos = [
+                Photo(storage.read_photo(p.file_name))
+                for p in sorted(item.photos, key=lambda photo: photo.id)[
+                    : get_settings().max_photos
                 ]
-                findings = _grounded_findings(text, await visual(photos, text), len(photos))
-        except (AIError, OSError, ValueError) as exc:
-            raise AppError(
-                503,
-                "verification_unavailable",
-                "Photo verification is unavailable. Please try again.",
-            ) from exc
-        ev.extend(policy.Evidence(finding.kind, finding.quote) for finding in findings)
-        verdict = policy.verify_photo_evidence(attrs, ev, findings, match.total)
-    else:
-        ev = _claim_evidence(evidence, report.description)
-        verdict = policy.verify(
-            item.category, attrs, ev, await _similarities(attrs, ev), match.total
-        )
+            ]
+            for text, findings in ((initial, original), (supplementary, additional)):
+                if text:
+                    findings.extend(
+                        _grounded_findings(text, await visual(photos, text), len(photos))
+                    )
+        except (AIError, OSError, ValueError):
+            log.warning("[VERIFY] Photo check unavailable for item %s", item.id)
+            original.clear()
+            additional.clear()
+            photo_failure = True
 
-    claim = None
-    if photo_workflow:
-        await locker_service.compartment_for_item(session, item.id, lock=True)
-        current_status = await session.scalar(
-            select(type(item).status).where(type(item).id == item.id).with_for_update()
+    # Serialize pickup decisions and attempts before trusting an earlier snapshot.
+    await session.scalar(select(User.id).where(User.id == user_id).with_for_update())
+    await locker_service.compartment_for_item(session, item.id, lock=True)
+    await session.refresh(item, ["status"], with_for_update=True)
+    if item.status != "open":
+        raise AppError(409, "item_unavailable", "This item is no longer available.")
+    if (await _lock_report(session, report_id)).status != "open":
+        raise AppError(409, "report_closed", "This report is no longer open.")
+    await _check_attempts(session, user_id, item_id)
+    claim = await _open_claim(session, user_id, match.id, lock=True)
+    latest_revision = (claim.id, claim.attempt_no) if claim else None
+    if latest_revision != revision:
+        raise AppError(409, "claim_updated", "Your claim changed. Refresh before checking again.")
+    competing = await session.scalar(
+        select(Claim.id)
+        .where(
+            Claim.found_item_id == item_id, Claim.user_id != user_id, Claim.status == "in_review"
         )
-        if current_status != "open":
-            raise AppError(409, "item_unavailable", "This item is no longer available.")
-        await _check_attempts(session, user_id, item_id, retry_review=True)
-        claim = await session.scalar(
-            select(Claim)
-            .where(
-                Claim.user_id == user_id, Claim.match_id == match.id, Claim.status == "in_review"
-            )
-            .order_by(Claim.id.desc())
-            .limit(1)
-            .with_for_update()
-        )
-    if claim is None:
-        claim = Claim(user_id=user_id, match_candidate=match)
-        session.add(claim)
-    claim.status = verdict.decision
-    claim.ownership_score = verdict.score
-    claim.critical_conflict = verdict.critical_conflict
-    claim.decided_at = utcnow() if verdict.decision != "in_review" else None
-    claim.evidence = [
-        OwnershipEvidence(
-            type=e.type,
-            value=e.value,
-            result={"unmatched": "not_verifiable", "conflict": "mismatch"}.get(
-                verdict.results[i][0], verdict.results[i][0]
-            ),
-            is_critical=e.type in CRITICAL_TYPES,
-            item_attribute_id=verdict.results[i][1],
-            similarity=verdict.results[i][2],
-        )
-        for i, e in enumerate(ev)
+        .limit(1)
+        .with_for_update()
+    )
+    trusted_id = next(
+        (
+            policy.normalized_identifier(a.value)
+            for a in item.private_attributes()
+            if a.name in CRITICAL_TYPES
+            and a.source == "admin"
+            and len(policy.normalized_identifier(a.value)) >= 8
+        ),
+        None,
+    )
+    identifiers = [
+        policy.normalized_identifier(e["value"]) for e in evidence if e["type"] in CRITICAL_TYPES
     ]
-    if description:
-        claim.evidence.extend(
-            OwnershipEvidence(type="description", value=description[start : start + 250])
-            for start in range(0, len(description), 250)
-        )
-    await session.flush()
+    identifiers.extend(
+        policy.normalized_identifier(match.group(1))
+        for line in (initial + "\n" + supplementary).splitlines()
+        if not UNCERTAIN_DETAIL.search(line)
+        for match in SERIAL_IN_DESCRIPTION.finditer(line)
+        if any(char.isdigit() for char in match.group(1))
+    )
+    verdict = policy.assess(
+        original,
+        additional,
+        category=item.category,
+        trusted_identifier=trusted_id,
+        identifiers=tuple(
+            value for value in identifiers if trusted_id and len(value) == len(trusted_id)
+        ),
+        competing=competing is not None,
+        exposed=item.owner_details_exposed,
+    )
+    if photo_failure and verdict.state != "refuted":
+        verdict = policy.Verdict("unresolved", "retry_photo_check")
 
-    issued = None
-    if verdict.decision == "approved":
-        issued = await _approve(session, claim)
+    new_claim = claim is None
+    if new_claim:
+        claim = Claim(user_id=user_id, match_candidate=match, attempt_no=1)
+        session.add(claim)
+    else:
+        claim.attempt_no += 1
+    claim.status = verdict.status
+    claim.verification_state = verdict.state
+    claim.next_action = verdict.action
+    claim.ownership_score = None
+    claim.critical_conflict = verdict.state == "refuted"
+    claim.decided_at = utcnow() if verdict.status != "in_review" else None
+    for source, text in (
+        ("initial_report", initial if new_claim else ""),
+        ("submission", supplied),
+    ):
+        claim.evidence.extend(
+            OwnershipEvidence(
+                type=source, value=text[start : start + 250], attempt_no=claim.attempt_no
+            )
+            for start in range(0, len(text), 250)
+        )
+    claim.evidence.extend(
+        OwnershipEvidence(
+            attempt_no=claim.attempt_no,
+            type=finding.kind,
+            value=finding.quote,
+            result={"confirmed": "match", "contradicted": "mismatch"}.get(
+                finding.status, "not_verifiable"
+            ),
+        )
+        for finding in original + additional
+    )
+    await session.flush()
+    issued = await _approve(session, claim) if verdict.status == "approved" else None
     audit.log(
         session,
         "claim_submitted",
@@ -160,144 +192,143 @@ async def submit(
         claim.id,
         actor_type="user",
         actor_id=user_id,
-        decision=claim.status,
-        score=verdict.score,
-        conflict=verdict.critical_conflict,
+        decision=verdict.state,
+        observations=[
+            {
+                "part": f.part,
+                "photo": f.photo_index,
+                "status": f.status,
+                "kind": f.kind,
+                "distinctive": f.distinctive,
+                "source": source,
+            }
+            for source, findings in (("initial", original), ("additional", additional))
+            for f in findings
+        ],
     )
     await session.commit()
-    log.info(
-        "[VERIFY] Matching %.0f | Details %.0f -> Gesamt %d -> %s",
-        match.total,
-        verdict.detail_score,
-        verdict.score,
-        verdict.decision,
-    )
+    log.info("[VERIFY] Claim %s -> %s", claim.id, verdict.state)
     return claim, issued
+
+
+async def _open_claim(
+    session: AsyncSession, user_id: int, match_id: int, *, lock: bool = False
+) -> Claim | None:
+    query = (
+        select(Claim)
+        .where(Claim.user_id == user_id, Claim.match_id == match_id, Claim.status == "in_review")
+        .order_by(Claim.id.desc())
+        .limit(1)
+    )
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return await session.scalar(query)
 
 
 def _grounded_findings(
     text: str, findings: list[PhotoFinding], photo_count: int
 ) -> list[PhotoFinding]:
     normalized = " ".join(text.casefold().split())
-    seen: set[str] = set()
+    uncertain_segments = [
+        " ".join(segment.casefold().split())
+        for segment in re.split(r"[.!?;\n]", text)
+        if UNCERTAIN_DETAIL.search(segment)
+    ]
+    seen: set[tuple[str, str]] = set()
     grounded = []
     for finding in findings:
         quote = " ".join(finding.quote.casefold().split())
-        if not quote or quote not in normalized or quote in seen:
-            continue
-        if UNCERTAIN_DETAIL.search(quote):
-            finding = finding.model_copy(update={"status": "ambiguous", "photo_index": None})
+        quoted = re.compile(rf"(?<!\w){re.escape(quote)}(?!\w)")
+        if not quote or not quoted.search(normalized):
+            raise AIError("The photo result references text outside the claim")
         if finding.status in {"confirmed", "contradicted"} and (
             finding.photo_index is None or not 0 <= finding.photo_index < photo_count
         ):
-            continue
-        grounded.append(finding)
-        seen.add(quote)
+            raise AIError("The photo result references an invalid photo")
+        if UNCERTAIN_DETAIL.search(quote) or any(quoted.search(s) for s in uncertain_segments):
+            finding = finding.model_copy(update={"status": "ambiguous", "photo_index": None})
+        key = (quote, finding.status)
+        if key not in seen:
+            grounded.append(finding)
+            seen.add(key)
     return grounded
 
 
-def _claim_evidence(explicit: list[dict], description: str | None) -> list[policy.Evidence]:
-    # Reserve space for typed evidence, including serial suffixes, before expanding free text.
-    evidence = [policy.Evidence(e["type"], e["value"]) for e in explicit if e["type"] != "other"]
-    seen = {" ".join(e.value.casefold().split()) for e in evidence}
-    free_text = (e["value"] for e in explicit if e["type"] == "other")
-    for text in chain(free_text, [description or ""]):
-        for part in DETAIL_SEPARATOR.split(text):
-            if len(evidence) >= MAX_EVIDENCE:
-                return evidence
-            value = part.strip(" .\t\r")[:200]
-            key = " ".join(value.casefold().split())
-            if key and key not in seen:
-                evidence.append(policy.Evidence("other", value))
-                seen.add(key)
-    return evidence
-
-
-async def _similarities(attrs: list[policy.Attr], ev: list[policy.Evidence]) -> DetailScores:
-    private: list[DetailAttribute] = [
-        {"id": a.id, "type": a.type, "value": a.value}
-        for a in attrs
-        if a.type not in CRITICAL_TYPES
-    ]
-    indices = [i for i, e in enumerate(ev) if e.type not in CRITICAL_TYPES]
-    if not private or not indices:
-        return {}
-    texts = [ev[i].value for i in indices]
-    ai = get_ai_provider()
-    verify_details = getattr(ai, "verify_details", None)
-    if callable(verify_details):
-        scores = await verify_details(private, texts)
-        return {(attr_id, indices[i]): sim for (attr_id, i), sim in scores.items()}
-    scores = {}
-    for attr in private:
-        similarities = await ai.compare_texts(attr["value"], texts)
-        scores.update({(attr["id"], i): sim for i, sim in zip(indices, similarities, strict=True)})
-    return scores
-
-
 async def _check_attempts(
-    session: AsyncSession,
-    user_id: int,
-    item_id: int,
-    *,
-    retry_review: bool = False,
+    session: AsyncSession, user_id: int, item_id: int, *, lock: bool = True
 ) -> None:
     settings = get_settings()
-    open_claim = await session.scalar(
-        select(Claim.id).where(
+    since = utcnow() - timedelta(hours=settings.claim_cooldown_h)
+    attempts = (
+        select(Claim.found_item_id)
+        .select_from(audit.AuditLog)
+        .join(Claim, audit.AuditLog.entity_id == Claim.id)
+        .where(
+            audit.AuditLog.action == "claim_submitted",
+            audit.AuditLog.entity_type == "claim",
+            audit.AuditLog.at >= since,
             Claim.user_id == user_id,
-            Claim.found_item_id == item_id,
-            Claim.status.in_(["approved"] if retry_review else ["in_review", "approved"]),
+            audit.AuditLog.actor_id == user_id,
         )
     )
-    if open_claim:
-        raise AppError(409, "claim_exists", "You already have an open claim for this item.")
-    since = utcnow() - timedelta(hours=settings.claim_cooldown_h)
-    if retry_review:
-        # Review retries update the claim, while the audit retains each attempt.
-        failed = await session.scalar(
-            select(func.count())
-            .select_from(audit.AuditLog)
-            .join(Claim, audit.AuditLog.entity_id == Claim.id)
-            .where(
-                audit.AuditLog.action == "claim_submitted",
-                audit.AuditLog.entity_type == "claim",
-                audit.AuditLog.at >= since,
-                Claim.user_id == user_id,
-                Claim.found_item_id == item_id,
-            )
+    # A locking read sees current attempts even when a MySQL transaction has an older snapshot.
+    recent_items = list(await session.scalars(attempts.with_for_update() if lock else attempts))
+    if recent_items.count(item_id) >= settings.max_failed_claims or len(recent_items) >= 12:
+        raise AppError(429, "claim_cooldown", "Too many attempts. Please try again later.")
+
+
+async def _lock_report(session: AsyncSession, report_id: int) -> LostReport:
+    return await session.scalar(
+        select(LostReport)
+        .where(LostReport.id == report_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def _lock_report_for_release(session: AsyncSession, claim: Claim) -> LostReport:
+    report = await _lock_report(session, claim.lost_report_id)
+    other = await session.scalar(
+        select(Claim.id)
+        .join(MatchCandidate, MatchCandidate.id == Claim.match_id)
+        .where(
+            MatchCandidate.lost_report_id == report.id,
+            Claim.id != claim.id,
+            Claim.status == "approved",
         )
-    else:
-        failed = await session.scalar(
-            select(func.count()).where(
-                Claim.user_id == user_id,
-                Claim.found_item_id == item_id,
-                Claim.status == "rejected",
-                Claim.created_at >= since,
-            )
+        .limit(1)
+        .with_for_update()
+    )
+    if report.status != "open" or other is not None:
+        raise AppError(
+            409, "report_already_resolved", "This report already has an authorized return."
         )
-    if failed >= settings.max_failed_claims:
-        raise AppError(429, "claim_cooldown", "Too many failed attempts. Please try again later.")
+    return report
 
 
 async def _approve(session: AsyncSession, claim: Claim) -> locker_service.IssuedCode:
     """Reserve the item (first approval wins), close competing claims, issue the pickup code."""
     await locker_service.compartment_for_item(session, claim.found_item_id, lock=True)
+    await _lock_report_for_release(session, claim)
     if not await items.try_reserve(session, claim.found_item_id):
         await session.rollback()
         raise AppError(409, "item_unavailable", "This item is no longer available.")
     claim.status = "approved"
     claim.decided_at = utcnow()
     competing = await session.scalars(
-        select(Claim).where(
+        select(Claim)
+        .where(
             Claim.found_item_id == claim.found_item_id,
             Claim.id != claim.id,
             Claim.status == "in_review",
         )
+        .with_for_update()
     )
     for other in competing:
         other.status = "rejected"
-        other.decision_note = "Item was returned to another owner."
+        other.verification_state = "unresolved"
+        other.next_action = None
+        other.decision_note = "This item is no longer available."
         other.decided_at = utcnow()
     return await locker_service.issue_pickup_code(session, claim.found_item_id, claim.id)
 
@@ -348,18 +379,66 @@ async def get(session: AsyncSession, claim_id: int) -> Claim:
 
 
 async def decide(
-    session: AsyncSession, claim_id: int, admin_id: int, decision: str, note: str | None
+    session: AsyncSession,
+    claim_id: int,
+    admin_id: int,
+    decision: str,
+    note: str | None,
+    proof: str | None,
 ) -> Claim:
     claim = await get(session, claim_id)
+    item = await items.get_item(session, claim.found_item_id)
+    compartment = await locker_service.compartment_for_item(session, item.id, lock=True)
+    await _lock_report(session, claim.lost_report_id)
+    await session.refresh(claim, with_for_update=True)
+    await session.refresh(item, ["status"], with_for_update=True)
     if claim.status != "in_review":
         raise AppError(409, "not_in_review", "Only claims in review can be decided.")
-    claim.decided_by = admin_id
-    claim.decision_note = note
+    if decision != "reject":
+        if not note or len(note.strip()) < 10:
+            raise AppError(
+                422, "review_note_required", "Document what was checked before authorizing release."
+            )
+        if item.status != "open":
+            raise AppError(409, "item_unavailable", "This item is no longer available.")
     if decision == "approve":
-        await _approve(session, claim)  # owner then requests the pickup code
+        if proof not in {"dated_identifier_record", "live_device_control", "independent_record"}:
+            raise AppError(
+                422, "independent_proof_required", "Select the independent proof you checked."
+            )
+        await _approve(session, claim)
+        claim.verification_state = "verified"
+    elif decision == "handed_over":
+        competing = await session.scalar(
+            select(Claim.id)
+            .where(
+                Claim.found_item_id == item.id,
+                Claim.user_id != claim.user_id,
+                Claim.status == "in_review",
+            )
+            .limit(1)
+            .with_for_update()
+        )
+        if item.category not in policy.LOW_RISK_CATEGORIES or competing is not None:
+            raise AppError(409, "handover_unavailable", "This handover requires independent proof.")
+        if proof != "in_person_low_risk":
+            raise AppError(
+                422, "handover_confirmation_required", "Confirm the documented in-person handover."
+            )
+        report = await _lock_report_for_release(session, claim)
+        await items.mark_returned(session, item.id, actor_type="admin", actor_id=admin_id)
+        report.status = "resolved"
+        await locker_service.clear_item_access(session, item.id, compartment)
+        # Keep the legacy enum while distinguishing completed handovers from code authorizations.
+        claim.status = "approved"
+        claim.verification_state = "handed_over"
     else:
         claim.status = "rejected"
-        claim.decided_at = utcnow()
+        claim.verification_state = "refuted"
+    claim.next_action = None
+    claim.decided_at = utcnow()
+    claim.decided_by = admin_id
+    claim.decision_note = note
     audit.log(
         session,
         "claim_decided",
@@ -367,7 +446,9 @@ async def decide(
         claim.id,
         actor_type="admin",
         actor_id=admin_id,
-        decision=claim.status,
+        decision=claim.verification_state,
+        proof=proof,
+        note=note,
     )
     await session.commit()
     return claim

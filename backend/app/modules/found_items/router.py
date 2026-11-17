@@ -1,12 +1,19 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from app.core.errors import AppError
 from app.modules.found_items import service
 from app.modules.found_items.models import FoundItem
-from app.modules.found_items.schemas import AdminItemOut, AttributesIn, DepositOut
+from app.modules.found_items.schemas import (
+    AdminItemOut,
+    AttributesIn,
+    ConfirmDepositIn,
+    DepositOut,
+    DraftOut,
+    DraftReview,
+)
 from app.modules.identity.deps import AdminUser, SessionDep
 from app.modules.locker import service as locker_service
 from app.shared.ratelimit import deposit_limiter
@@ -36,6 +43,78 @@ async def deposit(
     background.add_task(service.run_extraction, item.id)
     return DepositOut(
         item_id=item.id,
+        compartment=issued.compartment,
+        deposit_code=issued.code,
+        expires_at=issued.expires_at,
+    )
+
+
+DraftToken = Annotated[str, Header(alias="X-Deposit-Token", min_length=32, max_length=100)]
+
+
+@router.post("/api/deposit-drafts", response_model=DraftOut, status_code=201)
+async def start_photo_review(
+    request: Request,
+    background: BackgroundTasks,
+    session: SessionDep,
+    locker_code: Annotated[str, Form(max_length=20)],
+    location: Annotated[str, Form(max_length=50)],
+    photos: Annotated[list[UploadFile], File()],
+    note: Annotated[str, Form(max_length=500)] = "",
+):
+    ip = request.client.host if request.client else "unknown"
+    if not deposit_limiter.hit(ip):
+        raise AppError(429, "rate_limited", "Too many deposits. Please try again later.")
+    files = [(await p.read(), p.content_type) for p in photos]
+    item, token = await service.create_draft(session, locker_code, location, note, None, files)
+    background.add_task(service.run_extraction, item.id)
+    return DraftOut(item_id=item.id, token=token)
+
+
+@router.get("/api/deposit-drafts/{item_id}", response_model=DraftReview)
+async def photo_review(item_id: int, token: DraftToken, session: SessionDep):
+    _, item = await service.read_draft(session, item_id, token)
+    category = item.category
+    state = next(
+        (a.observation_state for a in item.attributes if a.name == "category"), "unreadable"
+    )
+    return DraftReview(
+        status=item.ai_status,
+        category=category,
+        category_state=state,
+        suggest_photo=item.ai_status == "done"
+        and len(item.photos) < 3
+        and category in {"phone", "laptop", "tablet", "headphones"}
+        and not item.private_attributes(),
+    )
+
+
+@router.post("/api/deposit-drafts/{item_id}/discard", status_code=204)
+async def discard_photo_review(item_id: int, token: DraftToken, session: SessionDep):
+    await service.discard_draft(session, item_id, token)
+
+
+@router.post("/api/deposit-drafts/{item_id}/retry", status_code=204)
+async def retry_photo_review(
+    item_id: int,
+    token: DraftToken,
+    session: SessionDep,
+    background: BackgroundTasks,
+):
+    await service.retry_draft(session, item_id, token)
+    background.add_task(service.run_extraction, item_id)
+
+
+@router.post("/api/deposit-drafts/{item_id}/confirm", response_model=DepositOut, status_code=201)
+async def confirm_photo_review(
+    item_id: int,
+    token: DraftToken,
+    body: ConfirmDepositIn,
+    session: SessionDep,
+):
+    issued = await service.confirm_draft(session, item_id, token, body.category)
+    return DepositOut(
+        item_id=item_id,
         compartment=issued.compartment,
         deposit_code=issued.code,
         expires_at=issued.expires_at,

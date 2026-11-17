@@ -1,15 +1,25 @@
 import asyncio
 import logging
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
+from hashlib import sha256
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import db
 from app.core.config import get_settings
+from app.core.db import utcnow
 from app.core.errors import AppError, not_found
-from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem, ItemAttribute, ItemPhoto
+from app.modules.found_items.models import (
+    ACTIVE_ITEM_STATUSES,
+    DepositSession,
+    FoundItem,
+    ItemAttribute,
+    ItemPhoto,
+)
 from app.modules.locker import service as locker_service
+from app.modules.locker.models import Locker
 from app.shared import audit, storage
 from app.shared.ai.provider import Photo, get_ai_provider
 from app.shared.ai.schemas import Extraction
@@ -28,6 +38,12 @@ async def submit_deposit(
     finder_contact: str | None,
     photos: list[tuple[bytes, str | None]],
 ) -> tuple[FoundItem, locker_service.IssuedCode]:
+    locker, item = await _new_deposit(session, locker_code, location, note, finder_contact, photos)
+    issued = await _reserve_deposit(session, locker, item)
+    return item, issued
+
+
+async def _new_deposit(session, locker_code, location, note, finder_contact, photos):
     settings = get_settings()
     if not 1 <= len(photos) <= settings.max_photos:
         raise AppError(422, "invalid_photo", f"Upload 1 to {settings.max_photos} photos.")
@@ -38,7 +54,14 @@ async def submit_deposit(
     if await locker_service.free_compartments(session, locker.id) == 0:
         raise AppError(409, "compartment_unavailable", "No free compartment in this locker.")
 
-    file_names = [storage.save_photo(data, ctype) for data, ctype in photos]
+    file_names = []
+    try:
+        for data, content_type in photos:
+            file_names.append(storage.save_photo(data, content_type))
+    except Exception:
+        for name in file_names:
+            storage.photo_path(name).unlink(missing_ok=True)
+        raise
     item = FoundItem(
         locker_id=locker.id,
         location=location,
@@ -48,6 +71,10 @@ async def submit_deposit(
     )
     session.add(item)
     await session.flush()
+    return locker, item
+
+
+async def _reserve_deposit(session, locker, item):
     issued = await locker_service.reserve_for_deposit(session, locker, item.id)
     audit.log(
         session,
@@ -58,7 +85,107 @@ async def submit_deposit(
         compartment=issued.compartment,
     )
     await session.commit()
-    return item, issued
+    return issued
+
+
+async def create_draft(session, locker_code, location, note, finder_contact, photos):
+    await purge_expired_drafts(session)
+    locker, item = await _new_deposit(session, locker_code, location, note, finder_contact, photos)
+    token = secrets.token_urlsafe(32)
+    draft = DepositSession(
+        locker_id=locker.id,
+        token_hash=sha256(token.encode()).hexdigest(),
+        expires_at=utcnow() + timedelta(minutes=20),
+    )
+    session.add(draft)
+    await session.flush()
+    item.session_id = draft.id
+    await session.commit()
+    return item, token
+
+
+async def read_draft(session, item_id: int, token: str, *, lock: bool = False):
+    query = (
+        select(DepositSession)
+        .join(FoundItem, FoundItem.session_id == DepositSession.id)
+        .where(
+            FoundItem.id == item_id,
+            DepositSession.token_hash == sha256(token.encode()).hexdigest(),
+            DepositSession.status == "active",
+            DepositSession.expires_at > utcnow(),
+        )
+    )
+    draft = await session.scalar(query.with_for_update() if lock else query)
+    if draft is None:
+        raise not_found("Photo review")
+    item = await _get(session, item_id)
+    if item.status != "awaiting_deposit" or item.compartment_id is not None:
+        raise not_found("Photo review")
+    return draft, item
+
+
+async def confirm_draft(session, item_id: int, token: str, category: str | None):
+    draft, item = await read_draft(session, item_id, token, lock=True)
+    if item.ai_status == "pending":
+        raise AppError(409, "analysis_pending", "Wait for the photo check to finish.")
+    if category is not None:
+        item.attributes = [a for a in item.attributes if a.name != "category"]
+        item.category = category
+        item.attributes.append(
+            ItemAttribute(
+                name="category",
+                value=category,
+                visibility="private",
+                source="finder",
+                confidence=1.0,
+                observation_state="observed",
+            )
+        )
+    locker = await session.get(Locker, draft.locker_id)
+    draft.status = "completed"
+    return await _reserve_deposit(session, locker, item)
+
+
+async def retry_draft(session, item_id: int, token: str) -> None:
+    _, item = await read_draft(session, item_id, token, lock=True)
+    if item.ai_status != "failed":
+        raise AppError(
+            409, "analysis_not_failed", "The photo check is already running or complete."
+        )
+    item.ai_status = "pending"
+    item.ai_error = None
+    await session.commit()
+
+
+async def discard_draft(session, item_id: int, token: str) -> None:
+    draft, item = await read_draft(session, item_id, token, lock=True)
+    await _expire_drafts(session, [(draft, item)])
+
+
+async def purge_expired_drafts(session: AsyncSession) -> None:
+    rows = await session.execute(
+        select(DepositSession, FoundItem)
+        .join(FoundItem, FoundItem.session_id == DepositSession.id)
+        .where(
+            DepositSession.status == "active",
+            DepositSession.expires_at <= utcnow(),
+            FoundItem.compartment_id.is_(None),
+        )
+        .with_for_update()
+    )
+    await _expire_drafts(session, rows.all())
+
+
+async def _expire_drafts(session, rows) -> None:
+    paths = []
+    for draft, item in rows:
+        draft.status = "expired"
+        item.status = "expired"
+        paths.extend(photo.file_name for photo in item.photos)
+        item.photos.clear()
+    await session.commit()
+    for name in paths:
+        storage.photo_path(name).unlink(missing_ok=True)
 
 
 # ---------- AI extraction (background, with retry) ----------
@@ -74,13 +201,12 @@ async def run_extraction(item_id: int) -> None:
     ai = get_ai_provider()
     async with db.SessionLocal() as session:
         item = await session.get(FoundItem, item_id)
-        if item is None or item.ai_status == "done":
+        if item is None or item.status == "expired" or item.ai_status != "pending":
             return
-        photos = [Photo(storage.read_photo(p.file_name)) for p in item.photos]
-
         for attempt in range(1, settings.ai_max_attempts + 1):
-            item.ai_attempts += 1
+            await session.commit()
             try:
+                photos = [Photo(storage.read_photo(p.file_name)) for p in item.photos]
                 extraction = await asyncio.wait_for(
                     ai.extract_attributes(photos, item.note or ""),
                     max(AI_TIMEOUT_S, settings.qwen_timeout + 1)
@@ -91,11 +217,28 @@ async def run_extraction(item_id: int) -> None:
                 log.warning(
                     "AI extraction failed for item %s (attempt %s): %s", item_id, attempt, exc
                 )
+                await session.refresh(
+                    item, ["status", "ai_status", "ai_attempts"], with_for_update=True
+                )
+                if item.status == "expired" or item.ai_status != "pending":
+                    return
+                item.ai_attempts += 1
                 item.ai_error = str(exc)[:500] or exc.__class__.__name__
+                if attempt == settings.ai_max_attempts:
+                    item.ai_status = "failed"
+                    audit.log(session, "ai_failed", "found_item", item.id, error=item.ai_error)
+                    await session.commit()
+                    await refresh_for_item(item_id)
+                    return
                 await session.commit()
-                if attempt < settings.ai_max_attempts:
-                    await asyncio.sleep(settings.ai_retry_base_delay_s * 4 ** (attempt - 1))
+                await asyncio.sleep(settings.ai_retry_base_delay_s * 4 ** (attempt - 1))
                 continue
+            await session.refresh(
+                item, ["status", "ai_status", "ai_attempts"], with_for_update=True
+            )
+            if item.status == "expired" or item.ai_status != "pending":
+                return
+            item.ai_attempts += 1
             _apply_extraction(item, extraction)
             audit.log(
                 session, "ai_extracted", "found_item", item.id, confidence=extraction.confidence
@@ -104,20 +247,26 @@ async def run_extraction(item_id: int) -> None:
             await refresh_for_item(item_id)
             return
 
-        item.ai_status = "failed"
-        audit.log(session, "ai_failed", "found_item", item.id, error=item.ai_error)
-        await session.commit()
-
 
 def _apply_extraction(item: FoundItem, ex: Extraction) -> None:
-    item.category = ex.category
-    item.public_summary = ex.public_summary[:200]
+    item.category = "other" if ex.observations.get("category") == "unreadable" else ex.category
+    item.public_summary = item.category
     item.description = ex.description
-    attrs = [
-        ItemAttribute(name=n, value=v, visibility="public", confidence=ex.confidence)
-        for n, v in (("color", ex.color), ("brand", ex.brand))
-        if v
-    ]
+    attrs = []
+    for name in ("category", "color", "brand", "model", "material"):
+        value = getattr(ex, name)
+        state = ex.observations.get(name) or ("estimated" if value else "unreadable")
+        if not value or state == "unreadable":
+            continue
+        attrs.append(
+            ItemAttribute(
+                name=name,
+                value=value,
+                visibility="public" if name == "color" and state == "observed" else "private",
+                observation_state=state,
+                confidence=1.0 if state == "observed" else 0.4,
+            )
+        )
     attrs += [
         ItemAttribute(
             name=a.type,
@@ -127,6 +276,7 @@ def _apply_extraction(item: FoundItem, ex: Extraction) -> None:
             confidence=a.confidence,
         )
         for a in ex.private_attributes
+        if a.type != "model" or not ex.model
     ]
     item.attributes = [a for a in item.attributes if a.source != "ai"] + attrs
     item.ai_status = "done"
@@ -143,8 +293,13 @@ def schedule_extraction(item_id: int) -> None:
 async def requeue_pending() -> int:
     """In-memory tasks are lost on restart, so re-schedule items still waiting for AI."""
     async with db.SessionLocal() as session:
+        await purge_expired_drafts(session)
         ids = list(
-            await session.scalars(select(FoundItem.id).where(FoundItem.ai_status == "pending"))
+            await session.scalars(
+                select(FoundItem.id).where(
+                    FoundItem.ai_status == "pending", FoundItem.status != "expired"
+                )
+            )
         )
     for item_id in ids:
         schedule_extraction(item_id)
@@ -173,7 +328,9 @@ async def mark_deposit_cancelled(session: AsyncSession, item_id: int, reason: st
     audit.log(session, "deposit_cancelled", "found_item", item_id, reason=reason)
 
 
-async def mark_returned(session: AsyncSession, item_id: int) -> None:
+async def mark_returned(
+    session: AsyncSession, item_id: int, *, actor_type: str = "device", actor_id: int | None = None
+) -> None:
     item = await _get(session, item_id)
     item.status = "returned"
     from app.modules.claims.models import Claim
@@ -185,7 +342,9 @@ async def mark_returned(session: AsyncSession, item_id: int) -> None:
     if approved:
         report = await session.get(LostReport, approved.lost_report_id)
         report.status = "resolved"
-    audit.log(session, "item_returned", "found_item", item_id, actor_type="device")
+    audit.log(
+        session, "item_returned", "found_item", item_id, actor_type=actor_type, actor_id=actor_id
+    )
 
 
 async def try_reserve(session: AsyncSession, item_id: int) -> bool:
@@ -206,13 +365,11 @@ async def get_item(session: AsyncSession, item_id: int) -> FoundItem:
     return await _get(session, item_id)
 
 
-async def stored_items(
-    session: AsyncSession, category: str, found_after: datetime
-) -> list[FoundItem]:
-    query = select(FoundItem).where(FoundItem.status == "open", FoundItem.found_at >= found_after)
-    if category != "other":
-        query = query.where(FoundItem.category.in_([category, "other"]))
-    return list(await session.scalars(query))
+async def stored_items(session: AsyncSession, found_after: datetime | None) -> list[FoundItem]:
+    query = select(FoundItem).where(FoundItem.status == "open").order_by(FoundItem.id)
+    if found_after is not None:
+        query = query.where(FoundItem.found_at >= found_after)
+    return list(await session.scalars(query.execution_options(populate_existing=True)))
 
 
 # ---------- admin ----------

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.modules.found_items.schemas import AttributeIO
 from app.shared.vocab import EvidenceType
@@ -21,18 +21,14 @@ class ClaimIn(BaseModel):
         | None
     ) = None
 
-    @model_validator(mode="after")
-    def require_evidence(self):
-        if not self.description and not self.evidence:
-            raise ValueError("Describe an identifying detail.")
-        return self
-
 
 class ClaimOut(BaseModel):
     id: int
     found_item_id: int
     lost_report_id: int
     status: str
+    verification_state: str | None = None
+    next_action: str | None = None
     message: str
     created_at: datetime
     compartment: int | None = None
@@ -61,6 +57,8 @@ class AdminClaimOut(BaseModel):
     found_item_id: int
     lost_report_id: int
     status: str
+    verification_state: str | None = None
+    next_action: str | None = None
     ownership_score: float | None
     critical_conflict: bool
     created_at: datetime
@@ -71,5 +69,14 @@ class AdminClaimOut(BaseModel):
 
 
 class DecisionIn(BaseModel):
-    decision: Literal["approve", "reject"]
+    decision: Literal["approve", "reject", "handed_over"]
+    proof: (
+        Literal[
+            "dated_identifier_record",
+            "live_device_control",
+            "independent_record",
+            "in_person_low_risk",
+        ]
+        | None
+    ) = None
     note: str | None = Field(default=None, max_length=500)

@@ -2,9 +2,11 @@ import json
 from unittest.mock import Mock
 from urllib.error import HTTPError
 
+import pytest
+
 from app.core.config import Settings
 from app.shared.ai import provider
-from app.shared.ai.provider import Photo
+from app.shared.ai.provider import AIError, Photo
 from app.shared.ai.qwen import QwenProvider
 
 
@@ -95,7 +97,7 @@ async def test_qwen_detail_matrix_maps_original_ids_in_one_request(monkeypatch):
     assert request.call_count == 1
 
 
-async def test_qwen_falls_back_on_bad_or_unavailable_responses(monkeypatch):
+async def test_qwen_surfaces_bad_or_unavailable_responses(monkeypatch):
     ai = QwenProvider(Settings(qwen_model="test-qwen"))
     request = Mock(
         side_effect=[
@@ -105,13 +107,12 @@ async def test_qwen_falls_back_on_bad_or_unavailable_responses(monkeypatch):
         ]
     )
     monkeypatch.setattr(ai, "_request", request)
-    assert (await ai.extract_attributes([], "black phone")).category == "phone"
-    assert await ai.compare_texts("cat sticker", ["cat sticker", "new tablet"]) == [1.0, 0.0]
-    assert await ai.verify_details(
-        [{"id": 1, "type": "damage", "value": "scratch"}], ["scratch"]
-    ) == {
-        (1, 0): 1.0,
-    }
+    with pytest.raises(AIError):
+        await ai.extract_attributes([], "black phone")
+    with pytest.raises(AIError):
+        await ai.compare_texts("cat sticker", ["cat sticker", "new tablet"])
+    with pytest.raises(AIError):
+        await ai.verify_details([{"id": 1, "type": "damage", "value": "scratch"}], ["scratch"])
 
 
 async def test_qwen_does_not_call_api_for_empty_candidates_or_details(monkeypatch):
@@ -135,7 +136,7 @@ async def test_qwen_verifies_evidence_with_finder_photo_in_same_request(monkeypa
     request = Mock(return_value=response({"findings": [finding]}))
     monkeypatch.setattr(ai, "_request", request)
     results = await ai.verify_photos([Photo(b"a")], description)
-    assert [entry.model_dump() for entry in results] == [finding]
+    assert [entry.model_dump(exclude_defaults=True) for entry in results] == [finding]
     content = request.call_args.args[2]["messages"][1]["content"]
     assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,YQ=="
     assert json.loads(content[1]["text"])["description"] == description

@@ -42,6 +42,7 @@ class FoundItem(Base):
     # Backend additions keep direct deposits, AI retries and existing page responses.
     locker_id: Mapped[int | None] = mapped_column(ForeignKey("locker.locker_id"))
     finder_contact: Mapped[str | None] = mapped_column(String(200))
+    owner_details_exposed: Mapped[bool] = mapped_column(default=False, server_default="0")
     ai_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
     ai_error: Mapped[str | None] = mapped_column(String(500))
     public_summary: Mapped[str | None] = mapped_column(String(200))
@@ -56,7 +57,12 @@ class FoundItem(Base):
         return next((a.value for a in self.attributes if a.name in names), None)
 
     def private_attributes(self) -> list["ItemAttribute"]:
-        return [a for a in self.attributes if a.visibility == "private"]
+        return [
+            a
+            for a in self.attributes
+            if a.visibility == "private"
+            and a.name not in {"category", "brand", "material", "color"}
+        ]
 
 
 class ItemPhoto(Base):
@@ -77,6 +83,7 @@ class ItemAttribute(Base):
     )
     name: Mapped[str] = mapped_column(String(50))
     value: Mapped[str] = mapped_column(String(255))
+    observation_state: Mapped[str | None] = mapped_column(String(12))
     confidence: Mapped[float | None] = mapped_column(Float)
     visibility: Mapped[str] = mapped_column(db_enum("public", "private"))
     weight: Mapped[int] = mapped_column(SmallInteger, default=1)

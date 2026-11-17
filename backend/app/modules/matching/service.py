@@ -1,49 +1,100 @@
 import logging
+from collections import Counter
 from datetime import timedelta
+from typing import get_args
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import db
 from app.core.config import get_settings
+from app.core.db import utcnow
 from app.modules.found_items import service as items
 from app.modules.found_items.models import FoundItem
 from app.modules.lost_reports import service as reports
 from app.modules.lost_reports.models import LostReport
 from app.modules.matching import policy
 from app.modules.matching.models import MatchCandidate
-from app.modules.matching.schemas import Breakdown, CandidateOut
+from app.modules.matching.schemas import CandidateOut
 from app.shared import audit
-from app.shared.ai.provider import get_ai_provider
+from app.shared.ai.provider import AIError, get_ai_provider
+from app.shared.vocab import Category, Color
 
 log = logging.getLogger(__name__)
+SEARCH_TOLERANCE = timedelta(days=policy.RETRIEVAL_TOLERANCE_DAYS)
+SEMANTIC_BATCH = 24
+PAGE_SIZE = 5
 
 
 def _lost_text(r) -> str:
-    return " ".join(p for p in [r.color, r.brand, r.model, r.description] if p)
+    return " ".join(
+        p for p in [r.color, r.brand, r.model, r.material, r.description, r.unique_marks] if p
+    )
 
 
-async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> list[CandidateOut]:
+def _pool_snapshot(pool: list[FoundItem]) -> list[tuple]:
+    return [
+        (
+            item.id,
+            item.ai_status,
+            item.category,
+            item.description,
+            item.note,
+            tuple(sorted((a.id, a.value, a.confidence) for a in item.attributes)),
+        )
+        for item in pool
+    ]
+
+
+async def candidates(
+    session: AsyncSession, report_id: int, owner_id: int, offset: int = 0
+) -> list[CandidateOut]:
     report = await reports.get_own(session, report_id, owner_id)
     if report.status != "open":
         return []
-    settings = get_settings()
     lost = policy.LostFacts(
-        report.category, report.location, report.lost_at, report.color, report.brand, report.model
+        report.category,
+        report.location,
+        report.lost_at,
+        report.color,
+        report.brand,
+        report.model,
+        report.material,
     )
 
-    pool = await items.stored_items(session, report.category, report.lost_at - timedelta(days=1))
+    found_after = report.lost_at - SEARCH_TOLERANCE if report.lost_at else None
+    pool = await items.stored_items(session, found_after)
+    snapshot = _pool_snapshot(pool)
     await session.commit()
-    semantic = (
-        await get_ai_provider().compare_texts(
-            _lost_text(report), [i.description or i.note or "" for i in pool]
-        )
-        if pool
-        else []
-    )
+    provider = get_ai_provider()
+    query = _lost_text(report)
+    semantic: list[float | None] = []
+    for start in range(0, len(pool), SEMANTIC_BATCH):
+        batch = pool[start : start + SEMANTIC_BATCH]
+        try:
+            values = await provider.compare_texts(
+                query, [(item.description or item.note or "")[:1000] for item in batch]
+            )
+            if len(values) != len(batch):
+                raise AIError("Incomplete similarity scores")
+            semantic.extend(
+                value if item.description or item.note else None
+                for item, value in zip(batch, values, strict=True)
+            )
+        except AIError:
+            log.warning(
+                "Semantic ranking unavailable for report %s; using observed fields", report.id
+            )
+            semantic.extend([None] * len(batch))
 
+    colors = Counter(item.attr("color") for item in pool if item.attr("color"))
+    color_count = sum(colors.values())
     scored = []
+    shown = set()
     for item, sem in zip(pool, semantic, strict=True):
+        reliability = {
+            attr.name: attr.confidence for attr in item.attributes if attr.confidence is not None
+        }
         found = policy.FoundFacts(
             item.category,
             item.location,
@@ -51,22 +102,30 @@ async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> li
             item.attr("color"),
             item.attr("brand"),
             item.attr("model"),
+            item.attr("material"),
+            reliability,
         )
-        scored.append((item.id, policy.score(lost, found, sem)))
-    top = policy.top_candidates(scored, settings.match_threshold, settings.max_candidates)
-    shown = {item_id for item_id, _ in top}
+        frequency = colors[found.color] / color_count if color_count >= 5 else None
+        scored.append((item.id, policy.score(lost, found, sem, frequency)))
+        if policy.plausible(lost, found, sem):
+            shown.add(item.id)
+    ranked = sorted(
+        ((item_id, points) for item_id, points in scored if item_id in shown),
+        key=lambda entry: (-entry[1]["total"], entry[0]),
+    )
 
     locked_report = await session.scalar(
-        select(LostReport.id)
+        select(LostReport)
         .where(LostReport.id == report_id, LostReport.status == "open")
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if locked_report is None:
         return []
-    latest = await items.stored_items(session, report.category, report.lost_at - timedelta(days=1))
-    if {item.id for item in latest} != {item.id for item in pool}:
+    latest = await items.stored_items(session, found_after)
+    if _pool_snapshot(latest) != snapshot:
         # An item arrived or left during the model call. Keep the newer ranking.
-        return await cached_candidates(session, report_id, owner_id)
+        return await cached_candidates(session, report_id, owner_id, offset, refresh_unranked=False)
 
     # Claims reference match_id: update rows in place, never delete their history.
     existing = {
@@ -90,6 +149,7 @@ async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> li
             setattr(
                 candidate, name, value if name == "total" else value / policy.WEIGHTS[name] * 100
             )
+    locked_report.ranked_at = utcnow()
     audit.log(
         session,
         "candidates_ranked",
@@ -103,51 +163,56 @@ async def candidates(session: AsyncSession, report_id: int, owner_id: int) -> li
     await session.commit()
 
     by_id = {i.id: i for i in pool}
-    return [_candidate_out(by_id[item_id], points) for item_id, points in top]
+    return [_candidate_out(by_id[item_id]) for item_id, _ in ranked[offset : offset + PAGE_SIZE]]
 
 
-def _candidate_out(item: FoundItem, points: dict) -> CandidateOut:
+def _candidate_out(item: FoundItem) -> CandidateOut:
+    category = item.category if item.category in get_args(Category) else "other"
+    color = next(
+        (
+            a.value
+            for a in item.attributes
+            if a.name in {"color", "colour"}
+            and a.visibility == "public"
+            and a.value in get_args(Color)
+        ),
+        None,
+    )
     return CandidateOut(
         found_item_id=item.id,
-        score=points["total"],
-        breakdown=Breakdown(**{k: v for k, v in points.items() if k != "total"}),
-        category=item.category,
-        color=item.attr("color"),
-        location=item.location,
+        category=category,
+        color=color,
+        location=item.location if item.location in get_settings().locations else "other",
         found_date=item.found_at.date(),
-        public_summary=item.public_summary,
     )
 
 
 async def cached_candidates(
-    session: AsyncSession, report_id: int, owner_id: int
+    session: AsyncSession,
+    report_id: int,
+    owner_id: int,
+    offset: int = 0,
+    *,
+    refresh_unranked: bool = True,
 ) -> list[CandidateOut]:
     report = await reports.get_own(session, report_id, owner_id)
     if report.status != "open":
         return []
-    rows = await session.execute(
-        select(MatchCandidate, FoundItem)
-        .join(FoundItem, FoundItem.id == MatchCandidate.found_item_id)
+    if refresh_unranked and report.ranked_at is None:
+        return await candidates(session, report_id, owner_id, offset)
+    rows = await session.scalars(
+        select(FoundItem)
+        .join(MatchCandidate, FoundItem.id == MatchCandidate.found_item_id)
         .where(
             MatchCandidate.lost_report_id == report_id,
             MatchCandidate.shown.is_(True),
             FoundItem.status == "open",
         )
         .order_by(MatchCandidate.total.desc(), FoundItem.id)
+        .offset(offset)
+        .limit(PAGE_SIZE)
     )
-    return [
-        _candidate_out(
-            item,
-            {
-                "total": match.total,
-                **{
-                    key: round(getattr(match, key) * weight / 100, 1)
-                    for key, weight in policy.WEIGHTS.items()
-                },
-            },
-        )
-        for match, item in rows
-    ]
+    return [_candidate_out(item) for item in rows]
 
 
 async def refresh_for_report(report_id: int, owner_id: int) -> None:
@@ -161,19 +226,16 @@ async def refresh_for_report(report_id: int, owner_id: int) -> None:
 async def refresh_for_item(item_id: int) -> None:
     async with db.SessionLocal() as session:
         item = await session.get(FoundItem, item_id)
-        if item is None or item.status != "open" or item.ai_status != "done":
+        if item is None or item.status != "open":
             return
-        category = LostReport.category == "other"
-        if item.category == "other":
-            category = LostReport.category.is_not(None)
-        elif item.category is not None:
-            category = LostReport.category.in_([item.category, "other"])
         reports_to_refresh = (
             await session.execute(
                 select(LostReport.id, LostReport.owner_id).where(
                     LostReport.status == "open",
-                    category,
-                    LostReport.lost_at <= item.found_at + timedelta(days=1),
+                    or_(
+                        LostReport.lost_at.is_(None),
+                        LostReport.lost_at <= item.found_at + SEARCH_TOLERANCE,
+                    ),
                 )
             )
         ).all()

@@ -1,530 +1,361 @@
 from datetime import timedelta
-from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy import select
 
 from app.core.db import utcnow
 from app.modules.claims import policy, service
-from app.modules.found_items.models import FoundItem
-from app.modules.lost_reports.models import LostReport
-from app.modules.matching.models import MatchCandidate
+from app.modules.found_items.models import FoundItem, ItemAttribute
 from app.shared.ai.mock import MockAIProvider
-from app.shared.ai.provider import PhotoFinding, set_ai_provider
+from app.shared.ai.provider import AIError, PhotoFinding, set_ai_provider
 from tests.conftest import deposit_and_store
 
-# ---------- policy ----------
-
-ATTRS = [
-    policy.Attr(1, "serial_suffix", "4821", "strong"),
-    policy.Attr(2, "sticker_or_mark", "cat sticker", "distinctive"),
-]
-
-
-def verify(evidence, sims=None, category="phone", attrs=ATTRS, match_score=80):
-    ev = [policy.Evidence(t, v) for t, v in evidence]
-    return policy.verify(category, attrs, ev, sims or {}, match_score)
-
-
-def test_strong_evidence_approved():
-    v = verify([("serial_suffix", "SN-99214821"), ("sticker_or_mark", "cat")], {(2, 1): 0.9})
-    assert (v.decision, v.score) == ("approved", 88)
+BACK = "Glass missing beside the rear camera"
+FRONT = "Star-shaped crack at the top of the screen"
+GOOD = [{"type": "damage", "value": FRONT}]
+OPERATOR_APPROVAL = {
+    "decision": "approve",
+    "proof": "dated_identifier_record",
+    "note": "Compared the serial with a dated device listing.",
+}
+HANDOVER = {
+    "decision": "handed_over",
+    "proof": "in_person_low_risk",
+    "note": "Checked the account holder in person and handed over the cap.",
+}
 
 
-def test_partial_evidence_goes_to_review_or_rejected():
-    v = verify([("serial_suffix", "4821")])
-    assert (v.decision, v.score) == ("in_review", 72)
-    v = verify([("sticker_or_mark", "cat")], {(2, 0): 0.9}, match_score=50)
-    assert (v.decision, v.score) == ("rejected", 46)
-
-
-def test_wrong_serial_is_critical_conflict():
-    v = verify([("serial_suffix", "1234"), ("sticker_or_mark", "cat")], {(2, 1): 0.9})
-    assert v.decision == "rejected" and v.critical_conflict
-    assert v.results[0][0] == "conflict"
-
-
-def test_generic_item_never_auto_approved():
-    attrs = [policy.Attr(1, "damage", "bent handle", "distinctive")]
-    v = verify(
-        [("damage", "bent handle")],
-        {(1, 0): 1.0},
-        category="umbrella",
-        attrs=attrs,
-        match_score=100,
+def finding(quote, part="back", *, status="confirmed", distinctive=True, kind="damage"):
+    return PhotoFinding(
+        quote=quote,
+        part=part,
+        status=status,
+        kind=kind,
+        distinctive=distinctive,
+        photo_index=0 if status in ("confirmed", "contradicted") else None,
+        observation=f"Visible {quote}",
     )
-    assert (v.decision, v.score) == ("in_review", 100)
-    assert verify([("other", "plain")], category="umbrella", attrs=[]).decision == "rejected"
 
 
-def test_low_similarity_does_not_count():
-    v = verify([("serial_suffix", "4821"), ("sticker_or_mark", "dog")], {(2, 1): 0.2})
-    assert v.score == 72 and v.results[1][0] == "mismatch"
+def visual_provider(*, fail=False):
+    ai = MockAIProvider()
+
+    async def observe(photos, text):
+        assert photos
+        if fail:
+            raise AIError("Simulated photo service failure")
+        return [
+            finding(quote, part)
+            for quote, part in ((BACK, "back"), (FRONT, "front"))
+            if quote in text
+        ]
+
+    ai.verify_photos = AsyncMock(side_effect=observe)
+    set_ai_provider(ai)
+    return ai
 
 
-@pytest.mark.parametrize(
-    ("text", "match_score", "similarity", "expected"),
-    [
-        ("schwarzes Handy", 70, 0.4, ("rejected", 42, 0)),
-        ("Auto als Hintergrund", 92, 0.95, ("approved", 75, 50)),
-    ],
-)
-def test_specific_wallpaper_can_verify_where_generic_text_cannot(
-    text, match_score, similarity, expected
-):
-    attrs = [
-        policy.Attr(1, "sticker_or_mark", "rally car wallpaper", "distinctive"),
-        policy.Attr(2, "damage", "scratched back", "distinctive"),
-    ]
-    verdict = verify([("other", text)], {(1, 0): similarity}, attrs=attrs, match_score=match_score)
-    assert (verdict.decision, verdict.score, verdict.detail_score) == expected
-
-
-def test_a_lower_weight_detail_cannot_substitute_for_a_top_attribute():
-    attrs = [
-        policy.Attr(1, "engraving", "engraved initials", "strong"),
-        policy.Attr(2, "damage", "scratched back", "distinctive"),
-        policy.Attr(3, "accessory", "hard case", "generic"),
-    ]
-    verdict = verify([("other", "hard case")], {(3, 0): 1}, attrs=attrs, match_score=92)
-    assert (verdict.decision, verdict.score, verdict.detail_score) == ("in_review", 55, 0)
-
-
-def test_top_attributes_can_use_different_evidence_when_best_match_overlaps():
-    attrs = [
-        policy.Attr(1, "damage", "scratched screen", "distinctive"),
-        policy.Attr(2, "damage", "scratched back", "distinctive"),
-    ]
-    verdict = verify(
-        [("other", "scratch on back"), ("other", "screen damage")],
-        {(1, 0): 0.97, (1, 1): 0.8, (2, 0): 0.9},
-        attrs=attrs,
-    )
-    assert (verdict.decision, verdict.detail_score) == ("approved", 100)
-    assert verdict.results == {0: ("match", 2, 0.9), 1: ("match", 1, 0.8)}
-
-
-def test_split_free_text_and_report_to_eight_details_with_typed_serial_preserved():
-    evidence = service._claim_evidence(
-        [
-            {"type": "other", "value": "Auto; Kratzer\nGravur und Band, Aufkleber"},
-            {"type": "serial_suffix", "value": "4821"},
-        ],
-        "Auto mit Hülle and Display with Name",
-    )
-    assert [e.value for e in evidence] == [
-        "4821",
-        "Auto",
-        "Kratzer",
-        "Gravur",
-        "Band",
-        "Aufkleber",
-        "Hülle",
-        "Display",
-    ]
-    assert [e.type for e in evidence] == ["serial_suffix"] + ["other"] * 7
-
-
-async def test_provider_without_batch_method_uses_compare_texts_with_correct_indices():
-    compare = AsyncMock(return_value=[0.9, 0.2])
-    set_ai_provider(SimpleNamespace(compare_texts=compare))
-    evidence = [
-        policy.Evidence("other", "Auto"),
-        policy.Evidence("serial_suffix", "4821"),
-        policy.Evidence("damage", "Cracked glass"),
-    ]
-    assert await service._similarities(ATTRS, evidence) == {(2, 0): 0.9, (2, 2): 0.2}
-    compare.assert_awaited_once_with("cat sticker", ["Auto", "Cracked glass"])
-
-
-@pytest.mark.parametrize(
-    ("match_score", "expected_score", "decision"),
-    [(58, 75, "approved"), (57, 74, "in_review"), (16, 50, "in_review"), (15, 49, "rejected")],
-)
-def test_combined_score_thresholds(match_score, expected_score, decision):
-    attrs = [
-        policy.Attr(1, "damage", "cracked back", "distinctive"),
-        policy.Attr(2, "sticker_or_mark", "car wallpaper", "distinctive"),
-        policy.Attr(3, "accessory", "black case", "distinctive"),
-    ]
-    v = verify(
-        [("other", "Kratzer hinten"), ("accessory", "Auto als Hintergrund")],
-        {(1, 0): 0.9, (2, 1): 0.9},
-        attrs=attrs,
-        match_score=match_score,
-    )
-    assert (v.decision, v.score) == (decision, expected_score)
-
-
-def test_repeated_evidence_can_only_confirm_one_detail():
-    attrs = [
-        policy.Attr(1, "damage", "scratched screen", "distinctive"),
-        policy.Attr(2, "damage", "scratched back", "distinctive"),
-    ]
-    v = verify(
-        [("damage", "scratch"), ("other", " Scratch ")],
-        {(1, 0): 0.9, (2, 1): 0.9},
-        attrs=attrs,
-    )
-    assert (v.decision, v.score) == ("in_review", 68)
-
-
-def test_wrong_serial_remains_a_conflict_alongside_correct_evidence():
-    v = verify(
-        [("serial_suffix", "4821"), ("serial_suffix", "1234"), ("other", "cat")],
-        {(2, 2): 1.0},
-        match_score=100,
-    )
-    assert v.decision == "rejected" and v.critical_conflict
-
-
-# ---------- API ----------
-
-GOOD = [
-    {"type": "serial_suffix", "value": "4821"},
-    {"type": "sticker_or_mark", "value": "cat sticker on the back"},
-]
-
-
-async def setup_candidate(
-    client, owner, locker, description="Black Samsung phone with a cat sticker"
-):
-    """Stored phone + the owner's lost report that lists it as a candidate."""
-    _, h = locker
-    item_id = await deposit_and_store(client, h)
-    report = {
-        "category": "phone",
+async def make_report(owner, *, description, category="phone", **fields):
+    data = {
+        "category": category,
         "location": "library",
         "lost_at": (utcnow() - timedelta(hours=2)).isoformat(),
-        "color": "black",
-        "brand": "Samsung",
         "description": description,
+        **fields,
     }
-    report_id = (await owner.post("/api/lost-reports", json=report)).json()["id"]
-    cands = (await owner.get(f"/api/lost-reports/{report_id}/candidates")).json()
-    assert cands[0]["found_item_id"] == item_id
-    return item_id, report_id, h
+    response = await owner.post("/api/lost-reports", json=data)
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
 
 
-async def claim(c, report_id, item_id, evidence):
+async def setup_candidate(client, owner, locker, description=BACK, *, category="phone"):
+    _, headers = locker
+    visual_provider()
+    item_id = await deposit_and_store(
+        client, headers, note="Purple Apple iPhone" if category == "phone" else "Black cap"
+    )
+    report_id = await make_report(owner, description=description, category=category)
+    candidates = (await owner.get(f"/api/lost-reports/{report_id}/candidates?refresh=false")).json()
+    assert candidates[0]["found_item_id"] == item_id
+    return item_id, report_id, headers
+
+
+async def claim(c, report_id, item_id, evidence=None, **more):
     return await c.post(
         "/api/claims",
-        json={"lost_report_id": report_id, "found_item_id": item_id, "evidence": evidence},
+        json={"lost_report_id": report_id, "found_item_id": item_id, "evidence": evidence, **more},
     )
+
+
+@pytest.mark.parametrize(
+    ("category", "initial", "additional", "expected"),
+    [
+        pytest.param(
+            "phone",
+            [finding(BACK), finding(FRONT, "front")],
+            [],
+            ("verified", None),
+            id="purple-iphone-distinct-surfaces",
+        ),
+        pytest.param(
+            "phone",
+            [finding("black phone", kind="common")],
+            [],
+            ("needs_more_evidence", "device_record"),
+            id="undamaged-iphone",
+        ),
+        pytest.param(
+            "clothing",
+            [finding("black cap", kind="common")],
+            [],
+            ("unresolved", "contact_operator"),
+            id="identical-caps",
+        ),
+        pytest.param(
+            "keys",
+            [finding("fox charm", status="unobservable")],
+            [],
+            ("unresolved", "contact_operator"),
+            id="keys-sparse-photos",
+        ),
+        pytest.param(
+            "headphones", [], [], ("needs_more_evidence", "device_record"), id="headphones-serial"
+        ),
+        pytest.param(
+            "bag",
+            [finding("Repair on the shoulder strap", "strap")],
+            [],
+            ("needs_more_evidence", "another_detail"),
+            id="backpack-one-repair",
+        ),
+        pytest.param(
+            "phone",
+            [finding(BACK, status="unobservable")],
+            [],
+            ("needs_more_evidence", "device_record"),
+            id="blurred-photo",
+        ),
+        pytest.param(
+            "phone",
+            [],
+            [finding(BACK), finding(FRONT, "front")],
+            ("needs_more_evidence", "device_record"),
+            id="post-listing-guess",
+        ),
+        pytest.param(
+            "phone",
+            [finding(BACK)],
+            [finding("Missing glass by camera")],
+            ("needs_more_evidence", "another_detail"),
+            id="same-mark-paraphrased",
+        ),
+        pytest.param(
+            "phone",
+            [finding(BACK)],
+            [finding(BACK, "front")],
+            ("needs_more_evidence", "another_detail"),
+            id="same-quote-relabelled",
+        ),
+        pytest.param(
+            "phone",
+            [finding("Back is pristine", status="contradicted")],
+            [],
+            ("refuted", None),
+            id="clear-conflict",
+        ),
+    ],
+)
+def test_adaptive_verification_scenarios(category, initial, additional, expected):
+    verdict = policy.assess(initial, additional, category=category)
+    assert (verdict.state, verdict.action) == expected
+
+
+def test_typed_identifier_alone_cannot_authorize_pickup():
+    kwargs = {"category": "headphones", "trusted_identifier": "sn77485633"}
+    assert (
+        policy.assess([], [], identifiers=("sn77485633",), **kwargs).state == "needs_more_evidence"
+    )
+    assert policy.assess([], [], identifiers=("xx77485633",), **kwargs).state == "refuted"
+
+
+def test_visual_support_is_grounded_in_claim_and_photo():
+    with pytest.raises(AIError):
+        service._grounded_findings("a blue phone", [finding("cat sticker")], 1)
+    with pytest.raises(AIError):
+        service._grounded_findings(BACK, [finding(BACK).model_copy(update={"photo_index": 2})], 1)
+    guess = "Maybe a red fox charm"
+    result = service._grounded_findings(guess, [finding(guess)], 1)
+    assert result[0].status == "ambiguous"
+
+
+def test_guess_stays_ambiguous_if_the_model_omits_the_qualifier():
+    text = "Maybe there is a red fox charm."
+    result = service._grounded_findings(text, [finding("red fox charm")], 1)
+    assert result[0].status == "ambiguous"
 
 
 async def test_approved_claim_to_pickup(client, owner, session, locker):
-    item_id, report_id, h = await setup_candidate(client, owner, locker)
-
-    r = await claim(owner, report_id, item_id, GOOD)
-    assert r.status_code == 201
-    body = r.json()
-    assert body["status"] == "approved" and len(body["pickup_code"]) == 6
-
-    # Locker: pickup code opens the compartment, owner takes the item, presses #
-    r = await client.post(
+    item_id, report_id, headers = await setup_candidate(client, owner, locker, BACK + ". " + FRONT)
+    response = await claim(owner, report_id, item_id)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["verification_state"] == "verified"
+    assert len(body["pickup_code"]) == 6
+    pickup = await client.post(
         "/api/device/codes/validate",
+        headers=headers,
         json={"device_id": "locker_01", "code": body["pickup_code"]},
-        headers=h,
     )
-    assert r.json()["action"] == "pickup" and r.json()["authorized"] is True
-    r = await client.post(
-        f"/api/device/compartments/{r.json()['compartment']}/state",
+    assert pickup.json()["authorized"] and pickup.json()["action"] == "pickup"
+    state = await client.post(
+        f"/api/device/compartments/{pickup.json()['compartment']}/state",
+        headers=headers,
         json={"device_id": "locker_01", "occupied": False},
-        headers=h,
     )
-    assert r.json()["state"] == "free"
-
-    item = await session.scalar(select(FoundItem).where(FoundItem.id == item_id))
-    assert item.status == "returned"
-    assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 2
+    assert state.json()["state"] == "free"
+    assert (await session.get(FoundItem, item_id)).status == "returned"
     assert (await owner.get(f"/api/lost-reports/{report_id}")).json()["status"] == "resolved"
 
 
-async def test_rejected_message_hides_reason(client, owner, locker):
+async def test_retries_retain_original_and_supplemental_evidence(client, owner, admin, locker):
     item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    r = await claim(owner, report_id, item_id, [{"type": "serial_suffix", "value": "0000"}])
-    body = r.json()
-    assert body["status"] == "rejected" and "serial" not in body["message"].lower()
-    assert body["pickup_code"] is None
+    first = (await claim(owner, report_id, item_id, description="The case is purple")).json()
+    assert first["next_action"] == "another_detail"
+    second = (await claim(owner, report_id, item_id, GOOD)).json()
+    assert second["id"] == first["id"] and second["verification_state"] == "verified"
+    assert "evidence" not in second
+    reviewed = (await admin.get(f"/api/admin/claims/{second['id']}")).json()
+    assert [row["value"] for row in reviewed["evidence"] if row["type"] == "submission"] == [
+        "The case is purple",
+        FRONT,
+    ]
 
 
-async def test_cooldown_after_three_failures(client, owner, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    bad = [{"type": "serial_suffix", "value": "0000"}]
+async def test_review_then_admin_approve_and_pickup_code(client, owner, admin, locker, session):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Plain iPhone")
+    item = await session.get(FoundItem, item_id)
+    item.category = "headphones"
+    item.attributes.append(
+        ItemAttribute(
+            name="serial_suffix", value="SN77485633", source="admin", visibility="private"
+        )
+    )
+    await session.commit()
+    response = await claim(owner, report_id, item_id, description="Serial number SN77485633")
+    claim_body = response.json()
+    assert claim_body["next_action"] == "device_record" and claim_body["pickup_code"] is None
+    url = f"/api/admin/claims/{claim_body['id']}/decision"
+    assert (await admin.post(url, json={"decision": "approve"})).status_code == 422
+    assert (await owner.post(url, json=OPERATOR_APPROVAL)).status_code == 403
+    assert (await admin.post(url, json=OPERATOR_APPROVAL)).json()[
+        "verification_state"
+    ] == "verified"
+    assert (await owner.post(f"/api/claims/{claim_body['id']}/pickup-code")).status_code == 200
+
+
+async def test_public_details_and_rate_limit(client, owner, locker):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Purple iPhone")
     for _ in range(3):
-        assert (await claim(owner, report_id, item_id, bad)).json()["status"] == "rejected"
-    r = await claim(owner, report_id, item_id, GOOD)
-    assert r.status_code == 429 and r.json()["error"]["code"] == "claim_cooldown"
+        response = await claim(owner, report_id, item_id, description="Apple phone, purple")
+        assert response.status_code == 201 and response.json()["pickup_code"] is None
+    assert (await claim(owner, report_id, item_id)).status_code == 429
 
 
 async def test_claim_requires_candidate(client, owner, other_owner, locker):
     item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    report = {
-        "category": "wallet",
-        "location": "library",
-        "lost_at": utcnow().isoformat(),
-        "description": "my wallet",
-    }
-    other_report = (await other_owner.post("/api/lost-reports", json=report)).json()["id"]
-    r = await claim(other_owner, other_report, item_id, GOOD)  # item did not qualify
-    assert r.json()["error"]["code"] == "not_a_candidate"
-    assert (await claim(other_owner, report_id, item_id, GOOD)).status_code == 404  # not theirs
-
-
-async def test_review_then_admin_approve_and_pickup_code(client, owner, admin, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Black Samsung phone")
-    r = await claim(owner, report_id, item_id, [{"type": "other", "value": "plain case"}])
-    claim_id = r.json()["id"]
-    assert r.json()["status"] == "in_review"
-
-    queue = (await admin.get("/api/admin/claims")).json()
-    assert [c["id"] for c in queue] == [claim_id]
-    assert queue[0]["ownership_score"] == 60 and queue[0]["item_private_attributes"]
-
-    r = await admin.post(f"/api/admin/claims/{claim_id}/decision", json={"decision": "approve"})
-    assert r.json()["status"] == "approved"
-
-    r = await owner.post(f"/api/claims/{claim_id}/pickup-code")
-    assert r.status_code == 200 and len(r.json()["pickup_code"]) == 6
-    assert (await owner.get(f"/api/claims/{claim_id}")).json()["pickup_code"] is None
-
-
-async def test_first_approval_wins(client, owner, other_owner, admin, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    # Second owner reports the same phone and goes to review.
-    report = {
-        "category": "phone",
-        "location": "library",
-        "lost_at": (utcnow() - timedelta(hours=1)).isoformat(),
-        "description": "Black Samsung phone",
-    }
-    other_report = (await other_owner.post("/api/lost-reports", json=report)).json()["id"]
-    await other_owner.get(f"/api/lost-reports/{other_report}/candidates")
-    review = await claim(
-        other_owner, other_report, item_id, [{"type": "other", "value": "plain case"}]
+    late_report = await make_report(
+        other_owner,
+        description="An Apple phone",
+        lost_at=(utcnow() + timedelta(days=8)).isoformat(),
     )
-    assert review.json()["status"] == "in_review"
-
-    assert (await claim(owner, report_id, item_id, GOOD)).json()["status"] == "approved"
-
-    # Competing claim was closed; the item cannot be claimed again.
-    r = await admin.get(f"/api/admin/claims/{review.json()['id']}")
-    assert r.json()["status"] == "rejected"
-    r = await claim(other_owner, other_report, item_id, GOOD)
-    assert r.json()["error"]["code"] == "item_unavailable"
+    assert (await claim(other_owner, late_report, item_id)).json()["error"][
+        "code"
+    ] == "not_a_candidate"
+    assert (await claim(other_owner, report_id, item_id)).status_code == 404
 
 
-async def test_admin_only(owner):
-    assert (await owner.get("/api/admin/claims")).status_code == 403
-
-
-async def test_photo_verification_rechecks_existing_review_and_issues_code(
-    client,
-    owner,
-    locker,
-    session,
+async def test_competing_claims_block_automatic_authorization(
+    client, owner, other_owner, admin, locker
 ):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Black Samsung phone")
-    weak = [{"type": "other", "value": "generic description"}]
-    first = (await claim(owner, report_id, item_id, weak)).json()
-    assert first["status"] == "in_review"
-    match = await session.scalar(
-        select(MatchCandidate).where(
-            MatchCandidate.lost_report_id == report_id,
-            MatchCandidate.found_item_id == item_id,
-        )
+    item_id, report_id, _ = await setup_candidate(client, owner, locker)
+    second = await make_report(other_owner, description="Purple iPhone")
+    competing = (await claim(other_owner, second, item_id)).json()
+    initial = (await claim(owner, report_id, item_id, GOOD)).json()
+    assert initial["verification_state"] == "unresolved" and initial["pickup_code"] is None
+    url = f"/api/admin/claims/{initial['id']}/decision"
+    assert (await admin.post(url, json=OPERATOR_APPROVAL)).json()["status"] == "approved"
+    assert (await other_owner.post(f"/api/claims/{competing['id']}/pickup-code")).status_code == 409
+    assert (await owner.post(f"/api/claims/{initial['id']}/pickup-code")).status_code == 200
+
+
+async def test_low_risk_handover_requires_operator_and_no_competing_claim(
+    client, owner, other_owner, admin, locker, session
+):
+    item_id, report_id, _ = await setup_candidate(
+        client, owner, locker, "Black cap", category="clothing"
     )
-    match.total = 90
+    item = await session.get(FoundItem, item_id)
+    item.category = "clothing"
     await session.commit()
-
-    ai = MockAIProvider()
-    description = (
-        "There is a rde cat stickr below the camera. "
-        "The upper left corner has a deep diagonal scratch. "
-        "I always kept it in my bag on the way to class. The phone is black and the remaining "
-        "details are ordinary. I bought it two years ago and used it every day."
-    )
-    assert len(description) > 200
-    ai.verify_photos = AsyncMock(
-        return_value=[
-            PhotoFinding(
-                quote="a rde cat stickr below the camera",
-                kind="mark",
-                status="confirmed",
-                photo_index=0,
-            ),
-            PhotoFinding(
-                quote="upper left corner has a deep diagonal scratch",
-                kind="damage",
-                status="confirmed",
-                photo_index=0,
-            ),
-        ]
-    )
-    set_ai_provider(ai)
-    reply = await owner.post(
-        "/api/claims",
-        json={
-            "lost_report_id": report_id,
-            "found_item_id": item_id,
-            "description": description,
-        },
-    )
-    result = reply.json()
-    assert result["id"] == first["id"]
-    assert result["status"] == "approved" and len(result["pickup_code"]) == 6
-    photos, details = ai.verify_photos.call_args.args
-    assert len(photos) == 1 and photos[0].data.startswith(b"\xff\xd8")
-    assert details == description
-
-
-@pytest.mark.parametrize(
-    ("findings_data", "status"),
-    [
-        ([("common", "confirmed")], "rejected"),
-        ([("accessory", "confirmed"), ("accessory", "confirmed")], "in_review"),
-        ([("accessory", "unobservable")], "in_review"),
-        ([("accessory", "ambiguous")], "in_review"),
-        ([("common", "ambiguous")], "in_review"),
-        ([("accessory", "confirmed"), ("damage", "confirmed")], "approved"),
-        (
-            [("accessory", "confirmed"), ("damage", "confirmed"), ("mark", "contradicted")],
-            "in_review",
-        ),
-    ],
-)
-def test_visual_release_requires_independent_confirmed_details(findings_data, status):
-    findings = [
-        PhotoFinding(quote=f"Detail {i}", kind=kind, status=outcome, photo_index=0)
-        for i, (kind, outcome) in enumerate(findings_data)
-    ]
-    evidence = [policy.Evidence(f.kind, f.quote) for f in findings]
-    verdict = policy.verify_photo_evidence([], evidence, findings, 90)
-    assert verdict.decision == status
-
-
-def test_visual_proof_cannot_override_wrong_serial():
-    findings = [
-        PhotoFinding(quote="cat sticker", kind="mark", status="confirmed", photo_index=0),
-        PhotoFinding(quote="scratch", kind="damage", status="confirmed", photo_index=0),
-    ]
-    evidence = [policy.Evidence("serial_suffix", "1234")] + [
-        policy.Evidence(f.kind, f.quote) for f in findings
-    ]
-    verdict = policy.verify_photo_evidence(ATTRS, evidence, findings, 100)
-    assert (verdict.decision, verdict.critical_conflict) == ("rejected", True)
-
-
-def test_a_full_serial_can_verify_with_no_visual_details():
-    stored = policy.Attr(2, "serial_suffix", "ABCD593802", "strong")
-    evidence = [policy.Evidence("serial_suffix", "ABCD593802")]
-    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "approved"
-    evidence[0].value = "593802"
-    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "rejected"
-    stored.value = "3802"
-    evidence[0].value = "ABCD593802"
-    assert policy.verify_photo_evidence([stored], evidence, [], 90).decision == "in_review"
-
-
-def test_visual_finding_must_quote_owner_and_reference_a_real_photo():
-    photo = dict(kind="mark", status="confirmed", photo_index=0)
-    findings = [
-        PhotoFinding(quote="red star", **photo),
-        PhotoFinding(quote="red star", kind="damage", status="confirmed", photo_index=0),
-        PhotoFinding(quote="cat sticker", **photo),
-        PhotoFinding(quote="big scratch", kind="damage", status="confirmed", photo_index=1),
-    ]
-    assert service._grounded_findings("A red star and a big scratch", findings, 1) == findings[:1]
-
-
-def test_tentative_claim_remains_ambiguous_even_if_model_definitively_scores_it():
-    text = "Maybe a red fox charm or something."
-    finding = PhotoFinding(quote=text, kind="accessory", status="contradicted", photo_index=0)
-    grounded = service._grounded_findings(text, [finding], 1)
-    assert grounded[0].status == "ambiguous"
-    verdict = policy.verify_photo_evidence([], [policy.Evidence("accessory", text)], grounded, 90)
-    assert verdict.decision == "in_review"
-
-
-async def test_review_retries_share_attempt_limit(client, owner, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    ai = MockAIProvider()
-    ai.verify_photos = AsyncMock(
-        return_value=[
-            PhotoFinding(quote="serial hidden inside", kind="mark", status="unobservable"),
-        ]
-    )
-    set_ai_provider(ai)
-    payload = {
-        "lost_report_id": report_id,
-        "found_item_id": item_id,
-        "description": "A serial hidden inside",
-    }
-    claim_ids = set()
-    for _ in range(3):
-        response = await owner.post("/api/claims", json=payload)
-        assert response.json()["status"] == "in_review"
-        claim_ids.add(response.json()["id"])
-    assert len(claim_ids) == 1
-    response = await owner.post("/api/claims", json=payload)
-    assert response.status_code == 429
-    assert ai.verify_photos.await_count == 3
-
-
-async def test_report_evidence_is_included_in_one_batch(client, owner, admin, locker, caplog):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    ai = MockAIProvider()
-    ai.verify_details = AsyncMock(wraps=ai.verify_details)
-    set_ai_provider(ai)
-
-    with caplog.at_level("INFO", logger="uvicorn.error"):
-        response = await claim(
-            owner,
-            report_id,
-            item_id,
-            [
-                {"type": "serial_suffix", "value": "4821"},
-                {"type": "other", "value": "blauer Rand; matte Rückseite"},
-            ],
-        )
-    assert response.json()["status"] == "approved"
-    args = ai.verify_details.call_args.args
-    assert ai.verify_details.await_count == 1
-    assert [row["type"] for row in args[0]] == ["sticker_or_mark"]
-    assert args[1] == ["blauer Rand", "matte Rückseite", "Black Samsung phone", "a cat sticker"]
+    second = await make_report(other_owner, description="Black cap", category="clothing")
+    current = (await claim(owner, report_id, item_id)).json()
+    competing = (await claim(other_owner, second, item_id)).json()
+    url = f"/api/admin/claims/{current['id']}/decision"
+    assert (await admin.post(url, json=HANDOVER)).status_code == 409
     assert (
-        caplog.messages.count("[VERIFY] Matching 100 | Details 100 -> Gesamt 100 -> approved") == 1
-    )
-    admin_claim = await admin.get(f"/api/admin/claims/{response.json()['id']}")
-    evidence = admin_claim.json()["evidence"]
-    assert any(row["value"] == "a cat sticker" and row["result"] == "match" for row in evidence)
+        await admin.post(
+            f"/api/admin/claims/{competing['id']}/decision",
+            json={"decision": "reject", "note": "The claimant withdrew during the visit."},
+        )
+    ).status_code == 200
+    final = await admin.post(url, json=HANDOVER)
+    assert final.status_code == 200, final.text
+    assert final.json()["status"] == "handed_over" and final.json()["pickup_code"] is None
+    assert (await owner.post(f"/api/claims/{current['id']}/pickup-code")).status_code == 409
+    assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 2
+    entries = (await admin.get("/api/admin/audit")).json()
+    assert next(e for e in entries if e["action"] == "claim_decided")["actor_type"] == "admin"
 
 
-async def test_claim_still_works_for_legacy_report_without_description(
-    client, owner, locker, session
-):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    report = await session.get(LostReport, report_id)
-    report.description = None
+async def test_outage_and_legacy_disclosures_do_not_issue_codes(client, owner, locker, session):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, BACK + ". " + FRONT)
+    visual_provider(fail=True)
+    failed = (await claim(owner, report_id, item_id)).json()
+    assert failed["next_action"] == "retry_photo_check" and failed["pickup_code"] is None
+    visual_provider()
+    item = await session.get(FoundItem, item_id)
+    item.owner_details_exposed = True
     await session.commit()
+    exposed = (await claim(owner, report_id, item_id)).json()
+    assert exposed["verification_state"] == "unresolved" and exposed["pickup_code"] is None
 
-    response = await claim(owner, report_id, item_id, GOOD)
-    assert response.status_code == 201 and response.json()["status"] == "approved"
+
+async def test_one_report_cannot_authorize_two_items(client, owner, locker):
+    item_id, report_id, headers = await setup_candidate(client, owner, locker, BACK + ". " + FRONT)
+    other_item = await deposit_and_store(client, headers, note="Purple Apple iPhone")
+    assert (await claim(owner, report_id, item_id)).json()["pickup_code"]
+    second = await claim(owner, report_id, other_item)
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "report_already_resolved"
 
 
-async def test_audit_log_records_flow(client, owner, admin, locker):
-    item_id, report_id, _ = await setup_candidate(client, owner, locker)
-    await claim(owner, report_id, item_id, GOOD)
-    actions = [e["action"] for e in (await admin.get("/api/admin/audit")).json()]
-    for expected in [
-        "item_submitted",
-        "ai_extracted",
-        "compartment_opened",
-        "item_stored",
-        "candidates_ranked",
-        "claim_submitted",
-    ]:
-        assert expected in actions
-    assert (await owner.get("/api/admin/audit")).status_code == 403
+async def test_photo_claim_with_conflicting_confirmations_stays_unresolved():
+    supported = [finding(BACK), finding(FRONT, "front")]
+    conflicts = [finding("Blue bezel", status="contradicted", kind="common")]
+    result = policy.assess(supported, conflicts, category="phone")
+    assert (result.state, result.action) == ("unresolved", "contact_operator")
+
+
+async def test_phone_cannot_use_low_risk_handover(client, owner, admin, locker):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Purple iPhone")
+    body = (await claim(owner, report_id, item_id)).json()
+    response = await admin.post(f"/api/admin/claims/{body['id']}/decision", json=HANDOVER)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "handover_unavailable"
+
+
+async def test_post_listing_details_alone_cannot_authorize_pickup(client, owner, locker):
+    item_id, report_id, _ = await setup_candidate(client, owner, locker, "Plain iPhone")
+    first = (await claim(owner, report_id, item_id, description=BACK + ". " + FRONT)).json()
+    assert first["next_action"] == "device_record"
+    assert first["pickup_code"] is None

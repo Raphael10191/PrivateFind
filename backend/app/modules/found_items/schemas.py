@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.shared.ai.schemas import ObservationState
 from app.shared.vocab import Category, Strength, Visibility
 
 
@@ -12,6 +13,22 @@ class DepositOut(BaseModel):
     expires_at: datetime
 
 
+class DraftOut(BaseModel):
+    item_id: int
+    token: str
+
+
+class DraftReview(BaseModel):
+    status: str
+    category: Category | None
+    category_state: ObservationState | None
+    suggest_photo: bool
+
+
+class ConfirmDepositIn(BaseModel):
+    category: Category | None = None
+
+
 class AttributeIO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,6 +37,7 @@ class AttributeIO(BaseModel):
     visibility: Visibility
     strength: Strength | None = None
     confidence: float | None = None
+    observation_state: ObservationState | None = None
 
 
 class AdminItemOut(BaseModel):

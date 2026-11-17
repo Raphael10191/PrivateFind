@@ -268,7 +268,7 @@
 
             <div class="report-bottom">
                 <span class="report-date">
-                    Lost date: {{ report.lost_at[:10] }}
+                    Lost date: {{ report.lost_at | english_date }}
                 </span>
 
                 <a href="/owner/report/view?id={{ report.id }}"

@@ -1,0 +1,265 @@
+
+{% extends "base.html" %}
+
+{% block title %}Item Details | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .details-page {
+        max-width: 680px;
+        margin: 12px auto;
+    }
+
+    .step-label {
+        color: #6D5BD0;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .details-heading h1 {
+        font-size: 30px;
+        margin: 0 0 10px;
+    }
+
+    .details-heading p {
+        color: #666670;
+        line-height: 1.5;
+        margin: 0 0 26px;
+    }
+
+    .details-card {
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 18px;
+        padding: 32px;
+    }
+
+    .details-field {
+        margin-bottom: 24px;
+    }
+
+    .details-field label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 9px;
+    }
+
+    .details-field input,
+    .details-field select,
+    .details-field textarea {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FAFAF8;
+        color: #1A1A1F;
+        font: inherit;
+    }
+
+    .details-field textarea {
+        min-height: 125px;
+        resize: vertical;
+    }
+
+    .details-field input:focus,
+    .details-field select:focus,
+    .details-field textarea:focus {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 1px;
+    }
+
+    .field-help {
+        margin: 7px 0 0;
+        color: #666670;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .details-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 24px;
+        border-top: 1px solid #ECECF0;
+    }
+
+    .back-action,
+    .submit-action {
+        padding: 13px 20px;
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .back-action {
+        background: white;
+        border: 1px solid #DCDCE4;
+        color: #1A1A1F;
+    }
+
+    .submit-action {
+        background: #6D5BD0;
+        border: 1px solid #6D5BD0;
+        color: white;
+    }
+
+    .submit-action:hover {
+        background: #5846B8;
+    }
+
+    .submit-action:disabled,
+    .back-action:disabled {
+        opacity: 0.65;
+        cursor: wait;
+    }
+
+    .form-error {
+        margin-top: 20px;
+        padding: 14px;
+        border-radius: 10px;
+        background: #FFF1F1;
+        color: #A32727;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 600px) {
+        .details-heading h1 {
+            font-size: 25px;
+        }
+
+        .details-card {
+            padding: 22px 18px;
+        }
+
+        .back-action,
+        .submit-action {
+            flex: 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="details-page">
+    <div class="details-heading">
+        <h1>What did you lose?</h1>
+    </div>
+    <form id="details-form" class="details-card">
+        <div class="details-field">
+            <label for="description">Describe the item</label>
+            <textarea id="description" name="description" maxlength="1000" minlength="3" required
+                      placeholder="For example, a blue canvas backpack or a black folding umbrella."></textarea>
+        </div>
+        <div class="details-field">
+            <label for="unique-marks">Identifying details (optional, kept private)</label>
+            <textarea id="unique-marks" name="unique_marks" maxlength="1000"
+                      placeholder="A fox charm beside a round key, an engraving, or where a crack starts."></textarea>
+        </div>
+        <details>
+            <summary>Add item, place or date details</summary>
+            <div class="details-field">
+                <label for="category">Item type</label>
+                <select id="category" name="category">
+                    <option value="other">Other or unsure</option>
+                    <option value="phone">Phone</option><option value="wallet">Wallet</option>
+                    <option value="keys">Keys</option><option value="bag">Bag</option>
+                    <option value="laptop">Laptop</option><option value="tablet">Tablet</option>
+                    <option value="headphones">Headphones</option><option value="bottle">Bottle</option>
+                    <option value="umbrella">Umbrella</option><option value="clothing">Clothing</option>
+                    <option value="id_card">ID card</option><option value="glasses">Glasses</option>
+                    <option value="book">Book</option><option value="jewelry">Jewelry</option>
+                <option value="watch">Watch</option><option value="electronics">Electronics</option>
+                </select>
+            </div>
+            <div class="details-field">
+                <label for="location">Where did you last see it?</label>
+                <select id="location" name="location">
+                    <option value="other">Other or unsure</option>
+                    <option value="library">Library</option>
+                    <option value="student_center">Student Center</option>
+                    <option value="engineering_building">Engineering Building</option>
+                    <option value="lecture_hall">Lecture Hall</option>
+                    <option value="cafeteria">Cafeteria</option><option value="gym">Gym</option>
+                    <option value="dormitory">Dormitory</option><option value="outdoor">Outdoor Area</option>
+                </select>
+            </div>
+            <div class="details-field">
+                <label for="lost-date">Approximate date lost</label>
+                <input id="lost-date" name="lost_date" type="date" lang="en">
+            </div>
+            <div class="details-field">
+                <label for="brand">Brand</label>
+                <input id="brand" name="brand" maxlength="50">
+            </div>
+            <div class="details-field">
+                <label for="model">Model</label>
+                <input id="model" name="model" maxlength="100">
+            </div>
+            <div class="details-field">
+                <label for="material">Material</label>
+                <input id="material" name="material" maxlength="50">
+            </div>
+        </details>
+        <div class="details-actions">
+            <button type="submit" class="submit-action" id="submit-report">Find My Item</button>
+        </div>
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById("details-form");
+    const errorBox = document.getElementById("form-error");
+    const submitButton = document.getElementById("submit-report");
+
+    const today = new Date();
+    const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+    form.elements.lost_date.max = localToday.toISOString().slice(0, 10);
+
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (submitButton.disabled) return;
+        errorBox.hidden = true;
+        form.elements.description.value = form.elements.description.value.trim();
+        if (!form.reportValidity()) return;
+
+        const data = Object.fromEntries(new FormData(form));
+        const date = data.lost_date || null;
+        delete data.lost_date;
+        data.lost_at = date ? date + "T00:00:00Z" : null;
+
+        submitButton.disabled = true;
+        submitButton.textContent = "Saving your report…";
+        try {
+            const response = await fetch("/api/lost-reports", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(data),
+            });
+            if (response.status === 401) {
+                window.location.replace("/login");
+                return;
+            }
+            const body = await response.json();
+            if (!response.ok || !body.id) throw new Error(body.error?.message || "Could not save your report.");
+            window.location.replace("/owner/report/view?id=" + encodeURIComponent(body.id));
+        } catch (error) {
+            errorBox.textContent = error.message;
+            errorBox.hidden = false;
+            submitButton.disabled = false;
+            submitButton.textContent = "Find My Item";
+        }
+    });
+</script>
+{% endblock %}

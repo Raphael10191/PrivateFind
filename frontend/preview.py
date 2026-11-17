@@ -1,7 +1,9 @@
 
 import json
+import os
+from datetime import datetime
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -11,7 +13,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent
-BACKEND_URL = "http://127.0.0.1:8000"
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 MAX_REQUEST_SIZE = 20 * 1024 * 1024
 
 templates = Environment(
@@ -19,12 +21,23 @@ templates = Environment(
     autoescape=select_autoescape(["html"]),
 )
 
+def english_date(value):
+    if not value:
+        return "Not specified"
+    date = datetime.fromisoformat(value)
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    return f"{months[date.month - 1]} {date.day}, {date.year}"
+
+
+templates.filters["english_date"] = english_date
+
 PAGES = {
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
     "/owner/account": "owner_account.html",
-    "/owner/report/new": "owner_report_step1.html",
-    "/owner/report/details": "owner_report_step2.html",
+    "/owner/report/new": "owner_report_form.html",
+    "/owner/report/details": "owner_report_form.html",
     "/owner/report/view": "owner_report_detail.html",
     "/owner/claim": "owner_claim.html",
     "/owner/claims": "owner_claims.html",
@@ -90,7 +103,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
         forwarded_headers = {}
 
-        for header in ("Content-Type", "Cookie", "Accept"):
+        for header in ("Content-Type", "Cookie", "Accept", "X-Deposit-Token"):
             value = self.headers.get(header)
             if value:
                 forwarded_headers[header] = value
@@ -103,7 +116,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
         )
 
         try:
-            response = urlopen(request, timeout=30)
+            long_request = url_parts.path == "/api/claims" or url_parts.path.endswith("/candidates")
+            response = urlopen(request, timeout=135 if long_request else 30)
 
         except HTTPError as error:
             response = error
@@ -333,7 +347,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = HTTPServer(
+    server = ThreadingHTTPServer(
         ("127.0.0.1", 8001),
         PreviewHandler,
     )

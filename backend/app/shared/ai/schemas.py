@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.shared.vocab import Category, Color, EvidenceType, Strength
@@ -10,12 +12,19 @@ class PrivateAttribute(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+ObservationState = Literal["observed", "estimated", "unreadable"]
+CaptureField = Literal["category", "color", "brand", "model", "material"]
+
+
 class Extraction(BaseModel):
     """AI output for one found item (WBS 4.3). Validated before anything is stored."""
 
     category: Category
     color: Color | None = None
     brand: str | None = None
+    model: str | None = None
+    material: str | None = None
+    observations: dict[CaptureField, ObservationState] = Field(default_factory=dict)
     public_summary: str = Field(
         description="One short sentence safe to show publicly: category, colour, brand only."
     )

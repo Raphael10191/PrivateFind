@@ -182,8 +182,7 @@
     <div class="claim-heading">
         <h1>Verify Your Ownership</h1>
         <p>
-            Describe a detail you would recognize on your item.
-            PrivateFind checks it against the finder's photos.
+            We use the details you already provided to check the item.
         </p>
     </div>
 
@@ -202,22 +201,20 @@
           class="claim-card"
           hidden>
 
-        <h2>Ownership Evidence</h2>
-
-        <div class="claim-field">
-            <label for="ownership-description">What makes your item recognizable?</label>
-            <textarea id="ownership-description" name="description" required maxlength="1000"
+        <div id="additional-evidence" class="claim-field" hidden>
+            <label for="ownership-description">Add one distinctive detail</label>
+            <textarea id="ownership-description" name="description" maxlength="1000"
                       aria-describedby="description-hint"
-                      placeholder="For example: One round key has a yellow cap, and there is a small fox charm on the ring.&#10;&#10;You can mention a color, model, serial number, marking, or repair."></textarea>
+                      placeholder="For example, a fox charm beside the round key or a repair on the left strap."></textarea>
             <p id="description-hint" class="claim-hint">
-                Describe the details you remember in your own words. A serial number is optional.
+                Avoid passwords and unlock codes.
             </p>
         </div>
 
         <button type="submit"
                 id="submit-claim"
                 class="primary-button">
-            Submit Ownership Claim
+            Check Ownership
         </button>
     </form>
 
@@ -396,14 +393,17 @@
         pickupButton.hidden = true;
     }
 
+    const additionalEvidence = document.getElementById("additional-evidence");
     const retryButton = document.getElementById("retry-claim");
     retryButton.addEventListener("click", () => {
         claimCreated = false;
         resultBox.hidden = true;
         claimForm.hidden = false;
         submitButton.disabled = false;
-        submitButton.textContent = "Submit Ownership Claim";
-        evidenceInput.focus();
+        submitButton.textContent = "Check Ownership";
+        additionalEvidence.hidden = retryButton.dataset.action !== "another_detail";
+        evidenceInput.value = "";
+        if (!additionalEvidence.hidden) evidenceInput.focus();
     });
 
     function showClaimResult(claim) {
@@ -418,7 +418,9 @@
         pickupDetails.hidden = true;
         statusButton.hidden = true;
         pickupButton.hidden = true;
-        retryButton.hidden = !["rejected", "in_review"].includes(claim.status);
+        retryButton.dataset.action = claim.next_action || "";
+        retryButton.hidden = !["another_detail", "retry_photo_check"].includes(claim.next_action);
+        retryButton.textContent = claim.next_action === "retry_photo_check" ? "Retry Photo Check" : "Add One Detail";
 
         const heading = document.getElementById(
             "result-heading"
@@ -429,6 +431,9 @@
         );
 
         message.textContent = claim.message || "";
+        if (["device_record", "contact_operator"].includes(claim.next_action)) {
+            message.textContent += ` Give them claim #${claim.id}.`;
+        }
 
         if (claim.status === "approved") {
             heading.textContent = "Ownership Approved";
@@ -448,11 +453,13 @@
             }
 
         } else if (claim.status === "in_review") {
-            heading.textContent =
-                "More Evidence Needed";
+            heading.textContent = claim.verification_state === "needs_more_evidence"
+                ? "More Evidence Needed" : "Claim Needs Review";
 
             statusButton.hidden = false;
 
+        } else if (claim.status === "handed_over") {
+            heading.textContent = "Handover Complete";
         } else if (claim.status === "rejected") {
             heading.textContent =
                 "Ownership Not Verified";
@@ -478,30 +485,14 @@
                  encodeURIComponent(reportId);
 
         try {
-            const candidates = await api(
-                "/api/lost-reports/" +
-                encodeURIComponent(reportId) +
-                "/candidates?refresh=false"
+            const claims = await api("/api/claims");
+            const existing = claims.find(claim =>
+                String(claim.lost_report_id) === reportId && String(claim.found_item_id) === itemId
+                && claim.status !== "rejected"
             );
-
-            if (!Array.isArray(candidates)) {
-                throw new Error(
-                    "Unexpected matching response."
-                );
-            }
-
-            const selected = candidates.find(
-                candidate =>
-                    String(candidate.found_item_id) === itemId
-            );
-
             loadingBox.hidden = true;
-
-            if (!selected) {
-                showError(
-                    "This item is no longer an available " +
-                    "match. Return to Report Details for the latest matches."
-                );
+            if (existing) {
+                showClaimResult(existing);
                 return;
             }
 
@@ -532,7 +523,7 @@
             }
 
             const description = evidenceInput.value.trim();
-            if (!description) {
+            if (!additionalEvidence.hidden && !description) {
                 showError("Describe an identifying detail.");
                 evidenceInput.focus();
                 return;
@@ -554,7 +545,7 @@
                         body: JSON.stringify({
                             lost_report_id: Number(reportId),
                             found_item_id: Number(itemId),
-                            description: description
+                            description: description || null
                         })
                     }
                 );
@@ -585,7 +576,7 @@
                 if (!claimCreated) {
                     submitButton.disabled = false;
                     submitButton.textContent =
-                        "Submit Ownership Claim";
+                        "Check Ownership";
                 }
             }
         }

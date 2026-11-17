@@ -31,9 +31,6 @@ class Settings(BaseSettings):
     deposit_code_ttl_min: int = 15
     pickup_code_ttl_h: int = 48
 
-    match_threshold: int = 60
-    max_candidates: int = 3
-
     max_failed_claims: int = 3
     claim_cooldown_h: int = 24
 

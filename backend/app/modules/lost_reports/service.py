@@ -1,3 +1,5 @@
+from datetime import UTC
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +12,8 @@ from app.shared import audit
 async def create(session: AsyncSession, owner_id: int, data: dict) -> LostReport:
     if data["location"] not in get_settings().locations:
         raise AppError(422, "invalid_location", "Unknown location.")
-    data["lost_at"] = data["lost_at"].replace(tzinfo=None)  # stored as naive UTC
+    if data["lost_at"] is not None and data["lost_at"].tzinfo is not None:
+        data["lost_at"] = data["lost_at"].astimezone(UTC).replace(tzinfo=None)
     data["lost_to"] = data["lost_at"]
     data["brand_model"] = " ".join(filter(None, [data.get("brand"), data.get("model")])) or None
     report = LostReport(owner_id=owner_id, **data)

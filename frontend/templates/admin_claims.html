@@ -315,9 +315,9 @@
 
                 <div class="review-field">
                     <span class="review-field-label">
-                        Ownership Score
+                        Verification
                     </span>
-                    <div id="detail-score"
+                    <div id="detail-verification"
                          class="review-field-value"></div>
                 </div>
 
@@ -339,9 +339,17 @@
 
                 <hr class="review-divider">
 
+                <label for="proof-method" class="review-note-label">Proof checked</label>
+                <select id="proof-method">
+                    <option value="">Choose the proof you checked</option>
+                    <option value="dated_identifier_record">Dated purchase or device record with matching identifier</option>
+                    <option value="live_device_control">Observed live control of this device</option>
+                    <option value="independent_record">Other independent ownership record</option>
+                    <option value="in_person_low_risk">Completed in-person handover for a low-risk item</option>
+                </select>
                 <label for="decision-note"
                        class="review-note-label">
-                    Decision note (optional)
+                    Decision note
                 </label>
 
                 <textarea
@@ -384,6 +392,7 @@
     const refreshButton = document.getElementById("refresh-claims");
     const approveButton = document.getElementById("approve-claim");
     const rejectButton = document.getElementById("reject-claim");
+    const proofInput = document.getElementById("proof-method");
     const noteInput = document.getElementById("decision-note");
 
     let selectedClaimId = null;
@@ -475,6 +484,7 @@
         placeholder.hidden = false;
         placeholder.textContent =
             "Select a claim to view its ownership evidence.";
+        proofInput.value = "";
         noteInput.value = "";
     }
 
@@ -575,11 +585,12 @@
                 "detail-report"
             ).textContent = "Report #" + claim.lost_report_id;
 
-            document.getElementById(
-                "detail-score"
-            ).textContent = claim.ownership_score == null
-                ? "Not available"
-                : claim.ownership_score + " / 100";
+            document.getElementById("detail-verification").textContent = {
+                needs_more_evidence: "More evidence needed",
+                unresolved: "Unresolved",
+                verified: "Ownership verified",
+                refuted: "Ownership not verified",
+            }[claim.verification_state] || "Review required";
 
             document.getElementById(
                 "detail-conflict"
@@ -598,6 +609,7 @@
                 true
             );
 
+            proofInput.value = "";
             noteInput.value = "";
             placeholder.hidden = true;
             reviewDetails.hidden = false;
@@ -703,13 +715,20 @@
     }
 
     async function submitDecision(decision) {
+        if (decision === "approve" && proofInput.value === "in_person_low_risk") {
+            decision = "handed_over";
+        }
+        if (decision !== "reject" && (!proofInput.value || noteInput.value.trim().length < 10)) {
+            showError("Select the proof or handover and document what you checked.");
+            return;
+        }
         if (submitting || selectedClaimId === null) return;
 
         const claimId = selectedClaimId;
 
         const action = decision === "approve"
             ? "approve"
-            : "reject";
+            : decision === "handed_over" ? "record the completed handover for" : "reject";
 
         const confirmed = window.confirm(
             "Are you sure you want to " +
@@ -726,6 +745,7 @@
         setDecisionButtons(true);
         refreshButton.disabled = true;
         noteInput.disabled = true;
+        proofInput.disabled = true;
 
         try {
             await apiRequest(
@@ -739,6 +759,7 @@
                     },
                     body: JSON.stringify({
                         decision: decision,
+                        proof: decision === "reject" ? null : proofInput.value,
                         note: noteInput.value.trim() || null
                     })
                 }
@@ -748,7 +769,7 @@
 
             successBox.textContent =
                 "Claim #" + claimId + " " +
-                (decision === "approve" ? "approved" : "rejected") +
+                (decision === "approve" ? "approved" : decision === "handed_over" ? "handed over" : "rejected") +
                 " successfully.";
 
             successBox.hidden = false;
@@ -760,6 +781,7 @@
             setDecisionButtons(false);
             refreshButton.disabled = false;
             noteInput.disabled = false;
+            proofInput.disabled = false;
         }
     }
 

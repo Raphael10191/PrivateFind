@@ -1,5 +1,7 @@
 # PrivateFind — System Architecture (v1)
 
+The current intake, ranking and release workflow is described in [Matching and ownership verification](matching-and-ownership.md). The original decisions below record the initial design.
+
 > **Implementation update (2026-11-10):** We now adopt Simon's 13-table database baseline and Raphael's device contract. Lifecycle values are lowercase. Claims link through `match_id`; items retain compartment history. Your async domain services and browser payload names remain. The seed creates one compartment. See [team-integration.md](team-integration.md) and the updated [API contract](api-contract.md). The original design below records earlier decisions and is superseded where these integration notes differ.
 
 

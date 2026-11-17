@@ -31,10 +31,11 @@ class RateLimiter:
 
 
 deposit_limiter = RateLimiter(limit=5, window_s=600)  # per client IP
+claim_limiter = RateLimiter(limit=6, window_s=60)  # per authenticated claimant
 login_limiter = RateLimiter(limit=10, window_s=60)  # per client IP
 device_code_limiter = RateLimiter(limit=5, window_s=60)  # wrong codes per locker
 
 
 def reset_all() -> None:
-    for limiter in (deposit_limiter, login_limiter, device_code_limiter):
+    for limiter in (deposit_limiter, claim_limiter, login_limiter, device_code_limiter):
         limiter.reset()

@@ -4,7 +4,15 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-WEIGHTS = {"category": 15, "location": 10, "time": 10, "attributes": 25, "semantic": 40}
+from app.shared.vocab import category_key
+
+WEIGHTS = {"category": 15, "location": 8, "time": 12, "attributes": 30, "semantic": 35}
+RETRIEVAL_TOLERANCE_DAYS = 7
+CATEGORY_FAMILIES = (
+    {"phone", "tablet", "laptop", "headphones", "watch", "electronics"},
+    {"wallet", "bag", "id_card"},
+    {"clothing", "glasses", "jewelry", "watch"},
+)
 BRAND_ALIASES = {
     "iphone": "apple",
     "ipad": "apple",
@@ -39,10 +47,11 @@ COLOR_GROUPS = (
 class LostFacts:
     category: str
     location: str
-    lost_at: datetime
+    lost_at: datetime | None
     color: str | None = None
     brand: str | None = None
     model: str | None = None
+    material: str | None = None
 
 
 @dataclass
@@ -53,28 +62,35 @@ class FoundFacts:
     color: str | None = None
     brand: str | None = None
     model: str | None = None
+    material: str | None = None
+
+    reliability: dict[str, float] | None = None
 
 
 def category_score(lost: LostFacts, found: FoundFacts) -> float:
-    if lost.category == found.category:
+    left, right = map(category_key, (lost.category, found.category))
+    if "other" in (left, right):
+        return 0.5
+    if left == right:
         return 1.0
-    return 0.4 if "other" in (lost.category, found.category) else 0.0
+    return 0.75 if any({left, right} <= group for group in CATEGORY_FAMILIES) else 0.2
 
 
 def location_score(lost: LostFacts, found: FoundFacts) -> float:
-    if lost.location == found.location:
-        return 1.0
-    return 0.5 if "other" in (lost.location, found.location) else 0.15
+    if any(value in ("", "other", None) for value in (lost.location, found.location)):
+        return 0.5
+    return 1.0 if lost.location == found.location else 0.3
 
 
 def time_score(lost: LostFacts, found: FoundFacts) -> float:
+    if lost.lost_at is None:
+        return 0.5
     hours = (found.found_at - lost.lost_at).total_seconds() / 3600
-    if hours < -24:  # found well before it was lost: almost certainly another item
-        return 0.0
-    for limit, score in ((24, 1.0), (72, 0.6), (168, 0.3)):
-        if hours <= limit:
-            return score
-    return 0.1
+    if -24 <= hours <= 48:
+        return 1.0
+    if hours < 0:
+        return 0.5 - min(abs(hours) / (24 * RETRIEVAL_TOLERANCE_DAYS), 1) * 0.25
+    return max(0.35, 1.0 - (hours - 48) / (24 * 21))
 
 
 def _tokens(value: str | None) -> set[str]:
@@ -133,41 +149,50 @@ def color_similarity(left: str | None, right: str | None) -> float | None:
     return 0.6 if any(a in group and b in group for group in COLOR_GROUPS) else 0.0
 
 
-def attribute_score(lost: LostFacts, found: FoundFacts) -> float:
-    """Average the similarities for attributes known on both sides."""
-    similarities = (
-        color_similarity(lost.color, found.color),
-        _brand_similarity(lost, found),
-        model_similarity(lost.model, found.model),
+def attribute_score(
+    lost: LostFacts, found: FoundFacts, color_frequency: float | None = None
+) -> float:
+    # The four fixed contributions leave unknown observations at the midpoint.
+    # Model and inferred brand share a signal, so do not count the inference twice.
+    similarities = {
+        "brand": _brand_similarity(lost, found) if lost.brand and found.brand else None,
+        "model": model_similarity(lost.model, found.model),
+        "color": color_similarity(lost.color, found.color),
+        "material": model_similarity(lost.material, found.material),
+    }
+    reliability = found.reliability or {}
+    color_weight = 0.12 if color_frequency is None else 0.20 - 0.14 * color_frequency
+    weights = {"brand": 0.28, "model": 0.42, "color": color_weight, "material": 0.10}
+    return 0.5 + sum(
+        weights[name] * reliability.get(name, 1.0) * (similarity - 0.5)
+        for name, similarity in similarities.items()
+        if similarity is not None
     )
-    comparable = [value for value in similarities if value is not None]
-    return sum(comparable) / len(comparable) if comparable else 0.5
 
 
-def score(lost: LostFacts, found: FoundFacts, semantic: float) -> dict[str, float]:
-    """Points per component (max = weight) plus 'total' (0..100, rounded)."""
+def score(
+    lost: LostFacts, found: FoundFacts, semantic: float | None, color_frequency: float | None = None
+) -> dict[str, float]:
+    reliability = (found.reliability or {}).get("category", 1.0)
     parts = {
-        "category": category_score(lost, found),
+        "category": 0.5 + reliability * (category_score(lost, found) - 0.5),
         "location": location_score(lost, found),
         "time": time_score(lost, found),
-        "attributes": attribute_score(lost, found),
-        "semantic": max(0.0, min(1.0, semantic)),
+        "attributes": attribute_score(lost, found, color_frequency),
+        "semantic": 0.5 if semantic is None else max(0.0, min(1.0, semantic)),
     }
-    points = {k: round(v * WEIGHTS[k], 1) for k, v in parts.items()}
-    total = sum(points.values())
-    if _brand_similarity(lost, found) == 0.0:
-        total = min(total, 45)
-    if _different_model_numbers(lost.model, found.model):
-        total -= 10
-    if color_similarity(lost.color, found.color) == 0.0:
-        total = min(total - 15, 55)
-    points["total"] = max(0, round(total))
+    points = {name: round(value * WEIGHTS[name], 1) for name, value in parts.items()}
+    points["total"] = round(sum(points.values()), 2)
     return points
 
 
-def top_candidates(
-    scored: list[tuple[int, dict]], threshold: int, limit: int
-) -> list[tuple[int, dict]]:
-    """Keep (item_id, points) above the threshold, best first, at most `limit`."""
-    above = [s for s in scored if s[1]["total"] >= threshold]
-    return sorted(above, key=lambda s: s[1]["total"], reverse=True)[:limit]
+def plausible(lost: LostFacts, found: FoundFacts, semantic: float | None) -> bool:
+    """Exclude only corroborated mismatches. Uncertainty keeps the candidate in play."""
+    category_reliability = (found.reliability or {}).get("category", 1.0)
+    return (
+        semantic is None
+        or semantic > 0.15
+        or category_score(lost, found) > 0.2
+        or category_reliability < 0.7
+        or attribute_score(lost, found) > 0.5
+    )
