@@ -387,6 +387,7 @@ async def test_photo_verification_rechecks_existing_review_and_issues_code(
         ([("accessory", "confirmed"), ("accessory", "confirmed")], "in_review"),
         ([("accessory", "unobservable")], "in_review"),
         ([("accessory", "ambiguous")], "in_review"),
+        ([("common", "ambiguous")], "in_review"),
         ([("accessory", "confirmed"), ("damage", "confirmed")], "approved"),
         (
             [("accessory", "confirmed"), ("damage", "confirmed"), ("mark", "contradicted")],

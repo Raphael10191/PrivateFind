@@ -168,7 +168,7 @@ def verify_photo_evidence(
         elif finding.status == "contradicted":
             results[index] = ("mismatch", None, None)
             contradicted = True
-        elif finding.kind != "common":
+        elif finding.status == "ambiguous" or finding.kind != "common":
             needs_evidence = True
 
     detail = 100 if full_serial else min(len(groups), 2) * 50
