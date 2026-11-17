@@ -342,7 +342,8 @@
             <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
             <input type="file" id="gallery-input" accept="image/*" multiple hidden>
             <p id="photo-hint" class="field-hint">
-                Add 1–3 photos. Include another angle or a close-up of a distinguishing detail when useful.
+                Add 1–3 photos. For a phone, show the front and back. Include a close-up
+                of an unusual detail if visible. A visible lock-screen wallpaper is optional.
             </p>
             <p id="photo-count" class="field-hint" role="status">0/3 photos</p>
             <ul id="photo-grid" class="photo-grid" aria-label="Selected photos" hidden></ul>
@@ -774,7 +775,7 @@
             if (result.status === "failed") {
                 reviewStatus.textContent = "Photo analysis is unavailable. Retry or select the item type to continue.";
             } else if (result.suggest_photo) {
-                reviewStatus.textContent = "A close-up of a mark, repair, or label could help identify this device. You can edit the photos or continue.";
+                reviewStatus.textContent = "An extra photo could help the owner claim this item. Try a close-up of a personal mark, repair, or unusual accessory. You can edit the photos or continue.";
             } else {
                 reviewStatus.textContent = "Confirm the item type or correct it below.";
             }

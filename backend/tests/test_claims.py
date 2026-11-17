@@ -375,3 +375,44 @@ def test_exact_model_guess_is_not_a_verified_finding(status):
     assert visual[0].status == "unobservable"
     assert visual[1].status == "confirmed"
     assert policy.assess(visual, [], category="phone").action == "device_record"
+
+
+@pytest.mark.parametrize(
+    "strong,competing,expected",
+    [
+        (True, False, "verified"),
+        (True, True, "unresolved"),
+        (False, False, "needs_more_evidence"),
+    ],
+)
+def test_one_individual_feature_requires_strong_prior_support(strong, competing, expected):
+    feature = finding("Engraved 'ORBIT 37' below the camera", kind="mark")
+    feature = feature.model_copy(update={"strong": strong})
+    assert policy.assess([feature], [], category="phone", competing=competing).state == expected
+    assert policy.assess([], [feature], category="phone").state == "needs_more_evidence"
+
+
+async def test_single_strong_feature_issues_code_but_standard_case_does_not(client, owner, locker):
+    ordinary = "black case with a magnetic ring and plain black wallpaper"
+    item_id, report_id, headers = await setup_candidate(client, owner, locker, ordinary)
+    personal = "Engraved ORBIT 37 below the camera"
+    ai = MockAIProvider()
+    ai.verify_photos = AsyncMock(
+        side_effect=lambda photos, text: [
+            finding(personal, kind="mark").model_copy(update={"strong": True})
+            if personal in text
+            else finding(ordinary, kind="common").model_copy(update={"strong": True})
+        ]
+    )
+    set_ai_provider(ai)
+    generic_result = (await claim(owner, report_id, item_id)).json()
+    assert generic_result["pickup_code"] is None
+    exact_report = await make_report(owner, description=personal)
+    approved = (await claim(owner, exact_report, item_id)).json()
+    assert approved["verification_state"] == "verified"
+    response = await client.post(
+        "/api/device/codes/validate",
+        headers=headers,
+        json={"device_id": "locker_01", "code": approved["pickup_code"]},
+    )
+    assert response.json()["authorized"] and response.json()["action"] == "pickup"

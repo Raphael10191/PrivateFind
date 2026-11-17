@@ -36,8 +36,9 @@ The previous category filter excluded valid finds before ranking. A fixed top th
   and brand, and common colors receive less weight in a sufficiently sized candidate pool. The
   owner sees a ranked page of five and can load more.
 - Verification uses the original finder photos and immutable owner statements. A visual
-  authorization requires two distinctive confirmed parts, including one documented before seeing
-  the candidate. For example, the display and rear housing can count independently. Repeated
+  authorization can use one clearly confirmed, highly specific feature described before seeing
+  the candidate. Otherwise two independently confirmed distinctive parts can qualify, including
+  one documented before seeing the candidate. Repeated
   descriptions of one mark, ordinary colors or branding, guesses and unobservable parts add no
   proof. The model must quote the owner's statement and identify the supporting photo. The
   backend validates this structure and issues the code using its existing locker transaction.

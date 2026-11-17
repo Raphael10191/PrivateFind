@@ -42,7 +42,9 @@ def assess(
     disagreements = [f for f in initial + additional if f.status == "contradicted"]
     if disagreements and not supported:
         return Verdict("refuted")
-    if not competing and not exposed and not disagreements and prior and len(supported) >= 2:
+    strong_initial = any(f.strong and has_visual_support(f) for f in initial)
+    enough_evidence = strong_initial or (bool(prior) and len(supported) >= 2)
+    if not competing and not exposed and not disagreements and enough_evidence:
         return Verdict("verified")
     if competing or disagreements or exposed:
         return Verdict("unresolved", "contact_operator")
@@ -53,15 +55,20 @@ def assess(
     return Verdict("unresolved", "contact_operator")
 
 
+def has_visual_support(finding: PhotoFinding) -> bool:
+    return (
+        finding.status == "confirmed"
+        and finding.kind not in {"common", "model"}
+        and finding.photo_index is not None
+        and bool(finding.part and finding.distinctive and finding.observation)
+    )
+
+
 def distinct_parts(findings: list[PhotoFinding]) -> set[str]:
     parts: set[str] = set()
     observations: set[str] = set()
     for f in findings:
-        if (
-            f.status != "confirmed"
-            or f.kind in {"common", "model"}
-            or not (f.part and f.distinctive and f.observation)
-        ):
+        if not has_visual_support(f):
             continue
         observation = " ".join(f.observation.casefold().split())
         if observation not in observations:

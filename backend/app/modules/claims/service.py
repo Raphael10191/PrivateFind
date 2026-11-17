@@ -205,6 +205,7 @@ async def submit(
                 "status": f.status,
                 "kind": f.kind,
                 "distinctive": f.distinctive,
+                "strong": f.strong,
                 "source": source,
             }
             for source, findings in (("initial", original), ("additional", additional))

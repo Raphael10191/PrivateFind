@@ -84,8 +84,13 @@ async def photo_review(item_id: int, token: DraftToken, session: SessionDep):
         category_state=state,
         suggest_photo=item.ai_status == "done"
         and len(item.photos) < 3
-        and category in {"phone", "laptop", "tablet", "headphones"}
-        and not item.private_attributes(),
+        and category in {"phone", "laptop", "tablet", "headphones", "watch"}
+        and not any(
+            attribute.name
+            in {"damage", "engraving", "sticker_or_mark", "accessory", "contents", "other"}
+            and attribute.strength in {"distinctive", "strong"}
+            for attribute in item.private_attributes()
+        ),
     )
 
 

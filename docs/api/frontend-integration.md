@@ -688,7 +688,7 @@ Start Docker with `docker compose up --build`. Default admin is `admin@example.c
 
 1. In a separate test database, capture an item through a finder draft and validate its deposit
    code with the device test tool. Report the compartment occupied.
-2. Create a report with the ordinary description and two specific, separate visible marks.
+2. Create a report describing one highly specific visible mark, such as a personal engraving.
 3. Select the candidate and check ownership. With a working visual provider, inspect the
    resulting state. With mock or an unreadable photo, use the operator flow.
 4. Verify that an unauthorized account cannot decide the claim, cannot retrieve private photos,
