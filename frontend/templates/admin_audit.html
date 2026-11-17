@@ -1,0 +1,825 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Log | PrivateFind{% endblock %}
+
+{% block head %}
+<style>
+    .audit-page {
+        max-width: 1040px;
+        margin: 12px auto;
+        padding-bottom: 40px;
+        color: #1A1A1F;
+    }
+
+    .audit-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .audit-heading h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+    }
+
+    .audit-heading p {
+        margin: 0;
+        color: #666670;
+        line-height: 1.5;
+    }
+
+    .audit-button {
+        padding: 11px 16px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FFFFFF;
+        color: #1A1A1F;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .audit-button:hover {
+        border-color: #6D5BD0;
+        color: #6D5BD0;
+    }
+
+    .audit-button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+    }
+
+    .audit-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .audit-field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        min-width: 145px;
+    }
+
+    .audit-field label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #666670;
+    }
+
+    .audit-field input,
+    .audit-field select {
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #FFFFFF;
+        color: #1A1A1F;
+        font: inherit;
+        font-size: 14px;
+    }
+
+    .audit-field input:focus,
+    .audit-field select:focus {
+        outline: 2px solid #BBB0E0;
+        outline-offset: 1px;
+    }
+
+    .audit-list {
+        border: 1px solid #ECECF0;
+        border-radius: 16px;
+        background: #FFFFFF;
+        overflow: hidden;
+    }
+
+    .audit-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .audit-table th {
+        padding: 15px 16px;
+        background: #F5F3FC;
+        color: #666670;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .audit-table td {
+        padding: 17px 16px;
+        border-top: 1px solid #ECECF0;
+        vertical-align: top;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .audit-event {
+        font-weight: 600;
+        color: #1A1A1F;
+    }
+
+    .audit-muted {
+        color: #666670;
+        font-size: 12px;
+    }
+
+    .audit-tag {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 20px;
+        background: #EFEBFA;
+        color: #6D5BD0;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .audit-details {
+        margin-top: 8px;
+    }
+
+    .audit-details summary {
+        color: #6D5BD0;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .audit-details pre {
+        max-width: 420px;
+        overflow-x: auto;
+        margin: 10px 0 0;
+        padding: 12px;
+        background: #FAFAF8;
+        border-radius: 8px;
+        color: #44444D;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .audit-mobile-list {
+        display: none;
+    }
+
+    .audit-card {
+        padding: 16px;
+        background: white;
+        border: 1px solid #ECECF0;
+        border-radius: 14px;
+    }
+
+    .audit-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .audit-card h2 {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .audit-card p {
+        margin: 5px 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #666670;
+    }
+
+    .audit-feedback {
+        padding: 20px;
+        border: 1px solid #ECECF0;
+        border-radius: 14px;
+        background: #FFFFFF;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .audit-feedback.error {
+        background: #FFF1F1;
+        color: #A32727;
+    }
+
+    .audit-count {
+        margin: 14px 0 0;
+        color: #777780;
+        font-size: 12px;
+    }
+
+    .audit-note {
+        margin-top: 14px;
+        font-size: 12px;
+        color: #777780;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+
+    @media (max-width: 700px) {
+        .audit-page {
+            padding-bottom: 100px;
+        }
+
+        .audit-heading {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .audit-heading h1 {
+            font-size: 26px;
+        }
+
+        .audit-heading .audit-button {
+            align-self: flex-start;
+        }
+
+        .audit-filters {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .audit-field {
+            min-width: 0;
+        }
+
+        .audit-field input,
+        .audit-field select {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        .audit-list {
+            display: none;
+        }
+
+        .audit-mobile-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .audit-details pre {
+            max-width: 100%;
+        }
+    }
+
+    .audit-readable-details {
+        margin-top: 6px;
+        color: #666670;
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+    }
+
+    .audit-detail-line {
+        margin: 3px 0;
+    }
+
+    .audit-detail-line strong {
+        color: #1A1A1F;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="audit-page">
+
+    <header class="audit-heading">
+        <div>
+            <h1>Audit Log</h1>
+            <p>Review recorded system activity.</p>
+        </div>
+
+        <button
+            id="audit-refresh"
+            class="audit-button"
+            type="button"
+        >
+            Refresh
+        </button>
+    </header>
+
+    <form id="audit-filter-form" class="audit-filters">
+
+        <div class="audit-field">
+            <label for="audit-type">Entity type</label>
+            <select id="audit-type">
+                <option value="">All types</option>
+                <option value="claim">Claim</option>
+                <option value="found_item">Found item</option>
+                <option value="lost_report">Lost report</option>
+            </select>
+        </div>
+
+        <div class="audit-field">
+            <label for="audit-entity-id">Entity ID</label>
+            <input
+                id="audit-entity-id"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="All IDs"
+            >
+        </div>
+
+        <div class="audit-field">
+            <label for="audit-limit">Show latest</label>
+            <select id="audit-limit">
+                <option value="25">25 events</option>
+                <option value="50">50 events</option>
+                <option value="100" selected>100 events</option>
+                <option value="250">250 events</option>
+                <option value="500">500 events</option>
+                <option value="1000">1000 events</option>
+            </select>
+        </div>
+
+        <button type="submit" class="audit-button">
+            Apply Filters
+        </button>
+
+    </form>
+
+    <div
+        id="audit-feedback"
+        class="audit-feedback"
+        role="status"
+    >
+        Loading audit events...
+    </div>
+
+    <div
+        id="audit-desktop"
+        class="audit-list"
+        hidden
+    >
+        <table class="audit-table">
+            <thead>
+                <tr>
+                    <th scope="col">Date & Time</th>
+                    <th scope="col">Event</th>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Details</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table-body"></tbody>
+        </table>
+    </div>
+
+    <div
+        id="audit-mobile"
+        class="audit-mobile-list"
+        hidden
+    ></div>
+
+    <p id="audit-count" class="audit-count" hidden></p>
+
+    <p class="audit-note">
+        Audit records are read-only.
+        Timestamps without timezone information are shown
+        as recorded by the server.
+    </p>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const refreshButton =
+        document.getElementById("audit-refresh");
+
+    const form =
+        document.getElementById("audit-filter-form");
+
+    const typeInput =
+        document.getElementById("audit-type");
+
+    const idInput =
+        document.getElementById("audit-entity-id");
+
+    const limitInput =
+        document.getElementById("audit-limit");
+
+    const feedback =
+        document.getElementById("audit-feedback");
+
+    const desktop =
+        document.getElementById("audit-desktop");
+
+    const mobile =
+        document.getElementById("audit-mobile");
+
+    const tableBody =
+        document.getElementById("audit-table-body");
+
+    const count =
+        document.getElementById("audit-count");
+
+    function setFeedback(message, isError = false) {
+        feedback.textContent = message;
+        feedback.classList.toggle("error", isError);
+        feedback.hidden = false;
+    }
+
+    function titleCase(value) {
+        return String(value || "Unknown")
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, char => char.toUpperCase());
+    }
+
+    function formatTimestamp(value) {
+        if (!value) {
+            return "Unknown time";
+        }
+
+        const text = String(value);
+
+        // Convert only when the server explicitly supplies
+        // UTC (Z) or a timezone offset.
+        const hasTimezone =
+            /(?:Z|[+-]\d{2}:\d{2})$/i.test(text);
+
+        if (hasTimezone) {
+            const date = new Date(text);
+
+            if (!Number.isNaN(date.getTime())) {
+                return date.toLocaleString();
+            }
+        }
+
+        // The API uses a timezone-naive datetime.
+        // Do not silently assume UTC or local time.
+        return text.replace("T", " ");
+    }
+
+    function referenceLabel(entry) {
+        const type = titleCase(entry.entity_type);
+
+        if (entry.entity_id == null) {
+            return type;
+        }
+
+        return type + " #" + entry.entity_id;
+    }
+
+    function actorLabel(entry) {
+        const type = titleCase(entry.actor_type);
+
+        if (entry.actor_id == null) {
+            return type;
+        }
+
+        return type + " #" + entry.actor_id;
+    }
+
+    function makeText(tag, text, className = "") {
+        const element = document.createElement(tag);
+
+        element.textContent = String(text ?? "");
+        element.className = className;
+
+        return element;
+    }
+
+    function detailsElement(entry) {
+        const container = document.createElement("div");
+        container.className = "audit-readable-details";
+
+        const data = entry.details;
+
+        if (!data || Object.keys(data).length === 0) {
+            container.textContent = "No additional details recorded.";
+            return container;
+        }
+
+        function addDetail(label, value) {
+            const row = document.createElement("p");
+            row.className = "audit-detail-line";
+
+            const name = document.createElement("strong");
+            name.textContent = label + ": ";
+
+            const text = document.createElement("span");
+            text.textContent = String(value);
+
+            row.append(name, text);
+            container.appendChild(row);
+        }
+
+        function readableValue(value) {
+            if (value === null || value === undefined) {
+                return "Not available";
+            }
+
+            if (typeof value === "boolean") {
+                return value ? "Yes" : "No";
+            }
+
+            if (Array.isArray(value)) {
+                return value.length
+                    ? value.map(readableValue).join(", ")
+                    : "None";
+            }
+
+            if (typeof value === "object") {
+                return Object.entries(value)
+                    .map(([key, val]) =>
+                        titleCase(key) + ": " + readableValue(val)
+                    )
+                    .join("; ") || "None";
+            }
+
+            return String(value);
+        }
+
+        for (const [key, value] of Object.entries(data)) {
+            if (key === "shown" && Array.isArray(value)) {
+                addDetail(
+                    "Possible matches shown",
+                    value.length
+                );
+
+                if (value.length > 0) {
+                    addDetail(
+                        "Found items",
+                        value.map(id => "Found Item #" + id).join(", ")
+                    );
+                }
+            }
+            else if (key === "scored") {
+                addDetail("Items evaluated", value);
+            }
+            else if (key === "decision") {
+                addDetail("Decision", titleCase(value));
+            }
+            else {
+                addDetail(
+                    titleCase(key),
+                    readableValue(value)
+                );
+            }
+        }
+
+        return container;
+    }
+    function renderDesktopRow(entry) {
+        const row = document.createElement("tr");
+
+        const dateCell = document.createElement("td");
+        dateCell.append(
+            makeText(
+                "span",
+                formatTimestamp(entry.at)
+            )
+        );
+
+        const eventCell = document.createElement("td");
+        eventCell.append(
+            makeText(
+                "span",
+                titleCase(entry.action),
+                "audit-event"
+            )
+        );
+
+        const referenceCell = document.createElement("td");
+        referenceCell.append(
+            makeText(
+                "span",
+                referenceLabel(entry),
+                "audit-tag"
+            )
+        );
+
+        const actorCell = document.createElement("td");
+        actorCell.append(
+            makeText(
+                "span",
+                actorLabel(entry),
+                "audit-muted"
+            )
+        );
+
+        const detailsCell = document.createElement("td");
+        detailsCell.append(detailsElement(entry));
+
+        row.append(
+            dateCell,
+            eventCell,
+            referenceCell,
+            actorCell,
+            detailsCell
+        );
+
+        return row;
+    }
+
+    function renderMobileCard(entry) {
+        const card = document.createElement("article");
+        card.className = "audit-card";
+
+        const top = document.createElement("div");
+        top.className = "audit-card-top";
+
+        const event = makeText(
+            "h2",
+            titleCase(entry.action)
+        );
+
+        const tag = makeText(
+            "span",
+            referenceLabel(entry),
+            "audit-tag"
+        );
+
+        top.append(event, tag);
+
+        card.append(
+            top,
+            makeText(
+                "p",
+                formatTimestamp(entry.at)
+            ),
+            makeText(
+                "p",
+                "Actor: " + actorLabel(entry)
+            ),
+            detailsElement(entry)
+        );
+
+        return card;
+    }
+
+    function showEvents(events) {
+        tableBody.replaceChildren();
+        mobile.replaceChildren();
+
+        if (events.length === 0) {
+            desktop.hidden = true;
+            mobile.hidden = true;
+            count.hidden = true;
+
+            setFeedback(
+                "No audit events found for these filters."
+            );
+            return;
+        }
+
+        const desktopFragment =
+            document.createDocumentFragment();
+
+        const mobileFragment =
+            document.createDocumentFragment();
+
+        for (const entry of events) {
+            desktopFragment.append(
+                renderDesktopRow(entry)
+            );
+
+            mobileFragment.append(
+                renderMobileCard(entry)
+            );
+        }
+
+        tableBody.append(desktopFragment);
+        mobile.append(mobileFragment);
+
+        feedback.hidden = true;
+        desktop.hidden = false;
+        mobile.hidden = false;
+
+        count.textContent =
+            "Showing " + events.length +
+            " recorded event(s), newest first.";
+
+        count.hidden = false;
+    }
+
+    async function loadAudit() {
+        refreshButton.disabled = true;
+        refreshButton.textContent = "Loading...";
+
+        desktop.hidden = true;
+        mobile.hidden = true;
+        count.hidden = true;
+
+        setFeedback("Loading audit events...");
+
+        try {
+            const params = new URLSearchParams();
+
+            params.set("limit", limitInput.value);
+
+            const entityType = typeInput.value.trim();
+            const entityId = idInput.value.trim();
+
+            if (entityType) {
+                params.set("entity_type", entityType);
+            }
+
+            if (entityId) {
+                params.set("entity_id", entityId);
+            }
+
+            const response = await fetch(
+                "/api/admin/audit?" + params.toString(),
+                {
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store"
+                }
+            );
+
+            if (response.status === 401) {
+                window.location.replace("/login");
+                return;
+            }
+
+            if (response.status === 403) {
+                throw new Error(
+                    "Administrator access is required."
+                );
+            }
+
+            if (!response.ok) {
+                let message =
+                    "Unable to load audit records.";
+
+                try {
+                    const data = await response.json();
+
+                    message =
+                        data.error?.message ||
+                        data.detail ||
+                        message;
+
+                    if (typeof message !== "string") {
+                        message =
+                            "Unable to load audit records.";
+                    }
+                } catch {
+                    // Keep the default message.
+                }
+
+                throw new Error(message);
+            }
+
+            const events = await response.json();
+
+            if (!Array.isArray(events)) {
+                throw new Error(
+                    "Unexpected audit response."
+                );
+            }
+
+            showEvents(events);
+
+        } catch (error) {
+            setFeedback(
+                error.message ||
+                "Unable to load audit records.",
+                true
+            );
+
+        } finally {
+            refreshButton.disabled = false;
+            refreshButton.textContent = "Refresh";
+        }
+    }
+
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+
+        if (!form.reportValidity()) {
+            return;
+        }
+
+        loadAudit();
+    });
+
+    refreshButton.addEventListener(
+        "click",
+        loadAudit
+    );
+
+    loadAudit();
+})();
+</script>
+{% endblock %}

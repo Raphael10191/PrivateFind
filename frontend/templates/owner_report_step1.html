@@ -50,6 +50,7 @@
     .form-field select {
         display: block;
         width: 100%;
+        min-width: 0;
         padding: 14px;
         border: 1px solid #DCDCE4;
         border-radius: 10px;
@@ -73,7 +74,7 @@
 
     .time-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 16px;
     }
 
@@ -111,7 +112,43 @@
         background: #5846B8;
     }
 
+    .back-button:focus-visible,
+    .next-button:focus-visible {
+        outline: 2px solid #6D5BD0;
+        outline-offset: 3px;
+    }
+
+    /* Future-time validation feedback */
+
+    .time-error {
+        margin: 8px 0 0;
+        color: #A32727;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .time-error[hidden] {
+        display: none;
+    }
+
+    .form-field input.input-error {
+        border-color: #A32727;
+        background: #FFF8F8;
+    }
+
+    .form-field input.input-error:focus {
+        outline-color: #A32727;
+    }
+
+    /* Mobile layout */
+
     @media (max-width: 600px) {
+        .report-form-page {
+            width: 100%;
+            max-width: 100%;
+            padding-bottom: 100px;
+        }
+
         .form-heading h1 {
             font-size: 25px;
         }
@@ -121,13 +158,26 @@
         }
 
         .time-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 0;
+        }
+
+        .form-actions {
+            gap: 10px;
+            padding-top: 20px;
         }
 
         .back-button,
         .next-button {
             flex: 1;
+            min-width: 0;
+            padding: 13px 10px;
+            font-size: 14px;
+        }
+
+        .form-field input,
+        .form-field select {
+            max-width: 100%;
         }
     }
 </style>
@@ -135,9 +185,14 @@
 
 {% block content %}
 <section class="report-form-page">
+
     <div class="form-heading">
-        <div class="step-indicator">STEP 1 OF 2</div>
+        <div class="step-indicator">
+            STEP 1 OF 2
+        </div>
+
         <h1>Report a Lost Item</h1>
+
         <p>
             Tell us what you lost, and where and when
             you last saw it.
@@ -146,10 +201,18 @@
 
     <form id="lost-item-form" class="form-card">
 
-        <div class="form-field">
-            <label for="category">Item category *</label>
+        <!-- Item category -->
 
-            <select id="category" name="category" required>
+        <div class="form-field">
+            <label for="category">
+                Item category *
+            </label>
+
+            <select
+                id="category"
+                name="category"
+                required
+            >
                 <option value="">Select a category</option>
                 <option value="phone">Phone</option>
                 <option value="wallet">Wallet</option>
@@ -169,41 +232,54 @@
             </select>
         </div>
 
+        <!-- Campus location -->
+
         <div class="form-field">
             <label for="location">
                 Where did you lose it? *
             </label>
 
-            <select id="location"
-                    name="location"
-                    required>
+            <select
+                id="location"
+                name="location"
+                required
+            >
                 <option value="">
                     Select a campus location
                 </option>
+
                 <option value="library">
                     Library
                 </option>
+
                 <option value="student_center">
                     Student Center
                 </option>
+
                 <option value="engineering_building">
                     Engineering Building
                 </option>
+
                 <option value="lecture_hall">
                     Lecture Hall
                 </option>
+
                 <option value="cafeteria">
                     Cafeteria
                 </option>
+
                 <option value="gym">
                     Gym
                 </option>
+
                 <option value="dormitory">
                     Dormitory
                 </option>
+
                 <option value="outdoor">
                     Outdoor Area
                 </option>
+
                 <option value="other">
                     Other
                 </option>
@@ -213,6 +289,8 @@
                 Choose the closest campus area.
             </p>
         </div>
+
+        <!-- Specific location -->
 
         <div class="form-field">
             <label for="location-detail">
@@ -232,9 +310,14 @@
             </p>
         </div>
 
+        <!-- Date and time -->
+
         <div class="time-row">
+
             <div class="form-field">
-                <label for="lost-date">Date lost *</label>
+                <label for="lost-date">
+                    Date lost *
+                </label>
 
                 <input
                     type="date"
@@ -253,25 +336,49 @@
                     type="time"
                     id="lost-time"
                     name="lost_time"
+                    aria-describedby="lost-time-hint lost-time-error"
                 >
 
-                <p class="field-hint">
+                <p
+                    class="field-hint"
+                    id="lost-time-hint"
+                >
                     Optional, if you remember.
                 </p>
+
+                <!-- Visible validation message -->
+
+                <p
+                    id="lost-time-error"
+                    class="time-error"
+                    role="alert"
+                    hidden
+                >
+                    The lost time cannot be in the future.
+                </p>
             </div>
+
         </div>
 
+        <!-- Navigation buttons -->
+
         <div class="form-actions">
-            <button type="button"
-                    class="back-button"
-                    id="back-button">
+
+            <button
+                type="button"
+                class="back-button"
+                id="back-button"
+            >
                 Back
             </button>
 
-            <button type="submit"
-                    class="next-button">
+            <button
+                type="submit"
+                class="next-button"
+            >
                 Next: Item Details
             </button>
+
         </div>
 
     </form>
@@ -288,26 +395,59 @@
         "lost-date"
     );
 
+    const timeInput = document.getElementById(
+        "lost-time"
+    );
+
+    const timeError = document.getElementById(
+        "lost-time-error"
+    );
+
     const storageKey =
         "privatefind_lost_report_draft";
 
-    // Prevent future dates.
-    const today = new Date();
+    /*
+     * Return today's date in the browser's
+     * local timezone.
+     */
 
-    const offset =
-        today.getTimezoneOffset() * 60000;
+    function getLocalToday() {
+        const now = new Date();
 
-    dateInput.max = new Date(
-        today.getTime() - offset
-    ).toISOString().slice(0, 10);
+        const year = now.getFullYear();
 
-    // Restore an unfinished report.
+        const month = String(
+            now.getMonth() + 1
+        ).padStart(2, "0");
+
+        const day = String(
+            now.getDate()
+        ).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    }
+
+    /*
+     * Prevent selecting future dates.
+     */
+
+    function updateMaximumDate() {
+        dateInput.max = getLocalToday();
+    }
+
+    updateMaximumDate();
+
+    /*
+     * Restore a previously unfinished report.
+     */
+
     let savedDraft = null;
 
     try {
         savedDraft = JSON.parse(
             sessionStorage.getItem(storageKey) || "null"
         );
+
     } catch {
         sessionStorage.removeItem(storageKey);
     }
@@ -329,67 +469,176 @@
             savedDraft.lost_time || "";
     }
 
-    // Return to Owner Home.
+    /*
+     * Clear the future-time error.
+     */
+
+    function clearTimeError() {
+        timeError.hidden = true;
+
+        timeInput.classList.remove(
+            "input-error"
+        );
+
+        timeInput.removeAttribute(
+            "aria-invalid"
+        );
+    }
+
+    /*
+     * Display the future-time error.
+     */
+
+    function showTimeError() {
+        timeError.hidden = false;
+
+        timeInput.classList.add(
+            "input-error"
+        );
+
+        timeInput.setAttribute(
+            "aria-invalid",
+            "true"
+        );
+
+        timeInput.focus();
+    }
+
+    /*
+     * Check whether the entered time is
+     * later than the current local time.
+     *
+     * This check only applies when the
+     * selected date is today.
+     */
+
+    function isFutureLostTime() {
+        const date = dateInput.value;
+        const time = timeInput.value;
+
+        if (!date || !time) {
+            return false;
+        }
+
+        const now = new Date();
+
+        const today = getLocalToday();
+
+        if (date !== today) {
+            return false;
+        }
+
+        const currentTime =
+            String(now.getHours()).padStart(2, "0")
+            + ":"
+            + String(now.getMinutes()).padStart(2, "0");
+
+        return time > currentTime;
+    }
+
+    /*
+     * Revalidate when the user corrects
+     * the date or time.
+     */
+
+    function refreshTimeValidation() {
+        if (isFutureLostTime()) {
+            // Keep the error visible if it was
+            // already shown during submission.
+            if (!timeError.hidden) {
+                showTimeError();
+            }
+        } else {
+            clearTimeError();
+        }
+    }
+
+    dateInput.addEventListener(
+        "change",
+        refreshTimeValidation
+    );
+
+    timeInput.addEventListener(
+        "input",
+        refreshTimeValidation
+    );
+
+    timeInput.addEventListener(
+        "change",
+        refreshTimeValidation
+    );
+
+    /*
+     * Back button returns to Owner Home.
+     */
+
     document.getElementById(
         "back-button"
     ).addEventListener("click", () => {
         window.location.href = "/owner";
     });
 
-    // Save Step 1 without losing Step 2 details.
-    form.addEventListener("submit", (event) => {
-        event.preventDefault();
+    /*
+     * Save Step 1 and navigate to Step 2.
+     *
+     * Preserve any Step 2 values already
+     * stored in the unfinished draft.
+     */
 
-        if (!form.reportValidity()) {
-            return;
-        }
+    form.addEventListener(
+        "submit",
+        (event) => {
+            event.preventDefault();
 
-        const date = form.elements.lost_date.value;
-        const time = form.elements.lost_time.value;
+            // Refresh the maximum date in case
+            // the page stayed open overnight.
+            updateMaximumDate();
 
-        // Validate an entered time on today's date.
-        if (date === dateInput.max && time) {
-            const now = new Date();
-            const currentTime =
-                String(now.getHours()).padStart(2, "0")
-                + ":"
-                + String(now.getMinutes()).padStart(2, "0");
-
-            if (time > currentTime) {
-                const timeField = form.elements.lost_time;
-
-                timeField.setCustomValidity(
-                    "The lost time cannot be in the future."
-                );
-                timeField.reportValidity();
-                timeField.setCustomValidity("");
+            // Check standard required fields.
+            if (!form.reportValidity()) {
                 return;
             }
+
+            // Check that today's entered time
+            // is not in the future.
+            if (isFutureLostTime()) {
+                showTimeError();
+                return;
+            }
+
+            clearTimeError();
+
+            const date =
+                form.elements.lost_date.value;
+
+            const time =
+                form.elements.lost_time.value;
+
+            const draft = {
+                ...(savedDraft || {}),
+
+                category:
+                    form.elements.category.value,
+
+                location:
+                    form.elements.location.value,
+
+                location_detail:
+                    form.elements.location_detail.value.trim(),
+
+                lost_date: date,
+
+                lost_time: time
+            };
+
+            sessionStorage.setItem(
+                storageKey,
+                JSON.stringify(draft)
+            );
+
+            window.location.href =
+                "/owner/report/details";
         }
-
-        const draft = {
-            ...(savedDraft || {}),
-
-            category:
-                form.elements.category.value,
-
-            location:
-                form.elements.location.value,
-
-            location_detail:
-                form.elements.location_detail.value.trim(),
-
-            lost_date: date,
-            lost_time: time
-        };
-
-        sessionStorage.setItem(
-            storageKey,
-            JSON.stringify(draft)
-        );
-
-        window.location.href =
-            "/owner/report/details";
-    });
+    );
 </script>
 {% endblock %}

@@ -8,6 +8,19 @@
 
     <title>{% block title %}PrivateFind{% endblock %}</title>
 
+    <script>
+        // Identify public pages before displaying navigation.
+        const currentPath = window.location.pathname;
+
+        if (currentPath.startsWith("/found/")) {
+            document.documentElement.classList.add("finder-route");
+        }
+
+        if (currentPath === "/login" || currentPath === "/register") {
+            document.documentElement.classList.add("auth-route");
+        }
+    </script>
+
     <style>
         :root {
             --background: #FAFAF8;
@@ -53,6 +66,8 @@
             font-weight: bold;
             white-space: nowrap;
         }
+
+        /* Navigation */
 
         .navigation {
             display: flex;
@@ -188,6 +203,28 @@
             display: inline-block;
         }
 
+        /* Public pages have no account navigation */
+
+        .finder-route .navigation,
+        .finder-route .mobile-navigation,
+        .auth-route .navigation,
+        .auth-route .mobile-navigation {
+            display: none !important;
+        }
+
+        .finder-route .header,
+        .auth-route .header {
+            justify-content: flex-start;
+        }
+
+        /* Branding only on public pages */
+
+        .finder-route .logo,
+        .auth-route .logo {
+            cursor: default;
+            color: var(--text);
+        }
+
         /* Mobile Owner navigation */
 
         .mobile-navigation {
@@ -208,9 +245,12 @@
             outline-offset: 3px;
         }
 
+        /* Mobile layout */
+
         @media (max-width: 600px) {
             .header {
                 padding: 16px 6%;
+                flex-wrap: wrap;
             }
 
             .logo {
@@ -254,12 +294,6 @@
                 padding: 9px 12px;
                 font-size: 13px;
             }
-        }
-
-        @media (max-width: 600px) {
-            .header {
-                flex-wrap: wrap;
-            }
 
             body.auth-admin .navigation {
                 width: 100%;
@@ -271,6 +305,11 @@
             .navigation a {
                 font-size: 13px;
             }
+
+            .finder-route main,
+            .auth-route main {
+                padding-bottom: 24px;
+            }
         }
     </style>
 
@@ -280,18 +319,31 @@
 <body>
 
     <header class="header">
-        <a href="/" class="logo">PrivateFind</a>
+
+        <!-- PrivateFind logo -->
+
+        {% if active_page in ["login", "register", "finder"] %}
+            <span class="logo" id="site-logo">
+                PrivateFind
+            </span>
+        {% else %}
+            <a href="/" class="logo" id="site-logo">
+                PrivateFind
+            </a>
+        {% endif %}
 
         <nav class="navigation"
              aria-label="Main navigation">
 
             <!-- Guest navigation -->
+
             <a href="/login"
                class="guest-only">
                 Sign In
             </a>
 
             <!-- Owner navigation -->
+
             <a href="/owner"
                class="auth-required
                {% if active_page == 'home' %}
@@ -315,6 +367,7 @@
             </a>
 
             <!-- Owner account menu -->
+
             <details class="profile-menu auth-required">
                 <summary aria-label="Account menu">
                     👤
@@ -349,6 +402,7 @@
             </details>
 
             <!-- Admin navigation -->
+
             <a href="/admin"
                class="admin-only
                {% if active_page == 'admin' %}
@@ -381,6 +435,15 @@
                {% endif %}>
                 Claim Reviews
             </a>
+            <!-- Admin Audit Log -->
+            <a href="/admin/audit"
+               class="admin-only {% if active_page == 'admin_audit' %}active-link{% endif %}"
+               {% if active_page == 'admin_audit' %}
+                   aria-current="page"
+               {% endif %}>
+                Audit Log
+            </a>
+
 
             <button
                 type="button"
@@ -397,6 +460,7 @@
     </main>
 
     <!-- Mobile Owner navigation -->
+
     <nav class="mobile-navigation auth-required"
          aria-label="Mobile owner navigation">
 
@@ -424,11 +488,30 @@
 
     </nav>
 
-    <!-- Authentication and sign out -->
+    <!-- Authentication and sign-out logic -->
+
     <script>
         document.addEventListener(
             "DOMContentLoaded",
             async () => {
+
+                const isFinderPage =
+                    document.documentElement.classList.contains(
+                        "finder-route"
+                    );
+
+                const isAuthPage =
+                    document.documentElement.classList.contains(
+                        "auth-route"
+                    );
+
+                /*
+                 * Finder is a public flow.
+                 * No account navigation or session check needed.
+                 */
+                if (isFinderPage) {
+                    return;
+                }
 
                 let user = null;
                 let authChecked = false;
@@ -455,6 +538,26 @@
                     );
                 }
 
+                /*
+                 * Already signed-in users should not
+                 * see the login or registration screen again.
+                 */
+                if (isAuthPage && authChecked && user) {
+                    if (user.role === "owner") {
+                        window.location.replace("/owner");
+                        return;
+                    }
+
+                    if (user.role === "admin") {
+                        window.location.replace("/admin");
+                        return;
+                    }
+                }
+
+                /*
+                 * Apply role-aware navigation only
+                 * when the authentication check succeeded.
+                 */
                 if (authChecked) {
                     if (user && user.role === "owner") {
                         document.body.classList.add(
@@ -475,6 +578,9 @@
                     }
                 }
 
+                /*
+                 * Sign-out controls for authenticated users.
+                 */
                 document.querySelectorAll(
                     "[data-signout]"
                 ).forEach(button => {

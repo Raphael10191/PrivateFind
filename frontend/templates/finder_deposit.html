@@ -68,6 +68,7 @@
     .finder-field textarea {
         display: block;
         width: 100%;
+        min-width: 0;
         padding: 14px;
         border: 1px solid #DCDCE4;
         border-radius: 10px;
@@ -175,6 +176,10 @@
         margin-bottom: 4px;
     }
 
+    .deposit-detail .field-hint {
+        margin-top: 5px;
+    }
+
     .instructions {
         margin-top: 24px;
         padding: 18px;
@@ -214,6 +219,12 @@
         .deposit-code strong {
             font-size: 28px;
         }
+
+        .finder-field input,
+        .finder-field select,
+        .finder-field textarea {
+            max-width: 100%;
+        }
     }
 </style>
 {% endblock %}
@@ -223,6 +234,7 @@
 
     <div class="finder-heading">
         <h1>Deposit a Found Item</h1>
+
         <p>
             Found something on campus?
             Help return it to its owner.
@@ -230,20 +242,26 @@
         </p>
     </div>
 
-    <div id="loading-locker"
-         class="finder-card"
-         role="status">
+    <div
+        id="loading-locker"
+        class="finder-card"
+        role="status"
+    >
         Checking locker availability...
     </div>
 
-    <p id="finder-error"
-       class="finder-error"
-       role="alert"
-       hidden></p>
+    <p
+        id="finder-error"
+        class="finder-error"
+        role="alert"
+        hidden
+    ></p>
 
-    <form id="deposit-form"
-          class="finder-card"
-          hidden>
+    <form
+        id="deposit-form"
+        class="finder-card"
+        hidden
+    >
 
         <div class="locker-info">
             <strong id="locker-name"></strong>
@@ -258,7 +276,8 @@
             <select
                 id="location"
                 name="location"
-                required>
+                required
+            >
                 <option value="">
                     Select a location
                 </option>
@@ -312,15 +331,21 @@
         <button
             type="submit"
             class="submit-button"
-            id="deposit-button">
+            id="deposit-button"
+        >
             Continue to Locker Instructions
         </button>
+
     </form>
 
-    <section id="deposit-success"
-             class="finder-card"
-             role="status"
-             hidden>
+    <!-- Deposit request accepted -->
+
+    <section
+        id="deposit-success"
+        class="finder-card"
+        role="status"
+        hidden
+    >
 
         <h2 class="success-heading">
             Your Deposit Code Is Ready
@@ -342,9 +367,16 @@
             <span id="result-compartment"></span>
         </div>
 
+        <!-- Improved expiration display -->
+
         <div class="deposit-detail">
             <strong>Code expires</strong>
             <span id="result-expiry"></span>
+
+            <p
+                class="field-hint"
+                id="result-expiry-note"
+            ></p>
         </div>
 
         <div class="instructions">
@@ -354,14 +386,17 @@
                 <li>
                     Go to the smart locker.
                 </li>
+
                 <li>
                     Enter your deposit code
                     on the locker.
                 </li>
+
                 <li>
                     Place the found item inside
                     the assigned compartment.
                 </li>
+
                 <li>
                     Close the compartment and
                     press # on the locker.
@@ -374,6 +409,7 @@
             until the locker completes the
             physical deposit process.
         </p>
+
     </section>
 
 </section>
@@ -410,6 +446,97 @@
     let submitting = false;
     let submitted = false;
 
+    /*
+     * NEW: Format deposit expiration dates.
+     *
+     * If the server provides an explicit timezone,
+     * convert the time to the user's local timezone.
+     *
+     * If no timezone is provided, preserve the
+     * original date and clock time without assuming
+     * whether the backend means UTC or local time.
+     */
+
+    function formatDepositExpiry(value) {
+        const raw = String(value || "").trim();
+
+        const hasTimezone =
+            /(?:Z|[+-]\d{2}:\d{2})$/i.test(raw);
+
+        const options = {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit"
+        };
+
+        if (hasTimezone) {
+            const parsed = new Date(raw);
+
+            if (!Number.isNaN(parsed.getTime())) {
+                return {
+                    text: new Intl.DateTimeFormat(
+                        undefined,
+                        options
+                    ).format(parsed),
+
+                    note: "Shown in your local time"
+                };
+            }
+        }
+
+        // Handle timestamps without timezone data.
+        const match = raw.match(
+            /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/
+        );
+
+        if (match) {
+            const [
+                ,
+                year,
+                month,
+                day,
+                hour,
+                minute
+            ] = match;
+
+            const parsed = new Date(
+                Number(year),
+                Number(month) - 1,
+                Number(day),
+                Number(hour),
+                Number(minute)
+            );
+
+            const isValid =
+                parsed.getFullYear() === Number(year) &&
+                parsed.getMonth() === Number(month) - 1 &&
+                parsed.getDate() === Number(day) &&
+                parsed.getHours() === Number(hour) &&
+                parsed.getMinutes() === Number(minute);
+
+            if (isValid) {
+                return {
+                    text: new Intl.DateTimeFormat(
+                        undefined,
+                        options
+                    ).format(parsed),
+
+                    note:
+                        "Timezone not specified by the server"
+                };
+            }
+        }
+
+        // Keep the original text for unexpected formats.
+        return {
+            text: raw,
+            note:
+                "Confirm the expiration time with the locker"
+        };
+    }
+
     function humanize(value) {
         return String(value || "")
             .replaceAll("_", " ")
@@ -432,6 +559,7 @@
 
             message =
                 data.error?.message || message;
+
         } catch {
             // Keep the default message.
         }
@@ -439,16 +567,23 @@
         return message;
     }
 
+    /*
+     * Check the locker before displaying
+     * the Finder deposit form.
+     */
+
     async function loadLocker() {
         if (
             !lockerCode ||
             !/^[A-Za-z0-9_-]{1,20}$/.test(lockerCode)
         ) {
             loadingBox.hidden = true;
+
             showError(
                 "Invalid or missing locker code. " +
                 "Please scan the locker QR code again."
             );
+
             return;
         }
 
@@ -485,12 +620,15 @@
             const locationSelect =
                 form.elements.location;
 
-            for (const location of locker.locations || []) {
+            for (
+                const location of locker.locations || []
+            ) {
                 const option =
                     document.createElement("option");
 
                 option.value = location;
-                option.textContent = humanize(location);
+                option.textContent =
+                    humanize(location);
 
                 locationSelect.appendChild(option);
             }
@@ -502,6 +640,7 @@
                     "This locker is currently full. " +
                     "Please use another available locker."
                 );
+
                 form.hidden = true;
                 return;
             }
@@ -514,6 +653,7 @@
                     "Campus locations are unavailable. " +
                     "Please try again later."
                 );
+
                 return;
             }
 
@@ -521,6 +661,7 @@
 
         } catch (error) {
             loadingBox.hidden = true;
+
             showError(
                 error.message ||
                 "Could not connect to the locker."
@@ -528,8 +669,17 @@
         }
     }
 
+    /*
+     * Validate images before submission.
+     * Require 1 to 3 supported photos,
+     * each no larger than 5 MB.
+     */
+
     function validatePhotos(files) {
-        if (files.length < 1 || files.length > 3) {
+        if (
+            files.length < 1 ||
+            files.length > 3
+        ) {
             throw new Error(
                 "Please select between 1 and 3 photos."
             );
@@ -541,7 +691,8 @@
             "image/webp"
         ];
 
-        const maxFileSize = 5 * 1024 * 1024;
+        const maxFileSize =
+            5 * 1024 * 1024;
 
         for (const file of files) {
             if (!allowedTypes.includes(file.type)) {
@@ -559,6 +710,14 @@
         }
     }
 
+    /*
+     * Submit the Finder request.
+     *
+     * Successful submission generates a deposit
+     * code, but it does not confirm that an item
+     * has physically entered the smart locker.
+     */
+
     form.addEventListener(
         "submit",
         async (event) => {
@@ -574,11 +733,13 @@
                 return;
             }
 
-            const files =
-                Array.from(form.elements.photos.files);
+            const files = Array.from(
+                form.elements.photos.files
+            );
 
             try {
                 validatePhotos(files);
+
             } catch (error) {
                 showError(error.message);
                 return;
@@ -607,7 +768,9 @@
 
             submitting = true;
             depositButton.disabled = true;
-            depositButton.textContent = "Submitting...";
+
+            depositButton.textContent =
+                "Submitting...";
 
             try {
                 const response = await fetch(
@@ -632,7 +795,8 @@
                     );
                 }
 
-                const result = await response.json();
+                const result =
+                    await response.json();
 
                 if (
                     !result.deposit_code ||
@@ -658,13 +822,24 @@
                 ).textContent =
                     String(result.compartment);
 
-                // Keep the backend's timestamp text.
-                // Do not assume an unspecified timezone.
+                /*
+                 * UPDATED: Show a readable expiration
+                 * instead of the raw ISO timestamp.
+                 */
+
+                const expiry = formatDepositExpiry(
+                    result.expires_at
+                );
+
                 document.getElementById(
                     "result-expiry"
-                ).textContent =
-                    String(result.expires_at);
+                ).textContent = expiry.text;
 
+                document.getElementById(
+                    "result-expiry-note"
+                ).textContent = expiry.note;
+
+                // Show instructions after acceptance.
                 form.hidden = true;
                 successBox.hidden = false;
 
@@ -685,6 +860,7 @@
 
                 if (!submitted) {
                     depositButton.disabled = false;
+
                     depositButton.textContent =
                         "Continue to Locker Instructions";
                 }
@@ -692,6 +868,7 @@
         }
     );
 
+    // Load the locker when the page opens.
     loadLocker();
 </script>
 {% endblock %}

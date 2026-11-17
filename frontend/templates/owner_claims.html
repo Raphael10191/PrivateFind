@@ -90,6 +90,7 @@
         gap: 10px;
         flex-wrap: wrap;
         margin-top: 18px;
+        align-items: center;
     }
 
     .report-link {
@@ -104,6 +105,16 @@
         margin-top: 16px;
         line-height: 1.6;
         color: #666670;
+    }
+
+    .status-feedback {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #EFEBFA;
+        color: #4E429A;
+        font-size: 14px;
+        line-height: 1.5;
     }
 
     .pickup-panel {
@@ -137,6 +148,10 @@
         color: #A32727;
     }
 
+    .claim-error {
+        color: #A32727;
+    }
+
     [hidden] {
         display: none !important;
     }
@@ -164,26 +179,32 @@
 
 {% block content %}
 <section class="claims-page">
+
     <header class="claims-heading">
         <div>
             <h1>My Claims</h1>
             <p>Track your ownership verification requests.</p>
         </div>
 
-        <button id="refresh-claims"
-                class="secondary-button"
-                type="button">
+        <button
+            id="refresh-claims"
+            class="secondary-button"
+            type="button"
+        >
             Refresh
         </button>
     </header>
 
-    <div id="claims-feedback"
-         class="feedback"
-         role="status">
+    <div
+        id="claims-feedback"
+        class="feedback"
+        role="status"
+    >
         Loading your claims...
     </div>
 
     <div id="claims-list" hidden></div>
+
 </section>
 {% endblock %}
 
@@ -248,13 +269,16 @@
 
     function paragraph(text, className = "") {
         const element = document.createElement("p");
+
         element.textContent = text;
         element.className = className;
+
         return element;
     }
 
     function actionButton(text, callback) {
         const button = document.createElement("button");
+
         button.type = "button";
         button.className = "secondary-button";
         button.textContent = text;
@@ -264,10 +288,22 @@
 
             button.disabled = true;
 
+            const originalText = button.textContent;
+
             try {
+                button.textContent = "Checking...";
+
                 await callback();
+
+            } catch (error) {
+                console.error(
+                    "Claim action failed:",
+                    error
+                );
+
             } finally {
                 button.disabled = false;
+                button.textContent = originalText;
             }
         });
 
@@ -291,11 +327,13 @@
         header.append(title, status);
         card.appendChild(header);
 
-        card.appendChild(paragraph(
-            "Lost report #" + claim.lost_report_id +
-            " · Found item #" + claim.found_item_id,
-            "claim-meta"
-        ));
+        card.appendChild(
+            paragraph(
+                "Lost report #" + claim.lost_report_id +
+                " · Found item #" + claim.found_item_id,
+                "claim-meta"
+            )
+        );
 
         const message = paragraph(
             claim.message || "",
@@ -308,41 +346,66 @@
         actions.className = "claim-actions";
 
         const reportLink = document.createElement("a");
+
         reportLink.className = "report-link";
+
         reportLink.href =
             "/owner/report/view?id=" +
             encodeURIComponent(claim.lost_report_id);
 
         reportLink.textContent = "View Lost Report";
+
         actions.appendChild(reportLink);
 
+        const statusFeedback = paragraph(
+            "",
+            "status-feedback"
+        );
+
+        statusFeedback.setAttribute("role", "status");
+        statusFeedback.hidden = true;
+
         const pickupPanel = document.createElement("div");
+
         pickupPanel.className = "pickup-panel";
         pickupPanel.hidden = true;
 
-        const errorMessage = paragraph("");
-        errorMessage.className = "claim-message";
+        const errorMessage = paragraph(
+            "",
+            "claim-message claim-error"
+        );
+
         errorMessage.setAttribute("role", "alert");
         errorMessage.hidden = true;
 
         function showStatus(updated) {
-            status.textContent = statusLabel(updated.status);
+            status.textContent = statusLabel(
+                updated.status
+            );
+
             message.textContent = updated.message || "";
 
+            // Keep the View Lost Report link.
+            // Remove any old action buttons.
             while (actions.children.length > 1) {
                 actions.lastElementChild.remove();
             }
 
             pickupPanel.hidden = true;
             pickupPanel.replaceChildren();
+
             errorMessage.hidden = true;
 
             if (
                 updated.status === "in_review" ||
                 updated.status === "pending"
             ) {
-                actions.appendChild(
-                    actionButton("Check Status", async () => {
+                const checkButton = actionButton(
+                    "Check Status",
+                    async () => {
+                        statusFeedback.hidden = true;
+                        errorMessage.hidden = true;
+
                         try {
                             const latest = await api(
                                 "/api/claims/" +
@@ -350,87 +413,124 @@
                             );
 
                             showStatus(latest);
+
+                            if (
+                                latest.status === "in_review" ||
+                                latest.status === "pending"
+                            ) {
+                                statusFeedback.textContent =
+                                    "Status checked. Your claim is still " +
+                                    statusLabel(
+                                        latest.status
+                                    ).toLowerCase() +
+                                    ".";
+                            } else {
+                                statusFeedback.textContent =
+                                    "Status updated: " +
+                                    statusLabel(
+                                        latest.status
+                                    ) +
+                                    ".";
+                            }
+
+                            statusFeedback.hidden = false;
+
                         } catch (error) {
                             errorMessage.textContent =
-                                error.message;
+                                error.message ||
+                                "Could not check claim status.";
+
                             errorMessage.hidden = false;
                         }
-                    })
+                    }
                 );
+
+                actions.appendChild(checkButton);
             }
 
             if (updated.status === "approved") {
-                actions.appendChild(
-                    actionButton(
-                        "Get Pickup Code",
-                        async () => {
-                            errorMessage.hidden = true;
+                const pickupButton = actionButton(
+                    "Get Pickup Code",
+                    async () => {
+                        errorMessage.hidden = true;
+                        statusFeedback.hidden = true;
 
-                            try {
-                                const result = await api(
-                                    "/api/claims/" +
-                                    encodeURIComponent(updated.id) +
-                                    "/pickup-code",
-                                    { method: "POST" }
-                                );
-
-                                if (
-                                    result.pickup_code == null ||
-                                    result.compartment == null ||
-                                    result.expires_at == null
-                                ) {
-                                    throw new Error(
-                                        "Pickup information is incomplete."
-                                    );
+                        try {
+                            const result = await api(
+                                "/api/claims/" +
+                                encodeURIComponent(updated.id) +
+                                "/pickup-code",
+                                {
+                                    method: "POST"
                                 }
+                            );
 
-                                pickupPanel.replaceChildren();
-
-                                const heading =
-                                    document.createElement("strong");
-
-                                heading.textContent =
-                                    "Locker Pickup Instructions";
-
-                                const code =
-                                    document.createElement("span");
-
-                                code.className = "pickup-code";
-                                code.textContent =
-                                    String(result.pickup_code);
-
-                                pickupPanel.append(
-                                    heading,
-                                    code,
-                                    paragraph(
-                                        "Compartment: " +
-                                        result.compartment
-                                    ),
-                                    paragraph(
-                                        "Expires: " +
-                                        result.expires_at
-                                    ),
-                                    paragraph(
-                                        "Enter this code at the locker. " +
-                                        "Collection is complete only " +
-                                        "after the locker confirms pickup."
-                                    )
+                            if (
+                                result.pickup_code == null ||
+                                result.compartment == null ||
+                                result.expires_at == null
+                            ) {
+                                throw new Error(
+                                    "Pickup information is incomplete."
                                 );
-
-                                pickupPanel.hidden = false;
-
-                            } catch (error) {
-                                errorMessage.textContent =
-                                    error.message;
-                                errorMessage.hidden = false;
                             }
+
+                            pickupPanel.replaceChildren();
+
+                            const heading =
+                                document.createElement("strong");
+
+                            heading.textContent =
+                                "Locker Pickup Instructions";
+
+                            const code =
+                                document.createElement("span");
+
+                            code.className = "pickup-code";
+                            code.textContent =
+                                String(result.pickup_code);
+
+                            pickupPanel.append(
+                                heading,
+                                code,
+                                paragraph(
+                                    "Compartment: " +
+                                    result.compartment
+                                ),
+                                paragraph(
+                                    "Expires: " +
+                                    result.expires_at
+                                ),
+                                paragraph(
+                                    "Enter this code at the locker. " +
+                                    "Collection is complete only " +
+                                    "after the locker confirms pickup."
+                                )
+                            );
+
+                            pickupPanel.hidden = false;
+
+                        } catch (error) {
+                            errorMessage.textContent =
+                                error.message ||
+                                "Could not retrieve pickup code.";
+
+                            errorMessage.hidden = false;
                         }
-                    )
+                    }
                 );
+
+                actions.appendChild(pickupButton);
             }
         }
 
-        card.append(actions, errorMessage, pickupPanel);
+        card.append(
+            actions,
+            statusFeedback,
+            errorMessage,
+            pickupPanel
+        );
+
         showStatus(claim);
 
         return card;
@@ -438,7 +538,10 @@
 
     async function loadClaims() {
         refreshButton.disabled = true;
+        refreshButton.textContent = "Refreshing...";
+
         claimsList.hidden = true;
+
         setFeedback("Loading your claims...");
 
         try {
@@ -459,6 +562,7 @@
                     "select a possible match and " +
                     "submit ownership evidence."
                 );
+
                 return;
             }
 
@@ -476,8 +580,10 @@
                 error.message || "Could not load claims.",
                 true
             );
+
         } finally {
             refreshButton.disabled = false;
+            refreshButton.textContent = "Refresh";
         }
     }
 
@@ -489,4 +595,3 @@
     loadClaims();
 </script>
 {% endblock %}
-

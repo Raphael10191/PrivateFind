@@ -25,15 +25,15 @@
 
     .items-heading p,
     .muted {
-        margin: 0;
         color: #666670;
         line-height: 1.5;
+        margin: 0;
     }
 
     .items-button {
-        padding: 11px 16px;
         border: 1px solid #E4E2EB;
         border-radius: 10px;
+        padding: 11px 16px;
         background: white;
         color: #1A1A1F;
         font: inherit;
@@ -51,6 +51,17 @@
         cursor: wait;
     }
 
+    .primary-button {
+        background: #6D5BD0;
+        border-color: #6D5BD0;
+        color: white;
+    }
+
+    .primary-button:hover {
+        background: #5846B8;
+        color: white;
+    }
+
     .items-filters {
         display: flex;
         flex-wrap: wrap;
@@ -58,7 +69,8 @@
         margin-bottom: 20px;
     }
 
-    .items-filters label {
+    .items-filters label,
+    .editor-field {
         display: flex;
         flex-direction: column;
         gap: 7px;
@@ -66,8 +78,10 @@
         font-size: 13px;
     }
 
-    .items-filters select {
-        min-width: 165px;
+    .items-filters select,
+    .editor-field input,
+    .editor-field select,
+    .editor-field textarea {
         padding: 11px;
         border: 1px solid #E4E2EB;
         border-radius: 10px;
@@ -75,6 +89,17 @@
         color: #1A1A1F;
         font: inherit;
         font-size: 14px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .items-filters select {
+        min-width: 165px;
+    }
+
+    .editor-field textarea {
+        min-height: 85px;
+        resize: vertical;
     }
 
     .items-grid {
@@ -166,9 +191,10 @@
         margin-bottom: 20px;
     }
 
-    .item-attribute {
-        padding: 12px;
-        margin-bottom: 9px;
+    .item-attribute,
+    .editor-attribute {
+        padding: 14px;
+        margin-bottom: 10px;
         background: #FAFAF8;
         border: 1px solid #ECECF0;
         border-radius: 10px;
@@ -180,10 +206,10 @@
     }
 
     .item-attribute p {
-        margin: 4px 0;
-        overflow-wrap: anywhere;
+        margin: 5px 0;
         font-size: 13px;
         line-height: 1.5;
+        overflow-wrap: anywhere;
     }
 
     .photo-grid {
@@ -193,13 +219,11 @@
     }
 
     .item-photo {
-        display: block;
         width: 100%;
         aspect-ratio: 4 / 3;
         object-fit: cover;
         border: 1px solid #ECECF0;
         border-radius: 10px;
-        background: #FAFAF8;
     }
 
     .item-message {
@@ -220,7 +244,7 @@
     }
 
     .item-empty {
-        padding: 20px 0;
+        padding: 18px 0;
         color: #666670;
         line-height: 1.6;
     }
@@ -234,6 +258,63 @@
         color: #666670;
         font-size: 13px;
         line-height: 1.6;
+    }
+
+    /* Attribute editor */
+
+    .editor-panel {
+        margin-top: 24px;
+        padding: 20px;
+        background: #FAFAF8;
+        border: 1px solid #E4E2EB;
+        border-radius: 14px;
+    }
+
+    .editor-panel h3 {
+        margin: 0 0 10px;
+    }
+
+    .editor-panel > p {
+        margin: 0 0 20px;
+        font-size: 13px;
+        color: #666670;
+        line-height: 1.6;
+    }
+
+    .editor-field {
+        margin-bottom: 16px;
+    }
+
+    .editor-attribute {
+        background: white;
+    }
+
+    .editor-attribute-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .editor-attribute-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .editor-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .editor-note {
+        color: #666670;
+        font-size: 12px;
+        line-height: 1.6;
+        margin: 12px 0;
     }
 
     [hidden] {
@@ -250,7 +331,8 @@
             font-size: 26px;
         }
 
-        .items-grid {
+        .items-grid,
+        .editor-attribute-grid {
             grid-template-columns: 1fr;
         }
 
@@ -265,7 +347,10 @@
 
         .items-filters select {
             min-width: 0;
-            width: 100%;
+        }
+
+        .editor-panel {
+            padding: 16px;
         }
     }
 </style>
@@ -280,10 +365,9 @@
             <p>Monitor deposits and review found-item details.</p>
         </div>
 
-        <button
-            id="refresh-items"
-            type="button"
-            class="items-button">
+        <button id="refresh-items"
+                type="button"
+                class="items-button">
             Refresh
         </button>
     </div>
@@ -299,6 +383,7 @@
        hidden></p>
 
     <div class="items-filters">
+
         <label for="status-filter">
             Item status
             <select id="status-filter">
@@ -320,6 +405,7 @@
                 <option value="failed">Failed</option>
             </select>
         </label>
+
     </div>
 
     <div class="items-grid">
@@ -346,7 +432,7 @@
 
                 <div class="item-field">
                     <span class="item-label">Item</span>
-                    <strong id="detail-id" class="item-value"></strong>
+                    <strong id="detail-id"></strong>
                 </div>
 
                 <div class="item-field">
@@ -389,11 +475,10 @@
                     <div id="detail-ai-error" class="item-value"></div>
                 </div>
 
-                <button
-                    id="retry-ai"
-                    type="button"
-                    class="items-button"
-                    hidden>
+                <button id="retry-ai"
+                        type="button"
+                        class="items-button"
+                        hidden>
                     Retry AI Processing
                 </button>
 
@@ -415,6 +500,87 @@
                 <h3>Item Attributes</h3>
                 <div id="detail-attributes"></div>
 
+                <button id="edit-item"
+                        type="button"
+                        class="items-button">
+                    Edit Item Details
+                </button>
+
+                <!-- Editing form -->
+                <form id="item-editor"
+                      class="editor-panel"
+                      hidden>
+
+                    <h3>Edit Item Details</h3>
+                    <p>
+                        Review all attributes carefully.
+                        Saving replaces the existing attribute list.
+                    </p>
+
+                    <label class="editor-field"
+                           for="edit-category">
+                        Category
+                        <select id="edit-category" required>
+                            <option value="phone">Phone</option>
+                            <option value="wallet">Wallet</option>
+                            <option value="keys">Keys</option>
+                            <option value="bag">Bag</option>
+                            <option value="laptop">Laptop</option>
+                            <option value="tablet">Tablet</option>
+                            <option value="headphones">Headphones</option>
+                            <option value="bottle">Bottle</option>
+                            <option value="umbrella">Umbrella</option>
+                            <option value="clothing">Clothing</option>
+                            <option value="id_card">ID Card</option>
+                            <option value="glasses">Glasses</option>
+                            <option value="book">Book</option>
+                            <option value="jewelry">Jewelry</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </label>
+
+                    <label class="editor-field"
+                           for="edit-summary">
+                        Public summary
+                        <textarea
+                            id="edit-summary"
+                            maxlength="200"
+                            placeholder="A short description without ownership secrets"></textarea>
+                    </label>
+
+                    <h3>Attributes</h3>
+
+                    <div id="editor-attributes"></div>
+
+                    <button id="add-attribute"
+                            class="items-button"
+                            type="button">
+                        + Add Attribute
+                    </button>
+
+                    <p class="editor-note">
+                        Public information may be used in matches
+                        or shown to Owners. Keep serial numbers,
+                        engraved marks, contents, and other
+                        ownership secrets private.
+                    </p>
+
+                    <div class="editor-actions">
+                        <button type="submit"
+                                id="save-item"
+                                class="items-button primary-button">
+                            Save Changes
+                        </button>
+
+                        <button type="button"
+                                id="cancel-edit"
+                                class="items-button">
+                            Cancel
+                        </button>
+                    </div>
+
+                </form>
+
             </div>
         </section>
 
@@ -435,10 +601,26 @@
     const statusFilter = document.getElementById("status-filter");
     const aiFilter = document.getElementById("ai-filter");
 
-    let selectedItemId = null;
-    let selectedItemStatus = null;
-    let retrying = false;
+    const editButton = document.getElementById("edit-item");
+    const editor = document.getElementById("item-editor");
+    const categoryInput = document.getElementById("edit-category");
+    const summaryInput = document.getElementById("edit-summary");
+    const attributesBox = document.getElementById("editor-attributes");
+    const addButton = document.getElementById("add-attribute");
+    const saveButton = document.getElementById("save-item");
+    const cancelButton = document.getElementById("cancel-edit");
+
+    let selectedItem = null;
+    let busy = false;
     let requestVersion = 0;
+
+    const privateOnlyNames = new Set([
+        "serial_suffix",
+        "sticker_or_mark",
+        "damage",
+        "contents",
+        "engraving"
+    ]);
 
     function humanize(value) {
         return String(value ?? "Unknown")
@@ -467,10 +649,18 @@
         successBox.hidden = true;
     }
 
-    function showError(message) {
-        errorBox.textContent = message;
-        errorBox.hidden = false;
-    }
+    
+     function showError(message) {
+       errorBox.textContent = message;
+       errorBox.hidden = false;
+
+    // Make sure the user can see the error.
+    errorBox.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+    });
+}
+
 
     function getApiError(data, fallback) {
         if (typeof data?.error?.message === "string") {
@@ -505,7 +695,7 @@
         try {
             data = await response.json();
         } catch {
-            // Non-JSON server response.
+            // A server error may return non-JSON.
         }
 
         if (!response.ok) {
@@ -520,16 +710,192 @@
         return data;
     }
 
+    function createField(labelText, value, maxLength, cssClass) {
+        const label = document.createElement("label");
+        label.className = "editor-field";
+
+        label.appendChild(
+            createText("span", labelText)
+        );
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = cssClass;
+        input.maxLength = maxLength;
+        input.required = true;
+        input.value = value ?? "";
+
+        label.appendChild(input);
+        return label;
+    }
+
+    function createSelect(labelText, options, value, cssClass) {
+        const label = document.createElement("label");
+        label.className = "editor-field";
+
+        label.appendChild(
+            createText("span", labelText)
+        );
+
+        const select = document.createElement("select");
+        select.className = cssClass;
+
+        options.forEach(([optionValue, optionLabel]) => {
+            const option = document.createElement("option");
+            option.value = optionValue;
+            option.textContent = optionLabel;
+            select.appendChild(option);
+        });
+
+        select.value = value;
+        label.appendChild(select);
+
+        return label;
+    }
+
+    function addAttributeRow(attribute = {}) {
+        if (attributesBox.children.length >= 30) {
+            showError("An item can have at most 30 attributes.");
+            return;
+        }
+
+        const row = document.createElement("div");
+        row.className = "editor-attribute";
+
+        const header = document.createElement("div");
+        header.className = "editor-attribute-header";
+
+        header.appendChild(
+            createText("strong", "Attribute")
+        );
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "items-button";
+        remove.textContent = "Remove";
+
+        remove.addEventListener("click", () => {
+            row.remove();
+        });
+
+        header.appendChild(remove);
+        row.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "editor-attribute-grid";
+
+        grid.appendChild(
+            createField(
+                "Name",
+                attribute.name,
+                30,
+                "attribute-name"
+            )
+        );
+
+        grid.appendChild(
+            createField(
+                "Value",
+                attribute.value,
+                200,
+                "attribute-value"
+            )
+        );
+
+        const visibility =
+            attribute.visibility === "private"
+                ? "private"
+                : "public";
+
+        const visibilityLabel = createSelect(
+            "Visibility",
+            [
+                ["public", "Public"],
+                ["private", "Private"]
+            ],
+            visibility,
+            "attribute-visibility"
+        );
+
+        grid.appendChild(visibilityLabel);
+
+        const strengthLabel = createSelect(
+            "Strength",
+            [
+                ["generic", "Generic"],
+                ["distinctive", "Distinctive"],
+                ["strong", "Strong"]
+            ],
+            attribute.strength || "generic",
+            "attribute-strength"
+        );
+
+        grid.appendChild(strengthLabel);
+
+        row.appendChild(grid);
+        attributesBox.appendChild(row);
+
+        const nameInput = row.querySelector(".attribute-name");
+        const visibilityInput = row.querySelector(
+            ".attribute-visibility"
+        );
+
+        function enforcePrivateVisibility() {
+            const name = nameInput.value.trim().toLowerCase();
+
+            if (privateOnlyNames.has(name)) {
+                visibilityInput.value = "private";
+                visibilityInput.disabled = true;
+            } else {
+                visibilityInput.disabled = false;
+            }
+        }
+
+        nameInput.addEventListener(
+            "input",
+            enforcePrivateVisibility
+        );
+
+        enforcePrivateVisibility();
+    }
+
+    function closeEditor() {
+        editor.hidden = true;
+        editButton.hidden = false;
+        attributesBox.replaceChildren();
+    }
+
+    function openEditor() {
+        if (!selectedItem || busy) return;
+
+        clearMessages();
+
+        categoryInput.value = selectedItem.category || "other";
+        summaryInput.value = selectedItem.public_summary || "";
+
+        attributesBox.replaceChildren();
+
+        const attributes = Array.isArray(selectedItem.attributes)
+            ? selectedItem.attributes
+            : [];
+
+        attributes.forEach(attribute => {
+            addAttributeRow(attribute);
+        });
+
+        editButton.hidden = true;
+        editor.hidden = false;
+    }
+
     function resetDetails() {
         requestVersion += 1;
-        selectedItemId = null;
-        selectedItemStatus = null;
+        selectedItem = null;
         detailsBox.hidden = true;
         placeholder.hidden = false;
         placeholder.textContent =
             "Select a found item to view its details.";
         retryButton.hidden = true;
-        retryButton.disabled = false;
+        closeEditor();
     }
 
     function renderAttributes(attributes) {
@@ -660,11 +1026,9 @@
 
         setText("detail-ai", humanize(item.ai_status));
 
-        const aiErrorField = document.getElementById(
+        document.getElementById(
             "ai-error-field"
-        );
-
-        aiErrorField.hidden = !item.ai_error;
+        ).hidden = !item.ai_error;
 
         setText(
             "detail-ai-error",
@@ -685,15 +1049,14 @@
     }
 
     async function selectItem(itemId) {
-        if (retrying) return;
+        if (busy) return;
 
         clearMessages();
+        closeEditor();
 
         const version = ++requestVersion;
 
-        selectedItemId = null;
-        selectedItemStatus = null;
-
+        selectedItem = null;
         detailsBox.hidden = true;
         placeholder.hidden = false;
         placeholder.textContent = "Loading item details...";
@@ -706,9 +1069,7 @@
 
             if (version !== requestVersion) return;
 
-            selectedItemId = item.id;
-            selectedItemStatus = item.status;
-
+            selectedItem = item;
             renderItemDetails(item);
 
             itemsList.querySelectorAll(
@@ -722,20 +1083,25 @@
 
         } catch (error) {
             if (version !== requestVersion) return;
-
             resetDetails();
             showError(error.message);
         }
     }
 
     async function loadItems() {
-        if (retrying) return;
+        if (busy) return;
+
+        if (!editor.hidden &&
+            !window.confirm(
+                "Discard unsaved item changes?"
+            )) {
+            return;
+        }
 
         clearMessages();
         resetDetails();
 
         const version = requestVersion;
-
         refreshButton.disabled = true;
 
         itemsList.replaceChildren(
@@ -832,10 +1198,189 @@
         }
     }
 
-    async function retryAI() {
-        if (retrying || selectedItemId === null) return;
+    async function saveItem(event) {
+        event.preventDefault();
 
-        const itemId = selectedItemId;
+        if (!selectedItem || busy) return;
+
+        clearMessages();
+
+        const attributes = [];
+
+        for (const row of attributesBox.children) {
+            const name = row.querySelector(
+                ".attribute-name"
+            ).value.trim().toLowerCase();
+
+            const value = row.querySelector(
+                ".attribute-value"
+            ).value.trim();
+
+            const visibility = row.querySelector(
+                ".attribute-visibility"
+            ).value;
+
+            const strength = row.querySelector(
+                ".attribute-strength"
+            ).value;
+
+            
+            // 1. Reject empty attribute names or values.
+            if (!name || !value) {
+                showError(
+                    "Every attribute must have a name and value."
+                );
+                return;
+            }
+
+            // 2. Reject meaningless ownership information.
+            const normalizedValue = value
+                .toLowerCase()
+                .trim()
+                .replace(/[.!?]+$/g, "");
+
+            const unknownValues = new Set([
+                "idk",
+                "i don't know",
+                "i dont know",
+                "don't know",
+                "dont know",
+                "unknown",
+                "not sure",
+                "n/a",
+                "na",
+                "none",
+                "no idea"
+            ]);
+
+            if (unknownValues.has(normalizedValue)) {
+                showError(
+                    "Unknown information cannot be saved as " +
+                    "an item attribute. Please remove it."
+                );
+                return;
+            }
+
+            // 3. Validate serial suffixes.
+            // A serial number is optional, but if supplied,
+            // its suffix must have four letters or digits.
+            if (
+                name === "serial_suffix" &&
+                !/^[a-zA-Z0-9]{4}$/.test(value)
+            ) {
+                showError(
+                    "Serial suffix must contain exactly " +
+                    "four letters or digits. " +
+                    "If unknown, remove this attribute."
+                );
+                return;
+            }
+
+            // 4. Keep identifying attributes private.
+            if (
+                privateOnlyNames.has(name) &&
+                visibility !== "private"
+            ) {
+                showError(
+                    "Sensitive identifying attributes " +
+                    "must be private."
+                );
+                return;
+            }
+
+
+            attributes.push({
+                name,
+                value,
+                visibility,
+                strength
+            });
+        }
+
+        if (attributes.length > 30) {
+            showError("Maximum 30 attributes allowed.");
+            return;
+        }
+
+        const summary = summaryInput.value.trim();
+
+        const confirmed = window.confirm(
+            "Save changes to Found Item #" +
+            selectedItem.id +
+            "?\n\nThis will REPLACE its entire existing " +
+            "attribute list. Review public/private " +
+            "visibility before continuing."
+        );
+
+        if (!confirmed) return;
+
+        const itemId = selectedItem.id;
+        busy = true;
+
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+        addButton.disabled = true;
+        refreshButton.disabled = true;
+
+        try {
+            const updated = await apiRequest(
+                "/api/admin/items/" +
+                encodeURIComponent(itemId) +
+                "/attributes",
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        category: categoryInput.value,
+                        public_summary: summary,
+                        attributes
+                    })
+                }
+            );
+
+            selectedItem = updated;
+            closeEditor();
+            renderItemDetails(updated);
+
+            successBox.textContent =
+                "Found Item #" + itemId +
+                " updated successfully.";
+
+            successBox.hidden = false;
+
+            itemsList.querySelectorAll(
+                ".item-option"
+            ).forEach(button => {
+                if (button.dataset.itemId === String(itemId)) {
+                    button.querySelector("strong").textContent =
+                        updated.public_summary ||
+                        "Found Item #" + itemId;
+
+                    const aiLabel = button.querySelectorAll("span")[2];
+                    if (aiLabel) {
+                        aiLabel.textContent =
+                            "AI: " + humanize(updated.ai_status);
+                    }
+                }
+            });
+
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            busy = false;
+            saveButton.disabled = false;
+            cancelButton.disabled = false;
+            addButton.disabled = false;
+            refreshButton.disabled = false;
+        }
+    }
+
+    async function retryAI() {
+        if (busy || !selectedItem) return;
+
+        const itemId = selectedItem.id;
 
         if (!window.confirm(
             "Retry AI processing for Found Item #" +
@@ -844,8 +1389,9 @@
             return;
         }
 
-        retrying = true;
+        busy = true;
         clearMessages();
+
         retryButton.disabled = true;
         refreshButton.disabled = true;
 
@@ -854,27 +1400,28 @@
                 "/api/admin/items/" +
                 encodeURIComponent(itemId) +
                 "/retry-ai",
-                {
-                    method: "POST"
-                }
+                {method: "POST"}
             );
 
             successBox.textContent =
-                "AI processing has been queued. " +
-                "Refresh the item to check its new status.";
+                "AI processing queued. Refresh later to check status.";
 
             successBox.hidden = false;
-
             retryButton.hidden = true;
 
         } catch (error) {
             showError(error.message);
         } finally {
-            retrying = false;
+            busy = false;
             retryButton.disabled = false;
             refreshButton.disabled = false;
         }
     }
+
+    editButton.addEventListener("click", openEditor);
+    cancelButton.addEventListener("click", closeEditor);
+    addButton.addEventListener("click", () => addAttributeRow());
+    editor.addEventListener("submit", saveItem);
 
     refreshButton.addEventListener("click", loadItems);
     statusFilter.addEventListener("change", loadItems);

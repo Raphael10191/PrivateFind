@@ -1,6 +1,5 @@
 
 import json
-
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -19,6 +18,7 @@ templates = Environment(
     autoescape=select_autoescape(["html"]),
 )
 
+
 PAGES = {
     "/owner": "owner_home.html",
     "/owner/reports": "owner_reports.html",
@@ -34,6 +34,29 @@ PAGES = {
     "/admin": "admin_dashboard.html",
     "/admin/claims": "admin_claims.html",
     "/admin/items": "admin_items.html",
+    "/admin/audit": "admin_audit.html",
+}
+
+
+# Explicit navigation states.
+# Prevent incorrect Home highlighting on other pages.
+ACTIVE_PAGES = {
+    "/owner": "home",
+    "/owner/reports": "reports",
+    "/owner/account": "account",
+    "/owner/report/new": "new_report",
+    "/owner/report/details": "new_report",
+    "/owner/report/view": "reports",
+    "/owner/claim": "reports",
+    "/owner/claims": "claims",
+    "/found/new": "finder",
+    "/login": "login",
+    "/register": "register",
+    "/admin": "admin",
+    "/admin/claims": "admin_claims",
+    "/admin/items": "admin_items",
+    "/admin/audit": "admin_audit",
+
 }
 
 
@@ -171,15 +194,82 @@ class PreviewHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
 
-        # Forward backend API calls unchanged.
+        # Forward backend API requests unchanged.
         if path.startswith("/api/"):
             self.proxy_api()
             return
 
-        # Root sends visitors to the login page.
+        # Root route: send users to the correct destination
+        # based on their current authenticated role.
         if path == "/":
-            self.redirect("/login")
+            try:
+                current_user = self.get_current_user()
+
+            except (
+                HTTPError,
+                URLError,
+                TimeoutError,
+                OSError,
+                ValueError,
+            ):
+                self.send_error(
+                    502,
+                    "Authentication service unavailable"
+                )
+                return
+
+            if current_user is None:
+                self.redirect("/login")
+
+            elif current_user.get("role") == "admin":
+                self.redirect("/admin")
+
+            elif current_user.get("role") == "owner":
+                self.redirect("/owner")
+
+            else:
+                self.send_error(
+                    403,
+                    "Unsupported account role"
+                )
+
             return
+
+        # Login and registration are for guests.
+        # An authenticated user should go straight
+        # to the correct dashboard instead.
+        if path in ("/login", "/register"):
+            try:
+                current_user = self.get_current_user()
+
+            except (
+                HTTPError,
+                URLError,
+                TimeoutError,
+                OSError,
+                ValueError,
+            ):
+                self.send_error(
+                    502,
+                    "Authentication service unavailable"
+                )
+                return
+
+            if current_user is not None:
+                if current_user.get("role") == "owner":
+                    self.redirect("/owner")
+                    return
+
+                elif current_user.get("role") == "admin":
+                    self.redirect("/admin")
+                    return
+
+                else:
+                    self.send_error(
+                        403,
+                        "Unsupported account role"
+                    )
+                    return
 
         template_name = PAGES.get(path)
 
@@ -233,11 +323,12 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-        # Real account information.
+        # Provide real account information.
         if user is not None:
             account = {
                 "display_name": (
-                    user.get("display_name") or "Not provided"
+                    user.get("display_name")
+                    or "Not provided"
                 ),
                 "email": user.get("email", ""),
             }
@@ -268,21 +359,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-        # Determine which navigation item is active.
-        if path == "/admin":
-            active_page = "admin"
-        elif path == "/admin/items":
-            active_page = "admin_items"
-        elif path == "/admin/claims":
-            active_page = "admin_claims"
-        elif path == "/owner/claims":
-            active_page = "claims"
-        elif path == "/owner/account":
-            active_page = "account"
-        elif path == "/owner/reports":
-            active_page = "reports"
-        else:
-            active_page = "home"
+        # Highlight only the correct navigation item.
+        active_page = ACTIVE_PAGES.get(path, "")
 
         # Render the requested HTML page.
         html = templates.get_template(
