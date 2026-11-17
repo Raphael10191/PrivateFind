@@ -76,8 +76,83 @@
         font: inherit;
     }
 
-    .finder-field input[type="file"] {
-        padding: 12px;
+    .photo-field {
+        min-width: 0;
+        border: 0;
+        padding: 0;
+        margin: 0 0 24px;
+    }
+
+    .photo-field legend {
+        padding: 0;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 9px;
+    }
+
+    .photo-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .photo-actions button {
+        flex: 1 1 136px;
+        min-height: 44px;
+        padding: 8px 12px;
+        border: 1px solid #DCDCE4;
+        border-radius: 10px;
+        background: #EFEBFA;
+        color: #392B8A;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .photo-actions button:disabled {
+        opacity: 0.6;
+        cursor: default;
+    }
+
+    .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        list-style: none;
+        padding: 0;
+        margin: 10px 0 0;
+    }
+
+    .photo-grid li {
+        position: relative;
+    }
+
+    .photo-grid img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    .photo-remove {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 44px;
+        height: 44px;
+        border: 1px solid #DCDCE4;
+        border-radius: 50%;
+        background: white;
+        color: #1A1A1F;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .photo-error {
+        color: #A32727;
+        font-size: 14px;
+        margin: 8px 0 0;
     }
 
     .finder-field textarea {
@@ -243,6 +318,7 @@
 
     <form id="deposit-form"
           class="finder-card"
+          novalidate
           hidden>
 
         <div class="locker-info">
@@ -270,26 +346,22 @@
             </p>
         </div>
 
-        <div class="finder-field">
-            <label for="photos">
-                Item photos *
-            </label>
-
-            <input
-                type="file"
-                id="photos"
-                name="photos"
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                multiple
-                required
-            >
-
-            <p class="field-hint">
-                Upload 1–3 clear photos.
-                JPEG, PNG, or WebP only.
-                Maximum 5 MB per photo.
+        <fieldset class="finder-field photo-field" aria-describedby="photo-hint photo-error">
+            <legend>Item photos *</legend>
+            <div class="photo-actions">
+                <button type="button" id="take-photo">Foto aufnehmen</button>
+                <button type="button" id="choose-photos">Aus Galerie wählen</button>
+            </div>
+            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+            <input type="file" id="gallery-input" accept="image/*" multiple hidden>
+            <p id="photo-hint" class="field-hint">
+                Mindestens 1 Foto, optional bis zu 3 – am besten aus verschiedenen
+                Blickwinkeln und Nahaufnahmen von Details (Kratzer, Gravuren, Aufkleber).
             </p>
-        </div>
+            <p id="photo-count" class="field-hint" role="status">0/3 Fotos</p>
+            <ul id="photo-grid" class="photo-grid" aria-label="Ausgewählte Fotos" hidden></ul>
+            <p id="photo-error" class="photo-error" role="alert" hidden></p>
+        </fieldset>
 
         <div class="finder-field">
             <label for="note">
@@ -407,6 +479,14 @@
         "deposit-button"
     );
 
+    const photoGrid = document.getElementById("photo-grid");
+    const photoCount = document.getElementById("photo-count");
+    const photoError = document.getElementById("photo-error");
+    const cameraButton = document.getElementById("take-photo");
+    const galleryButton = document.getElementById("choose-photos");
+    const selectedPhotos = [];
+    const maxPhotos = 3;
+    let processingPhotos = false;
     let submitting = false;
     let submitted = false;
 
@@ -528,35 +608,118 @@
         }
     }
 
-    function validatePhotos(files) {
-        if (files.length < 1 || files.length > 3) {
-            throw new Error(
-                "Please select between 1 and 3 photos."
-            );
+    function showPhotoError(message = "") {
+        photoError.textContent = message;
+        photoError.hidden = !message;
+    }
+
+    function updatePhotoControls() {
+        const busy = processingPhotos || submitting || submitted;
+        const full = selectedPhotos.length >= maxPhotos;
+        cameraButton.disabled = busy || full;
+        galleryButton.disabled = busy || full;
+        depositButton.disabled = busy;
+        for (const button of photoGrid.querySelectorAll("button")) {
+            button.disabled = busy;
+        }
+        photoCount.textContent = processingPhotos
+            ? "Fotos werden vorbereitet …"
+            : selectedPhotos.length + "/" + maxPhotos + " Fotos";
+    }
+
+    function renderPhotos() {
+        photoGrid.replaceChildren();
+        photoGrid.hidden = selectedPhotos.length === 0;
+        selectedPhotos.forEach(({ previewUrl }, index) => {
+            const item = document.createElement("li");
+            const image = document.createElement("img");
+            image.src = previewUrl;
+            image.alt = "Foto " + (index + 1);
+
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "photo-remove";
+            remove.textContent = "✕";
+            remove.setAttribute("aria-label", image.alt + " entfernen");
+            remove.addEventListener("click", () => {
+                URL.revokeObjectURL(previewUrl);
+                selectedPhotos.splice(index, 1);
+                showPhotoError();
+                renderPhotos();
+                const remaining = photoGrid.querySelectorAll("button");
+                (remaining[index] || remaining[index - 1] || galleryButton).focus();
+            });
+            item.append(image, remove);
+            photoGrid.append(item);
+        });
+        updatePhotoControls();
+    }
+
+    async function resizePhoto(file) {
+        const sourceUrl = URL.createObjectURL(file);
+        try {
+            const image = new Image();
+            image.src = sourceUrl;
+            await image.decode();
+
+            const canvas = document.createElement("canvas");
+            const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext("2d");
+            context.fillStyle = "white";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+            if (!blob || blob.type !== "image/jpeg" || blob.size > 5 * 1024 * 1024) {
+                throw new Error("Das Foto konnte nicht als JPEG unter 5 MB gespeichert werden.");
+            }
+            return blob;
+        } finally {
+            URL.revokeObjectURL(sourceUrl);
+        }
+    }
+
+    async function addPhotos(event) {
+        const input = event.currentTarget;
+        const files = Array.from(input.files);
+        input.value = "";
+        if (processingPhotos || submitting || submitted || files.length === 0) {
+            return;
         }
 
-        const allowedTypes = [
-            "image/jpeg",
-            "image/png",
-            "image/webp"
-        ];
-
-        const maxFileSize = 5 * 1024 * 1024;
-
-        for (const file of files) {
-            if (!allowedTypes.includes(file.type)) {
-                throw new Error(
-                    "Only JPEG, PNG, and WebP " +
-                    "photos are supported."
-                );
+        showPhotoError();
+        processingPhotos = true;
+        updatePhotoControls();
+        const errors = [];
+        try {
+            for (const file of files) {
+                if (selectedPhotos.length >= maxPhotos) {
+                    errors.push("Du kannst bis zu 3 Fotos hinzufügen.");
+                    break;
+                }
+                try {
+                    const blob = await resizePhoto(file);
+                    selectedPhotos.push({ blob, previewUrl: URL.createObjectURL(blob) });
+                } catch {
+                    errors.push("Ein Foto ließ sich nicht öffnen oder verkleinern. Bitte wähle ein JPEG oder PNG.");
+                }
             }
-
-            if (file.size > maxFileSize) {
-                throw new Error(
-                    "Each photo must be 5 MB or smaller."
-                );
-            }
+        } finally {
+            processingPhotos = false;
+            showPhotoError([...new Set(errors)].join(" "));
+            renderPhotos();
         }
+    }
+
+    for (const [button, inputId] of [
+        [cameraButton, "camera-input"],
+        [galleryButton, "gallery-input"]
+    ]) {
+        const input = document.getElementById(inputId);
+        button.addEventListener("click", () => input.click());
+        input.addEventListener("change", addPhotos);
     }
 
     form.addEventListener(
@@ -564,23 +727,20 @@
         async (event) => {
             event.preventDefault();
 
-            if (submitting || submitted) {
+            if (submitting || submitted || processingPhotos) {
                 return;
             }
 
             errorBox.hidden = true;
+            showPhotoError();
 
-            if (!form.reportValidity()) {
+            if (selectedPhotos.length === 0) {
+                showPhotoError("Bitte füge mindestens ein Foto hinzu.");
+                cameraButton.focus();
                 return;
             }
 
-            const files =
-                Array.from(form.elements.photos.files);
-
-            try {
-                validatePhotos(files);
-            } catch (error) {
-                showError(error.message);
+            if (!form.reportValidity()) {
                 return;
             }
 
@@ -601,12 +761,12 @@
                 form.elements.note.value.trim()
             );
 
-            for (const file of files) {
-                data.append("photos", file);
-            }
+            selectedPhotos.forEach(({ blob }, index) => {
+                data.append("photos", blob, "photo" + (index + 1) + ".jpg");
+            });
 
             submitting = true;
-            depositButton.disabled = true;
+            updatePhotoControls();
             depositButton.textContent = "Submitting...";
 
             try {
@@ -647,6 +807,10 @@
                 }
 
                 submitted = true;
+                for (const { previewUrl } of selectedPhotos) {
+                    URL.revokeObjectURL(previewUrl);
+                }
+                selectedPhotos.length = 0;
 
                 document.getElementById(
                     "result-code"
@@ -682,9 +846,9 @@
 
             } finally {
                 submitting = false;
+                updatePhotoControls();
 
                 if (!submitted) {
-                    depositButton.disabled = false;
                     depositButton.textContent =
                         "Continue to Locker Instructions";
                 }
