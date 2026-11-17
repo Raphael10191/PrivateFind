@@ -194,8 +194,12 @@ def test_guess_stays_ambiguous_if_the_model_omits_the_qualifier():
     assert result[0].status == "ambiguous"
 
 
-async def test_approved_claim_to_pickup(client, owner, session, locker):
-    item_id, report_id, headers = await setup_candidate(client, owner, locker, BACK + ". " + FRONT)
+async def test_approved_claim_to_pickup(client, owner, admin, session, locker):
+    _, headers = locker
+    visual_provider()
+    item_id = await deposit_and_store(client, headers)
+    report_id = await make_report(owner, description=BACK, unique_marks=FRONT)
+    await owner.get(f"/api/lost-reports/{report_id}/candidates?refresh=false")
     response = await claim(owner, report_id, item_id)
     assert response.status_code == 201, response.text
     body = response.json()
@@ -216,6 +220,16 @@ async def test_approved_claim_to_pickup(client, owner, session, locker):
     assert (await session.get(FoundItem, item_id)).status == "returned"
     assert (await owner.get(f"/api/lost-reports/{report_id}")).json()["status"] == "resolved"
 
+    history_url = f"/api/admin/claims?status=&found_item_id={item_id}"
+    assert (await owner.get(history_url)).status_code == 403
+    result = await admin.get(history_url)
+    assert result.status_code == 200, result.text
+    [historical] = result.json()
+    assert historical["id"] == body["id"] and historical["status"] == "approved"
+    assert historical["owner_description"] == BACK
+    assert historical["owner_identifying_details"] == FRONT
+    assert (await admin.get(history_url.replace(f"={item_id}", "=999999"))).json() == []
+
 
 async def test_retries_retain_original_and_supplemental_evidence(client, owner, admin, locker):
     item_id, report_id, _ = await setup_candidate(client, owner, locker)
@@ -234,7 +248,6 @@ async def test_retries_retain_original_and_supplemental_evidence(client, owner, 
 async def test_review_then_admin_approve_and_pickup_code(client, owner, admin, locker, session):
     item_id, report_id, _ = await setup_candidate(client, owner, locker, "Plain iPhone")
     item = await session.get(FoundItem, item_id)
-    item.category = "headphones"
     item.attributes.append(
         ItemAttribute(
             name="serial_suffix", value="SN77485633", source="admin", visibility="private"

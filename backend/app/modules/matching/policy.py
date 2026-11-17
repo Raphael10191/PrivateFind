@@ -3,11 +3,13 @@
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from typing import get_args
 
-from app.shared.vocab import category_key
+from app.shared.vocab import CATEGORY_ALIASES, Category, category_key
 
 WEIGHTS = {"category": 15, "location": 8, "time": 12, "attributes": 30, "semantic": 35}
 RETRIEVAL_TOLERANCE_DAYS = 7
+CROSS_CATEGORY_SIMILARITY = 0.8
 CATEGORY_FAMILIES = (
     {"phone", "tablet", "laptop", "headphones", "watch", "electronics"},
     {"wallet", "bag", "id_card"},
@@ -197,13 +199,24 @@ def score(
     return points
 
 
+def incompatible_categories(category: str) -> set[str]:
+    category = category_key(category)
+    known = set(get_args(Category)) - {"other"}
+    if category not in known:
+        return set()
+    electronic = CATEGORY_FAMILIES[0]
+    compatible = electronic if category == "electronics" else {category}
+    if category in electronic and category != "electronics":
+        compatible.add("electronics")
+    incompatible = known - compatible
+    return incompatible | {
+        alias for alias, canonical in CATEGORY_ALIASES.items() if canonical in incompatible
+    }
+
+
 def plausible(lost: LostFacts, found: FoundFacts, semantic: float | None) -> bool:
-    """Exclude only corroborated mismatches. Uncertainty keeps the candidate in play."""
-    category_reliability = (found.reliability or {}).get("category", 1.0)
+    """A different specific item type needs strong evidence from the descriptions."""
     return (
-        semantic is None
-        or semantic > 0.15
-        or category_score(lost, found) > 0.2
-        or category_reliability < 0.7
-        or attribute_score(lost, found) > 0.5
+        category_key(found.category) not in incompatible_categories(lost.category)
+        or (semantic is not None and semantic >= CROSS_CATEGORY_SIMILARITY)
     )

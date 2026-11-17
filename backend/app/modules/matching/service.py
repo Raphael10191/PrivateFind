@@ -4,7 +4,7 @@ from collections import Counter
 from datetime import timedelta
 from typing import get_args
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import db
@@ -232,6 +232,7 @@ async def cached_candidates(
             MatchCandidate.lost_report_id == report_id,
             MatchCandidate.shown.is_(True),
             FoundItem.status == "open",
+            _visible_category(report.category),
         )
         .order_by(MatchCandidate.total.desc(), FoundItem.id)
         .offset(offset)
@@ -268,12 +269,29 @@ async def refresh_for_item(item_id: int) -> None:
         await refresh_for_report(report_id, owner_id)
 
 
-async def shown_match(session: AsyncSession, report_id: int, item_id: int) -> MatchCandidate | None:
+def _visible_category(report_category: str):
+    # Reapply eligibility to rankings saved before the category rule changed.
+    category = func.replace(func.lower(func.trim(FoundItem.category)), "_", " ")
+    return or_(
+        category.is_(None),
+        category.not_in(
+            name.replace("_", " ") for name in policy.incompatible_categories(report_category)
+        ),
+        MatchCandidate.semantic >= policy.CROSS_CATEGORY_SIMILARITY * 100,
+    )
+
+
+async def shown_match(
+    session: AsyncSession, report: LostReport, item_id: int
+) -> MatchCandidate | None:
     """Return the candidate that the owner was shown, including its stored score."""
     return await session.scalar(
-        select(MatchCandidate).where(
-            MatchCandidate.lost_report_id == report_id,
+        select(MatchCandidate)
+        .join(FoundItem, FoundItem.id == MatchCandidate.found_item_id)
+        .where(
+            MatchCandidate.lost_report_id == report.id,
             MatchCandidate.found_item_id == item_id,
             MatchCandidate.shown.is_(True),
+            _visible_category(report.category),
         )
     )

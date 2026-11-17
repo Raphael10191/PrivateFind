@@ -55,7 +55,7 @@ async def submit(
     if report.status != "open":
         raise AppError(409, "report_closed", "This report is no longer open.")
     item = await items.get_item(session, item_id)
-    match = await matching.shown_match(session, report.id, item.id)
+    match = await matching.shown_match(session, report, item.id)
     if match is None:
         raise AppError(409, "not_a_candidate", "This item is not a candidate for your report.")
     if item.status != "open":
@@ -378,10 +378,14 @@ async def new_pickup_code(
 # ---------- admin ----------
 
 
-async def list_by_status(session: AsyncSession, status: str | None) -> list[Claim]:
+async def list_by_status(
+    session: AsyncSession, status: str | None, found_item_id: int | None = None
+) -> list[Claim]:
     q = select(Claim).order_by(Claim.id.desc())
     if status:
         q = q.where(Claim.status == status)
+    if found_item_id is not None:
+        q = q.where(Claim.found_item_id == found_item_id)
     return list(await session.scalars(q))
 
 

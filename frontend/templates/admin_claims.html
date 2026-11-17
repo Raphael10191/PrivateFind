@@ -127,6 +127,7 @@
     .review-field-value {
         line-height: 1.5;
         overflow-wrap: anywhere;
+        white-space: pre-wrap;
     }
 
     .review-divider {
@@ -301,8 +302,7 @@
                     <span class="review-field-label">
                         Found Item
                     </span>
-                    <div id="detail-item"
-                         class="review-field-value"></div>
+                    <a id="detail-item" class="review-field-value"></a>
                 </div>
 
                 <div class="review-field">
@@ -331,7 +331,15 @@
 
                 <hr class="review-divider">
 
-                <h3>Submitted Evidence</h3>
+                <h3>Owner's Original Report</h3>
+                <div class="evidence-row">
+                    <strong>Item description</strong>
+                    <p id="detail-description" class="review-field-value"></p>
+                    <strong>Private identifying details</strong>
+                    <p id="detail-identifying-details" class="review-field-value"></p>
+                </div>
+
+                <h3>Verification Evidence</h3>
                 <div id="detail-evidence"></div>
 
                 <h3>Private Item Attributes</h3>
@@ -340,40 +348,43 @@
 
                 <hr class="review-divider">
 
-                <label for="proof-method" class="review-note-label">Proof checked</label>
-                <select id="proof-method">
-                    <option value="">Choose the proof you checked</option>
-                    <option value="dated_identifier_record">Dated purchase or device record with matching identifier</option>
-                    <option value="live_device_control">Observed live control of this device</option>
-                    <option value="independent_record">Other independent ownership record</option>
-                    <option value="in_person_low_risk">Completed in-person handover for a low-risk item</option>
-                </select>
-                <label for="decision-note"
-                       class="review-note-label">
-                    Decision note
-                </label>
+                <div id="review-decision">
+                    <label for="proof-method" class="review-note-label">Proof checked</label>
+                    <select id="proof-method">
+                        <option value="">Choose the proof you checked</option>
+                        <option value="dated_identifier_record">Dated purchase or device record with matching identifier</option>
+                        <option value="live_device_control">Observed live control of this device</option>
+                        <option value="independent_record">Other independent ownership record</option>
+                        <option value="in_person_low_risk">Completed in-person handover for a low-risk item</option>
+                    </select>
+                    <label for="decision-note"
+                           class="review-note-label">
+                        Decision note
+                    </label>
 
-                <textarea
-                    id="decision-note"
-                    class="review-note"
-                    maxlength="500"
-                    placeholder="Explain the review decision..."></textarea>
+                    <textarea
+                        id="decision-note"
+                        class="review-note"
+                        maxlength="500"
+                        placeholder="Explain the review decision..."></textarea>
 
-                <div class="review-actions">
-                    <button
-                        id="reject-claim"
-                        type="button"
-                        class="review-button">
-                        Reject
-                    </button>
+                    <div class="review-actions">
+                        <button
+                            id="reject-claim"
+                            type="button"
+                            class="review-button">
+                            Reject
+                        </button>
 
-                    <button
-                        id="approve-claim"
-                        type="button"
-                        class="review-button approve-button">
-                        Approve
-                    </button>
+                        <button
+                            id="approve-claim"
+                            type="button"
+                            class="review-button approve-button">
+                            Approve
+                        </button>
+                    </div>
                 </div>
+                <div id="review-decision-note" class="review-field-value" hidden></div>
 
             </div>
         </section>
@@ -519,7 +530,7 @@
                         isAttribute ? ({
                         model_candidate: "Possible model",
                         model_candidate_less_likely: "Less likely model"
-                    }[value.name] || value.name) : value.type
+                    }[value.name] || value.name) : (value.type === "submission" ? "Additional owner detail" : value.type)
                     )
                 )
             );
@@ -537,7 +548,7 @@
                             : "Visibility: " + humanize(value.visibility)
                     )
                 );
-            } else {
+            } else if (value.type !== "submission") {
                 row.appendChild(
                     createText(
                         "p",
@@ -571,23 +582,15 @@
 
             if (version !== requestVersion) return;
 
-            if (claim.status !== "in_review") {
-                throw new Error(
-                    "This claim is no longer awaiting review."
-                );
-            }
-
             selectedClaimId = claim.id;
 
             document.getElementById(
                 "detail-claim-id"
             ).textContent = "Claim #" + claim.id;
 
-            document.getElementById(
-                "detail-item"
-            ).textContent =
-                (claim.item_summary || "Item #" + claim.found_item_id) +
-                " (ID: " + claim.found_item_id + ")";
+            const itemLink = document.getElementById("detail-item");
+            itemLink.textContent = (claim.item_summary || "Found Item") + " #" + claim.found_item_id;
+            itemLink.href = "/admin/items?id=" + encodeURIComponent(claim.found_item_id);
 
             document.getElementById(
                 "detail-report"
@@ -598,7 +601,8 @@
                 unresolved: "Unresolved",
                 verified: "Ownership verified",
                 refuted: "Ownership not verified",
-            }[claim.verification_state] || "Review required";
+                handed_over: "Handed over in person",
+            }[claim.verification_state] || humanize(claim.status);
 
             document.getElementById(
                 "detail-conflict"
@@ -606,10 +610,20 @@
                 ? "Yes — review carefully"
                 : "No critical conflict reported";
 
+            document.getElementById("detail-description").textContent =
+                claim.owner_description || "None provided.";
+            document.getElementById("detail-identifying-details").textContent =
+                claim.owner_identifying_details || "None provided.";
+
             renderEvidence(
                 document.getElementById("detail-evidence"),
-                claim.evidence
+                claim.evidence.filter(entry => entry.type !== "initial_report")
             );
+
+            document.getElementById("review-decision").hidden = claim.status !== "in_review";
+            const decisionNote = document.getElementById("review-decision-note");
+            decisionNote.textContent = claim.decision_note || "";
+            decisionNote.hidden = !claim.decision_note;
 
             renderEvidence(
                 document.getElementById("detail-attributes"),
@@ -867,9 +881,7 @@
     loadClaims().then(() => {
         const id = new URLSearchParams(location.search).get("id");
         if (!id) return;
-        const option = Array.from(reviewsList.querySelectorAll("button"))
-            .find(button => button.dataset.claimId === id);
-        if (option) selectClaim(id);
+        selectClaim(id);
     });
 </script>
 {% endblock %}

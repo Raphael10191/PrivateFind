@@ -407,6 +407,11 @@
 
                 <hr class="item-divider">
 
+                <h3>Owner Claims</h3>
+                <div id="detail-claims" aria-live="polite"></div>
+
+                <hr class="item-divider">
+
                 <h3>Uploaded Photos</h3>
                 <div id="detail-photos" class="photo-grid"></div>
 
@@ -688,6 +693,42 @@
         detailsBox.hidden = false;
     }
 
+    async function loadItemClaims(itemId, version) {
+        const container = document.getElementById("detail-claims");
+        container.textContent = "Loading owner claims...";
+        const params = new URLSearchParams({ status: "", found_item_id: itemId });
+        try {
+            const claims = await apiRequest("/api/admin/claims?" + params);
+            if (version !== requestVersion) return;
+            container.replaceChildren();
+            if (!claims.length) {
+                container.textContent = "No claims have been submitted for this item.";
+            }
+            for (const claim of claims) {
+                const row = document.createElement("div");
+                row.className = "item-attribute";
+                const status = claim.verification_state === "handed_over"
+                    ? "Handed over"
+                    : humanize(claim.status);
+                const link = createText("a", "Claim #" + claim.id + " · " + status);
+                link.href = "/admin/claims?id=" + encodeURIComponent(claim.id);
+                row.append(
+                    link,
+                    createText("p", claim.owner_description || "No item description provided.", "item-value")
+                );
+                if (claim.owner_identifying_details) {
+                    row.append(
+                        createText("span", "Private identifying details", "item-label"),
+                        createText("p", claim.owner_identifying_details, "item-value")
+                    );
+                }
+                container.appendChild(row);
+            }
+        } catch {
+            if (version === requestVersion) container.textContent = "Could not load owner claims.";
+        }
+    }
+
     async function selectItem(itemId) {
         if (retrying) return;
 
@@ -714,6 +755,7 @@
             selectedItemStatus = item.status;
 
             renderItemDetails(item);
+            void loadItemClaims(item.id, version);
             if (window.matchMedia("(max-width: 760px)").matches) detailsBox.focus();
 
             itemsList.querySelectorAll(

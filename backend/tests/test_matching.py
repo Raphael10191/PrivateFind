@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.db import utcnow
 from app.modules.found_items.models import FoundItem, ItemAttribute
 from app.modules.matching import policy
+from app.modules.matching.models import MatchCandidate
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import set_ai_provider
 from tests.conftest import deposit_and_store
@@ -80,12 +81,15 @@ def test_attribute_score_neutral_without_data():
     assert policy.attribute_score(*facts(lost_color=None, lost_brand=None)) == 0.5
 
 
-def test_retrieval_requires_corroboration_before_excluding_a_mismatch():
-    lost, item = facts(found_category="umbrella", found_color=None, found_brand=None)
-    assert not policy.plausible(lost, item, semantic=0.1)
+def test_retrieval_requires_strong_similarity_for_different_item_types():
+    lost, item = facts(found_category="headphones")
+    assert not policy.plausible(lost, item, semantic=0.3)
+    assert not policy.plausible(lost, item, semantic=None)
+    assert policy.plausible(lost, item, semantic=0.85)
+    item.category = "electronics"
     assert policy.plausible(lost, item, semantic=None)
-    item.reliability = {"category": 0.4}
-    assert policy.plausible(lost, item, semantic=0.1)
+    item.category = "smartphone"
+    assert policy.plausible(lost, item, semantic=None)
 
 
 def report(**kw):
@@ -101,16 +105,32 @@ def report(**kw):
     }
 
 
-async def test_candidates_endpoint(client, owner, other_owner, locker):
+async def test_candidates_endpoint(client, owner, other_owner, locker, session):
     _, h = locker
     match_id = await deposit_and_store(client, h)
     await deposit_and_store(client, h, note="Silver Apple phone near the gym", location="gym")
+    headphones = FoundItem(
+        category="headphones", location="library", status="open", description="White headphones"
+    )
+    session.add(headphones)
+    await session.commit()
 
     report_id = (await owner.post("/api/lost-reports", json=report())).json()["id"]
     r = await owner.get(f"/api/lost-reports/{report_id}/candidates")
     assert r.status_code == 200
     cands = r.json()
     assert cands[0]["found_item_id"] == match_id
+    assert headphones.id not in [row["found_item_id"] for row in cands]
+    stale = await session.scalar(
+        select(MatchCandidate).where(
+            MatchCandidate.lost_report_id == report_id,
+            MatchCandidate.found_item_id == headphones.id,
+        )
+    )
+    stale.shown = True
+    await session.commit()
+    cached = await owner.get(f"/api/lost-reports/{report_id}/candidates?refresh=false")
+    assert cached.json() == cands
     assert set(cands[0]) == {"found_item_id", "category", "color", "location", "found_date"}
 
     assert (await other_owner.get(f"/api/lost-reports/{report_id}/candidates")).status_code == 404
