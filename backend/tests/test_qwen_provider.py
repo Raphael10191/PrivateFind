@@ -192,3 +192,19 @@ async def test_qwen_only_keeps_observed_models_as_exact(
     assert result.model == exact
     assert result.model_candidates == candidates
     assert result.private_attributes == []
+
+
+async def test_qwen_keeps_visible_features_with_nonnumeric_confidence(monkeypatch):
+    ai = QwenProvider(Settings(qwen_model="test-qwen"))
+    raw = {
+        "category": "phone",
+        "confidence": "strong",
+        "private_attributes": [
+            {"type": "sticker_or_mark", "value": "MINT LAB", "confidence": "strong"}
+        ],
+    }
+    monkeypatch.setattr(ai, "_request", Mock(return_value=response(raw)))
+    result = await ai.extract_attributes([Photo(b"a")], "")
+    assert result.confidence == 0.0
+    [mark] = result.private_attributes
+    assert mark.value == "MINT LAB" and mark.confidence == 0.0

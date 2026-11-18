@@ -55,7 +55,8 @@ Return one JSON object with category, color, brand, model, model_candidates (up 
 less_likely_models (up to three), material, observations, public_summary, description,
 private_attributes and confidence. Values for observations are observed, estimated or
 unreadable. Each private attribute has type, value, strength and confidence.
-Use short, concrete values in English."""
+Use strong, distinctive or generic for strength. Use a JSON number from 0 to 1 for every
+confidence value. Use short, concrete values in English."""
 
 COMPARE_HINT = """
 Return JSON with a "scores" list containing one number per candidate, in order."""
@@ -67,6 +68,13 @@ def _json_object(content: str) -> dict:
     if start < 0 or end < start:
         raise AIError("Qwen returned no JSON object")
     return json.loads(content[start : end + 1])
+
+
+def _extraction_confidence(value) -> float:
+    try:
+        return bounded_score(value)
+    except (AIError, TypeError, ValueError):
+        return 0.0
 
 
 def _clean_extraction(raw: dict, note: str) -> Extraction:
@@ -87,7 +95,7 @@ def _clean_extraction(raw: dict, note: str) -> Extraction:
                 "type": kind if kind in get_args(EvidenceType) else "other",
                 "value": value[:200],
                 "strength": strength if strength in get_args(Strength) else "generic",
-                "confidence": bounded_score(attr.get("confidence", 0.6)),
+                "confidence": _extraction_confidence(attr.get("confidence", 0.6)),
             }
         )
     extraction = Extraction.model_validate(
@@ -103,7 +111,7 @@ def _clean_extraction(raw: dict, note: str) -> Extraction:
             "public_summary": category,
             "description": str(raw.get("description") or note or category),
             "private_attributes": attributes,
-            "confidence": bounded_score(raw.get("confidence", 0.6)),
+            "confidence": _extraction_confidence(raw.get("confidence", 0.6)),
         }
     )
     state = extraction.observations.get("model")
