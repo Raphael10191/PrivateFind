@@ -80,6 +80,7 @@ def distinct_parts(findings: list[PhotoFinding]) -> set[str]:
 MESSAGES = {
     "pending": "Your claim is waiting to be checked.",
     "approved": "Ownership verified. Use the pickup code at the locker.",
+    "revoked": "The pickup was cancelled. Return to your lost report to check other matches.",
     "in_review": "Contact the locker operator to discuss your claim.",
     "rejected": "We could not verify this claim.",
     "handed_over": "The locker operator recorded an in-person handover.",

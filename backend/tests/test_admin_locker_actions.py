@@ -2,7 +2,7 @@ from sqlalchemy import update
 
 from app.modules.locker import service
 from app.modules.locker.models import Compartment
-from tests.conftest import deposit, jpeg
+from tests.conftest import deposit, deposit_and_store, jpeg
 from tests.test_claims import GOOD, claim, setup_candidate
 
 
@@ -123,10 +123,16 @@ async def test_mark_one_compartment_empty(client, owner, admin, locker):
     assert item["status"] == "expired" and item["photo_ids"]
     assert (await owner.post(f"/api/claims/{pickup['id']}/pickup-code")).status_code == 409
 
-    replacement = (await deposit(client)).json()
-    assert replacement["compartment"] == slot["number"]
+    assert (await owner.get(f"/api/claims/{pickup['id']}")).json()["status"] == "revoked"
+    [before] = (await owner.get("/api/claims")).json()
+    assert before["status"] == "revoked" and before["pickup_code"] is None
+
+    replacement_id = await deposit_and_store(client, headers)
     assert (await admin.post(url, json=request)).status_code == 409
-    assert await validate(client, headers, replacement["deposit_code"])
+    await owner.get(f"/api/lost-reports/{report_id}/candidates")
+    new_claim = await claim(owner, report_id, replacement_id, GOOD)
+    assert new_claim.status_code == 201, new_claim.text
+    assert new_claim.json()["status"] == "approved" and new_claim.json()["pickup_code"]
 
     entries = (await admin.get("/api/admin/audit")).json()
     [reset] = [entry for entry in entries if entry["action"] == "admin_compartment_reset"]

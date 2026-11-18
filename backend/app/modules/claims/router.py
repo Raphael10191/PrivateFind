@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
 from app.modules.claims import service
@@ -13,6 +15,7 @@ from app.modules.claims.schemas import (
     PickupCodeOut,
 )
 from app.modules.found_items import service as items
+from app.modules.found_items.models import FoundItem
 from app.modules.found_items.schemas import AttributeIO
 from app.modules.identity.deps import AdminUser, CurrentUser, SessionDep
 from app.modules.lost_reports.models import LostReport
@@ -21,8 +24,12 @@ from app.shared.ratelimit import claim_limiter
 router = APIRouter(tags=["claims"])
 
 
-def _out(claim: Claim, issued=None) -> ClaimOut:
-    status = "handed_over" if claim.verification_state == "handed_over" else claim.status
+def _out(claim: Claim, issued=None, *, pickup_revoked: bool = False) -> ClaimOut:
+    status = claim.status
+    if claim.verification_state == "handed_over":
+        status = "handed_over"
+    elif pickup_revoked:
+        status = "revoked"
     return ClaimOut(
         id=claim.id,
         found_item_id=claim.found_item_id,
@@ -53,14 +60,33 @@ async def submit(body: ClaimIn, user: CurrentUser, session: SessionDep):
     return _out(claim, issued)
 
 
+async def _owner_claims_out(session: AsyncSession, claims: list[Claim]) -> list[ClaimOut]:
+    approved_items = {c.found_item_id for c in claims if c.status == "approved"}
+    expired_items = set()
+    if approved_items:
+        expired_items = set(
+            await session.scalars(
+                select(FoundItem.id).where(
+                    FoundItem.id.in_(approved_items), FoundItem.status == "expired"
+                )
+            )
+        )
+    return [
+        _out(c, pickup_revoked=c.status == "approved" and c.found_item_id in expired_items)
+        for c in claims
+    ]
+
+
 @router.get("/api/claims", response_model=list[ClaimOut])
 async def list_mine(user: CurrentUser, session: SessionDep):
-    return [_out(c) for c in await service.list_mine(session, user.id)]
+    return await _owner_claims_out(session, await service.list_mine(session, user.id))
 
 
 @router.get("/api/claims/{claim_id}", response_model=ClaimOut)
 async def get_one(claim_id: int, user: CurrentUser, session: SessionDep):
-    return _out(await service.get_own(session, claim_id, user.id))
+    claim = await service.get_own(session, claim_id, user.id)
+    [response] = await _owner_claims_out(session, [claim])
+    return response
 
 
 @router.post("/api/claims/{claim_id}/pickup-code", response_model=PickupCodeOut)

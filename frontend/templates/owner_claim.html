@@ -458,6 +458,8 @@
 
             statusButton.hidden = false;
 
+        } else if (claim.status === "revoked") {
+            heading.textContent = "Pickup Cancelled";
         } else if (claim.status === "handed_over") {
             heading.textContent = "Handover Complete";
         } else if (claim.status === "rejected") {

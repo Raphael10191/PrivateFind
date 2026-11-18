@@ -11,6 +11,7 @@ from app.core.errors import AppError, not_found
 from app.modules.claims import policy
 from app.modules.claims.models import Claim, OwnershipEvidence
 from app.modules.found_items import service as items
+from app.modules.found_items.models import FoundItem
 from app.modules.identity.models import User
 from app.modules.locker import service as locker_service
 from app.modules.lost_reports import service as reports
@@ -305,10 +306,12 @@ async def _lock_report_for_release(session: AsyncSession, claim: Claim) -> LostR
     other = await session.scalar(
         select(Claim.id)
         .join(MatchCandidate, MatchCandidate.id == Claim.match_id)
+        .join(FoundItem, FoundItem.id == MatchCandidate.found_item_id)
         .where(
             MatchCandidate.lost_report_id == report.id,
             Claim.id != claim.id,
             Claim.status == "approved",
+            FoundItem.status != "expired",
         )
         .limit(1)
         .with_for_update()
