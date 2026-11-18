@@ -252,9 +252,9 @@ async def test_estimated_model_cannot_penalize_candidate_in_matching(
     client, owner, locker, session
 ):
     ai = MockAIProvider()
-    ai.compare_texts = AsyncMock(return_value=[0.8])
+    ai.compare_texts = AsyncMock(return_value=[0.1])
     set_ai_provider(ai)
-    item_id = await deposit_and_store(client, locker[1])
+    item_id = await deposit_and_store(client, locker[1], note="Black Apple iPhone")
     item = await session.get(FoundItem, item_id)
     item.description = "Black iPhone 13 in a case with a magnetic ring."
     item.attributes.append(
@@ -268,7 +268,10 @@ async def test_estimated_model_cannot_penalize_candidate_in_matching(
     )
     await session.commit()
 
-    saved = await owner.post("/api/lost-reports", json=report(model="14"))
+    saved = await owner.post(
+        "/api/lost-reports",
+        json=report(brand="Apple", model="iPhone 15", description="Black iPhone 15"),
+    )
     response = await owner.get(f"/api/lost-reports/{saved.json()['id']}/candidates")
     assert [item["found_item_id"] for item in response.json()] == [item_id]
     text = ai.compare_texts.await_args.args[1][0]

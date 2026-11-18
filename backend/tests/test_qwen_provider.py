@@ -55,6 +55,8 @@ async def test_qwen_extraction_sends_both_images_and_normalizes_output(monkeypat
     assert request.call_args_list[0].args == ("GET", "/models")
     method, path, body = request.call_args_list[1].args
     assert (method, path, body["model"]) == ("POST", "/chat/completions", "test-qwen")
+    assert "iPhone 17 Pro and iPhone 18 Pro" in body["messages"][0]["content"]
+    assert "An empty list is valid." in body["messages"][0]["content"]
     content = body["messages"][1]["content"]
     assert [part["image_url"]["url"] for part in content if part["type"] == "image_url"] == [
         "data:image/jpeg;base64,YQ==",
@@ -162,3 +164,31 @@ async def test_qwen_recognizes_model_alternatives_separately(monkeypatch):
     assert result.model_candidates == ["iPhone 13", "iPhone 14"]
     assert result.less_likely_models == ["iPhone 12"]
     assert result.observations["model"] == "estimated"
+
+
+@pytest.mark.parametrize(
+    ("observation", "exact", "candidates"),
+    [
+        (None, None, ["iPhone 13"]),
+        ("estimated", None, ["iPhone 13"]),
+        ("unreadable", None, []),
+        ("observed", "iPhone 13", []),
+    ],
+)
+async def test_qwen_only_keeps_observed_models_as_exact(
+    monkeypatch, observation, exact, candidates
+):
+    ai = QwenProvider(Settings(qwen_model="test-qwen"))
+    raw = {
+        "category": "phone",
+        "brand": "Apple",
+        "model": "iPhone 13",
+        "observations": {"model": observation} if observation else {},
+        "description": "Apple iPhone in a protective case.",
+        "private_attributes": [],
+    }
+    monkeypatch.setattr(ai, "_request", Mock(return_value=response(raw)))
+    result = await ai.extract_attributes([Photo(b"a")], "")
+    assert result.model == exact
+    assert result.model_candidates == candidates
+    assert result.private_attributes == []
