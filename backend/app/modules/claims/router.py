@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
@@ -26,20 +28,25 @@ from app.shared.ratelimit import claim_limiter
 router = APIRouter(tags=["claims"])
 
 
-def _out(claim: Claim, issued=None, *, pickup_revoked: bool = False) -> ClaimOut:
+def _out(claim: Claim, issued=None, *, item_status: str | None = None) -> ClaimOut:
     status = claim.status
+    next_action = claim.next_action
     if claim.verification_state == "handed_over":
         status = "handed_over"
-    elif pickup_revoked:
-        status = "revoked"
+    elif item_status in {"expired", "returned"}:
+        if status == "approved":
+            status = "collected" if item_status == "returned" else "revoked"
+        elif status in {"in_review", "pending"}:
+            status = "unavailable"
+        next_action = None
     return ClaimOut(
         id=claim.id,
         found_item_id=claim.found_item_id,
         lost_report_id=claim.lost_report_id,
         status=status,
         verification_state=claim.verification_state,
-        next_action=claim.next_action,
-        message=NEXT_ACTION_MESSAGES.get(claim.next_action, MESSAGES[status]),
+        next_action=next_action,
+        message=NEXT_ACTION_MESSAGES.get(next_action, MESSAGES[status]),
         created_at=claim.created_at,
         compartment=issued.compartment if issued else None,
         pickup_code=issued.code if issued else None,
@@ -68,20 +75,15 @@ async def submit(body: ClaimIn, user: CurrentUser, session: SessionDep):
 
 
 async def _owner_claims_out(session: AsyncSession, claims: list[Claim]) -> list[ClaimOut]:
-    approved_items = {c.found_item_id for c in claims if c.status == "approved"}
-    expired_items = set()
-    if approved_items:
-        expired_items = set(
-            await session.scalars(
-                select(FoundItem.id).where(
-                    FoundItem.id.in_(approved_items), FoundItem.status == "expired"
-                )
-            )
+    if not claims:
+        return []
+    item_states = await session.execute(
+        select(FoundItem.id, FoundItem.status).where(
+            FoundItem.id.in_({claim.found_item_id for claim in claims})
         )
-    return [
-        _out(c, pickup_revoked=c.status == "approved" and c.found_item_id in expired_items)
-        for c in claims
-    ]
+    )
+    statuses = dict(item_states.all())
+    return [_out(claim, item_status=statuses.get(claim.found_item_id)) for claim in claims]
 
 
 @router.get("/api/claims", response_model=list[ClaimOut])
@@ -107,7 +109,7 @@ async def pickup_code(claim_id: int, user: CurrentUser, session: SessionDep):
 # ---------- admin ----------
 
 
-async def _admin_out(session, claim: Claim) -> AdminClaimOut:
+async def _admin_out(session: AsyncSession, claim: Claim, details: dict | None) -> AdminClaimOut:
     item = await items.get_item(session, claim.found_item_id)
     report = await session.get(LostReport, claim.lost_report_id)
     return AdminClaimOut(
@@ -116,12 +118,14 @@ async def _admin_out(session, claim: Claim) -> AdminClaimOut:
         found_item_id=claim.found_item_id,
         lost_report_id=claim.lost_report_id,
         status=claim.status,
+        item_status=item.status,
         verification_state=claim.verification_state,
         next_action=claim.next_action,
         ownership_score=claim.ownership_score,
         critical_conflict=claim.critical_conflict,
         created_at=claim.created_at,
         decision_note=claim.decision_note,
+        verification_reason=_verification_reason(claim, details),
         owner_description=report.description if report else None,
         owner_identifying_details=report.unique_marks if report else None,
         evidence=[EvidenceOut.model_validate(e) for e in claim.evidence],
@@ -136,36 +140,50 @@ async def admin_list(
     session: SessionDep,
     status: str | None = "in_review",
     found_item_id: int | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ):
-    return [
-        await _admin_out(session, claim)
-        for claim in await service.list_by_status(session, status, found_item_id)
-    ]
+    claims = await service.list_by_status(session, status, found_item_id, limit)
+    details = await _latest_verification_details(session, [claim.id for claim in claims])
+    return [await _admin_out(session, claim, details.get(claim.id)) for claim in claims]
 
 
 @router.get("/api/admin/claims/{claim_id}", response_model=AdminClaimOut, tags=["admin"])
 async def admin_get(claim_id: int, _: AdminUser, session: SessionDep):
     claim = await service.get(session, claim_id)
-    response = await _admin_out(session, claim)
-    if claim.decided_by is not None:
-        response.verification_reason = "The operator recorded this decision after a manual review."
-        return response
-    if claim.status == "rejected" and claim.verification_state == "unresolved":
-        response.verification_reason = claim.decision_note
-        return response
-    details = await session.scalar(
-        select(AuditLog.details)
+    details = await _latest_verification_details(session, [claim.id])
+    return await _admin_out(session, claim, details.get(claim.id))
+
+
+async def _latest_verification_details(
+    session: AsyncSession, claim_ids: list[int]
+) -> dict[int, dict]:
+    if not claim_ids:
+        return {}
+    latest_ids = (
+        select(func.max(AuditLog.id))
         .where(
             AuditLog.entity_type == "claim",
-            AuditLog.entity_id == claim.id,
+            AuditLog.entity_id.in_(claim_ids),
             AuditLog.action == "claim_submitted",
         )
-        .order_by(AuditLog.id.desc())
-        .limit(1)
+        .group_by(AuditLog.entity_id)
     )
+    rows = await session.execute(
+        select(AuditLog.entity_id, AuditLog.details).where(AuditLog.id.in_(latest_ids))
+    )
+    return {claim_id: details for claim_id, details in rows if details}
+
+
+def _verification_reason(claim: Claim, details: dict | None) -> str | None:
+    if claim.decided_by is not None:
+        return "The operator recorded this decision after a manual review."
+    if claim.status == "rejected" and claim.verification_state == "unresolved":
+        return claim.decision_note
     if details and details.get("decision") == claim.verification_state:
-        response.verification_reason = details.get("verification_reason")
-    if response.verification_reason is None and claim.status == "approved":
+        reason = details.get("verification_reason")
+        if reason:
+            return reason
+    if claim.status == "approved":
         confirmed = [
             entry.value
             for entry in claim.evidence
@@ -173,11 +191,12 @@ async def admin_get(claim_id: int, _: AdminUser, session: SessionDep):
             and entry.type not in {"common", "model"}
             and entry.attempt_no in (None, claim.attempt_no)
         ]
-        response.verification_reason = "The reason was not recorded for this earlier approval."
+        reason = "The reason was not recorded for this earlier approval."
         if confirmed:
             details_text = "; ".join(dict.fromkeys(confirmed))
-            response.verification_reason += f" Recorded photo matches: {details_text}."
-    return response
+            reason += f" Recorded photo matches: {details_text}."
+        return reason
+    return None
 
 
 @router.post("/api/admin/claims/{claim_id}/decision", response_model=ClaimOut, tags=["admin"])

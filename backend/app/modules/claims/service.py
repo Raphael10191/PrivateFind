@@ -205,6 +205,8 @@ async def submit(
                 "kind": f.kind,
                 "distinctive": f.distinctive,
                 "strong": f.strong,
+                "distinctive_photo_match": policy.has_visual_support(f),
+                "combination_photo_match": policy.has_visual_support(f, combined=True),
                 "source": source,
             }
             for source, findings in (("initial", original), ("additional", additional))
@@ -380,14 +382,21 @@ async def new_pickup_code(
 
 
 async def list_by_status(
-    session: AsyncSession, status: str | None, found_item_id: int | None = None
+    session: AsyncSession,
+    status: str | None,
+    found_item_id: int | None = None,
+    limit: int | None = None,
 ) -> list[Claim]:
-    q = select(Claim).order_by(Claim.id.desc())
-    if status:
-        q = q.where(Claim.status == status)
+    query = select(Claim)
+    if status == "decided":
+        query = query.where(Claim.status.in_(("approved", "rejected"))).order_by(
+            Claim.decided_at.desc()
+        )
+    elif status:
+        query = query.where(Claim.status == status)
     if found_item_id is not None:
-        q = q.where(Claim.found_item_id == found_item_id)
-    return list(await session.scalars(q))
+        query = query.where(Claim.found_item_id == found_item_id)
+    return list(await session.scalars(query.order_by(Claim.id.desc()).limit(limit)))
 
 
 async def get(session: AsyncSession, claim_id: int) -> Claim:

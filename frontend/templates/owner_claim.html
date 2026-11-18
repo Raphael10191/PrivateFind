@@ -307,7 +307,7 @@
         "pickup-details"
     );
 
-    let claimId = null;
+    let currentClaim = null;
     let submitting = false;
     let claimCreated = false;
 
@@ -356,7 +356,7 @@
     });
 
     function showClaimResult(claim) {
-        claimId = claim.id;
+        currentClaim = claim;
         claimCreated = true;
 
         claimForm.hidden = true;
@@ -411,6 +411,10 @@
             heading.textContent = "Pickup Cancelled";
         } else if (claim.status === "handed_over") {
             heading.textContent = "Handover Complete";
+        } else if (claim.status === "collected") {
+            heading.textContent = "Item Collected";
+        } else if (claim.status === "unavailable") {
+            heading.textContent = "Item Unavailable";
         } else if (claim.status === "rejected") {
             heading.textContent =
                 "Ownership Not Verified";
@@ -533,36 +537,43 @@
         }
     );
 
-    statusButton.addEventListener(
-        "click",
-        async () => {
-            if (!claimId) return;
-
-            statusButton.disabled = true;
+    async function refreshClaim(quiet = false) {
+        const before = currentClaim;
+        if (!claimCreated || submitting || statusButton.disabled || pickupButton.disabled ||
+            !["pending", "in_review", "approved"].includes(before?.status)) return;
+        statusButton.disabled = true;
+        if (!quiet) {
             resultError.hidden = true;
+        }
 
-            try {
-                const claim = await api(
-                    "/api/claims/" +
-                    encodeURIComponent(claimId)
-                );
-
+        try {
+            const claim = await api("/api/claims/" + encodeURIComponent(before.id));
+            if (before === currentClaim && claimCreated &&
+                (!quiet || before.status !== claim.status || before.next_action !== claim.next_action)) {
                 showClaimResult(claim);
-
-            } catch (error) {
+            }
+        } catch (error) {
+            if (!quiet) {
                 resultError.textContent = error.message;
                 resultError.hidden = false;
-
-            } finally {
-                statusButton.disabled = false;
             }
+        } finally {
+            statusButton.disabled = false;
         }
-    );
+    }
+
+    statusButton.addEventListener("click", () => refreshClaim());
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) void refreshClaim(true);
+    });
+    setInterval(() => {
+        if (!document.hidden) void refreshClaim(true);
+    }, 5000);
 
     pickupButton.addEventListener(
         "click",
         async () => {
-            if (!claimId) return;
+            if (!currentClaim) return;
 
             pickupButton.disabled = true;
             resultError.hidden = true;
@@ -570,7 +581,7 @@
             try {
                 const result = await api(
                     "/api/claims/" +
-                    encodeURIComponent(claimId) +
+                    encodeURIComponent(currentClaim.id) +
                     "/pickup-code",
                     { method: "POST" }
                 );

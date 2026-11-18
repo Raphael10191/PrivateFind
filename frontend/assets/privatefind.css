@@ -473,6 +473,7 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 .overview-row strong { overflow-wrap: anywhere; }
 .overview-row span:first-child { flex: 1; min-width: 0; }
 .overview-row small { display: block; color: var(--muted); }
+#decisions-list small { overflow-wrap: anywhere; }
 .status-pill {
     display: inline-block;
     border-radius: 6px;

@@ -57,6 +57,7 @@ class AdminClaimOut(BaseModel):
     found_item_id: int
     lost_report_id: int
     status: str
+    item_status: str
     verification_state: str | None = None
     next_action: str | None = None
     ownership_score: float | None

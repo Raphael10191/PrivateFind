@@ -38,17 +38,25 @@ def assess(
     prior_quotes = {" ".join(f.quote.casefold().split()) for f in initial}
     extra = [f for f in additional if " ".join(f.quote.casefold().split()) not in prior_quotes]
     supported = distinct_findings(initial + extra)
+    combination = distinct_findings(initial, combined=True)
     if trusted_identifier and any(value != trusted_identifier for value in identifiers):
         return Verdict(
             "refuted", reason="The submitted identifier conflicts with the trusted record."
         )
     disagreements = [f for f in initial + additional if f.status == "contradicted"]
-    if disagreements and not supported:
+    if disagreements and not supported and len(combination) < 2:
         return Verdict(
             "refuted", reason="The photos contradict the claim and confirm no distinctive detail."
         )
     strong_initial = next((f for f in initial if f.strong and has_visual_support(f)), None)
     if not competing and not exposed and not disagreements:
+        if len(combination) >= 2:
+            details = " ".join(_describe_finding(f) for f in combination.values())
+            return Verdict(
+                "verified",
+                reason="Pickup code issued. The photo check found this combination of reported "
+                f"details identifying. {details}",
+            )
         if strong_initial is not None:
             return Verdict(
                 "verified",
@@ -96,34 +104,41 @@ def assess(
     )
 
 
-def has_visual_support(finding: PhotoFinding) -> bool:
+def has_visual_support(finding: PhotoFinding, *, combined: bool = False) -> bool:
+    identifying = finding.supports_combination if combined else finding.distinctive
     return (
         finding.status == "confirmed"
         and finding.kind not in {"common", "model"}
         and finding.photo_index is not None
-        and bool(finding.part and finding.distinctive and finding.observation)
+        and bool(finding.part and finding.observation and identifying)
     )
 
 
-def distinct_findings(findings: list[PhotoFinding]) -> dict[str, PhotoFinding]:
+def distinct_findings(
+    findings: list[PhotoFinding], *, combined: bool = False
+) -> dict[str, PhotoFinding]:
     parts: dict[str, PhotoFinding] = {}
     observations: set[str] = set()
+    quotes: set[str] = set()
     for finding in findings:
-        if not has_visual_support(finding):
+        if not has_visual_support(finding, combined=combined) or finding.part in parts:
             continue
         observation = " ".join(finding.observation.casefold().split())
-        if observation not in observations:
-            parts.setdefault(finding.part, finding)
+        quote = " ".join(finding.quote.casefold().split())
+        if observation not in observations and quote not in quotes:
+            parts[finding.part] = finding
             observations.add(observation)
+            quotes.add(quote)
     return parts
 
 
 def _describe_finding(finding: PhotoFinding) -> str:
     assert finding.photo_index is not None
-    return (
-        f"“{finding.quote}” matched photo {finding.photo_index + 1} "
-        f"({finding.part}): {finding.observation}."
-    )
+    location = f"“{finding.quote}” matched photo {finding.photo_index + 1} ({finding.part})"
+    if finding.observation:
+        observation = finding.observation.rstrip(".")
+        return f"{location}: {observation}."
+    return f"{location}."
 
 
 MESSAGES = {
@@ -133,6 +148,8 @@ MESSAGES = {
     "in_review": "Contact the locker operator to discuss your claim.",
     "rejected": "We could not verify this claim.",
     "handed_over": "The locker operator recorded an in-person handover.",
+    "collected": "The locker confirmed collection of your item.",
+    "unavailable": "This item is no longer available. View your lost report for other matches.",
 }
 NEXT_ACTION_MESSAGES = {
     "another_detail": "Add one more distinctive detail or contact the locker operator.",

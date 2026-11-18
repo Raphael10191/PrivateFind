@@ -184,8 +184,7 @@
 
     <div class="reviews-heading">
         <div>
-            <h1>Claim Reviews</h1>
-            <p>Review ownership evidence before making a decision.</p>
+            <h1 id="reviews-title">Claim Reviews</h1>
         </div>
 
         <button
@@ -195,6 +194,7 @@
             Refresh
         </button>
     </div>
+    <a id="switch-claim-view" href="/admin/claims?status=decided">View decision history</a>
 
     <p id="reviews-error"
        class="review-message review-error"
@@ -209,7 +209,7 @@
     <div class="reviews-grid">
 
         <section class="reviews-panel">
-            <h2>Awaiting Review</h2>
+            <h2 id="claim-list-title">Awaiting Review</h2>
 
             <div id="reviews-list"
                  aria-live="polite">
@@ -227,9 +227,7 @@
 
             <div id="review-details" tabindex="-1" hidden>
 
-                <span class="review-status">
-                    In Review
-                </span>
+                <span id="detail-status" class="review-status"></span>
 
                 <div class="review-field">
                     <span class="review-field-label">
@@ -357,7 +355,17 @@
     let submitting = false;
     let requestVersion = 0;
 
-    const {humanize, createText, requestJSON} = window.privateFind;
+    const {humanize, createText, requestJSON, adminClaimStatus} = window.privateFind;
+    const params = new URLSearchParams(location.search);
+    const viewingHistory = params.get("status") === "decided";
+    const claimsUrl = "/api/admin/claims?status=" + (viewingHistory ? "decided" : "in_review");
+    if (viewingHistory) {
+        document.getElementById("reviews-title").textContent = "Claim Decisions";
+        document.getElementById("claim-list-title").textContent = "Decision History";
+        const viewLink = document.getElementById("switch-claim-view");
+        viewLink.href = "/admin/claims";
+        viewLink.textContent = "Back to review queue";
+    }
 
     function showError(message) {
         errorBox.textContent = message;
@@ -473,6 +481,7 @@
             if (version !== requestVersion) return;
 
             selectedClaimId = claim.id;
+            document.getElementById("detail-status").textContent = adminClaimStatus(claim);
 
             document.getElementById(
                 "detail-claim-id"
@@ -565,9 +574,7 @@
         );
 
         try {
-            const claims = await apiRequest(
-                "/api/admin/claims?status=in_review"
-            );
+            const claims = await apiRequest(claimsUrl);
 
             if (version !== requestVersion) return;
 
@@ -634,7 +641,7 @@
             );
 
             resetDetails();
-            renderClaims(await apiRequest("/api/admin/claims?status=in_review"));
+            renderClaims(await apiRequest(claimsUrl));
 
             successBox.textContent =
                 "Claim #" + claimId + " " +
@@ -665,7 +672,7 @@
             reviewsList.appendChild(
                 createText(
                     "p",
-                    "No claims require review right now.",
+                    viewingHistory ? "No claim decisions recorded yet." : "No claims require review right now.",
                     "review-empty"
                 )
             );
@@ -693,7 +700,7 @@
             button.appendChild(
                 createText(
                     "span",
-                    "Lost Report #" + claim.lost_report_id
+                    viewingHistory ? adminClaimStatus(claim) : "Lost Report #" + claim.lost_report_id
                 )
             );
 
@@ -719,7 +726,7 @@
     );
 
     loadClaims().then(() => {
-        const id = new URLSearchParams(location.search).get("id");
+        const id = params.get("id");
         if (!id) return;
         selectClaim(id);
     });

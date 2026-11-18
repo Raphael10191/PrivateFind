@@ -63,7 +63,9 @@ scores 0.75-1.0. A clear contradiction scores 0.0-0.2.
 A missing detail alone is no contradiction. A model estimated from external appearance,
 or alternate visually plausible models, cannot contradict the owner's exact model.
 A missing generation or one absent from a list of estimates is neutral. Compare the product
-family, description, and visible details independently from any estimate."""
+family, description, and visible details independently from any estimate. A specific location
+mentioned in both texts can make a candidate more plausible. Treat locations as context for
+ranking, including where an item might have been moved. Unknown locations are neutral."""
 
 
 class _Similarities(BaseModel):

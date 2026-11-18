@@ -44,7 +44,9 @@ def _lost_text(report: LostReport) -> str:
 
 
 def _found_text(item: FoundItem) -> str:
-    description = (item.description or item.note or "")[:1000]
+    description = "\n".join(
+        part[:1000] for part in dict.fromkeys((item.description, item.note)) if part
+    )
     if item.observed_model():
         return description
     estimates = [*item.model_candidates(), *item.model_candidates(less_likely=True)]

@@ -25,13 +25,16 @@ HANDOVER = {
 }
 
 
-def finding(quote, part="back", *, status="confirmed", distinctive=True, kind="damage"):
+def finding(
+    quote, part="back", *, status="confirmed", distinctive=True, combined=False, kind="damage"
+):
     return PhotoFinding(
         quote=quote,
         part=part,
         status=status,
         kind=kind,
         distinctive=distinctive,
+        supports_combination=combined,
         photo_index=0 if status in ("confirmed", "contradicted") else None,
         observation=f"Visible {quote}",
     )
@@ -96,6 +99,65 @@ async def claim(c, report_id, item_id, evidence=None, **more):
             [],
             ("verified", None),
             id="purple-iphone-distinct-surfaces",
+        ),
+        pytest.param(
+            "phone",
+            [
+                finding("a lot of scratches on the back", distinctive=False, combined=True),
+                finding(
+                    "car wallpaper", "front", kind="contents", distinctive=False, combined=True
+                ),
+            ],
+            [],
+            ("verified", None),
+            id="car-wallpaper-and-large-rear-crack",
+        ),
+        pytest.param(
+            "bag",
+            [
+                finding(
+                    "ein Fuchsanhänger", "attachment", kind="accessory",
+                    distinctive=False, combined=True,
+                ),
+                finding("geflickter Träger", "strap", distinctive=False, combined=True),
+            ],
+            [],
+            ("verified", None),
+            id="other-item-and-language-use-the-same-combination-rule",
+        ),
+        pytest.param(
+            "phone",
+            [
+                finding(
+                    "big scratch on back", status="unobservable", distinctive=False, combined=True
+                ),
+                finding(
+                    "car bacground", "front", kind="contents", distinctive=False, combined=True
+                ),
+            ],
+            [],
+            ("needs_more_evidence", "device_record"),
+            id="the-wallpaper-alone-is-insufficient",
+        ),
+        pytest.param(
+            "phone",
+            [
+                finding("black phone", "front", kind="common", combined=True),
+                finding("iPhone 15", "back", kind="model", combined=True),
+            ],
+            [],
+            ("needs_more_evidence", "device_record"),
+            id="ordinary-product-details-cannot-form-a-combination",
+        ),
+        pytest.param(
+            "phone",
+            [
+                finding(BACK),
+                finding("white car drifting on a mountain road", "front", kind="contents"),
+            ],
+            [],
+            ("verified", None),
+            id="specific-damage-and-wallpaper",
         ),
         pytest.param(
             "phone",
@@ -226,6 +288,10 @@ async def test_approved_claim_to_pickup(client, owner, admin, session, locker):
     assert state.json()["state"] == "free"
     assert (await session.get(FoundItem, item_id)).status == "returned"
     assert (await owner.get(f"/api/lost-reports/{report_id}")).json()["status"] == "resolved"
+    status_url = f"/api/claims/{body['id']}"
+    collected = (await owner.get(status_url)).json()
+    assert collected["status"] == "collected" and collected["next_action"] is None
+    assert (await owner.post(status_url + "/pickup-code")).status_code == 409
 
     history_url = f"/api/admin/claims?status=&found_item_id={item_id}"
     assert (await owner.get(history_url)).status_code == 403
@@ -235,6 +301,11 @@ async def test_approved_claim_to_pickup(client, owner, admin, session, locker):
     assert historical["id"] == body["id"] and historical["status"] == "approved"
     assert historical["owner_description"] == BACK
     assert historical["owner_identifying_details"] == FRONT
+    assert historical["item_status"] == "returned"
+    assert historical["verification_reason"] == reason
+    decisions_url = "/api/admin/claims?status=decided&limit=6"
+    assert (await owner.get(decisions_url)).status_code == 403
+    assert (await admin.get(decisions_url)).json() == [historical]
     assert (await admin.get(history_url.replace(f"={item_id}", "=999999"))).json() == []
 
 
@@ -265,12 +336,16 @@ async def test_review_then_admin_approve_and_pickup_code(client, owner, admin, l
     claim_body = response.json()
     assert claim_body["next_action"] == "device_record" and claim_body["pickup_code"] is None
     url = f"/api/admin/claims/{claim_body['id']}/decision"
+    assert (await admin.get("/api/admin/claims?status=decided")).json() == []
     assert (await admin.post(url, json={"decision": "approve"})).status_code == 422
     assert (await owner.post(url, json=OPERATOR_APPROVAL)).status_code == 403
     assert (await admin.post(url, json=OPERATOR_APPROVAL)).json()[
         "verification_state"
     ] == "verified"
     assert (await owner.post(f"/api/claims/{claim_body['id']}/pickup-code")).status_code == 200
+    [historical] = (await admin.get("/api/admin/claims?status=decided")).json()
+    assert historical["id"] == claim_body["id"]
+    assert historical["decision_note"] == OPERATOR_APPROVAL["note"]
 
 
 async def test_public_details_and_rate_limit(client, owner, locker):

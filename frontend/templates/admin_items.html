@@ -594,9 +594,7 @@
             for (const claim of claims) {
                 const row = document.createElement("div");
                 row.className = "item-attribute";
-                const status = claim.verification_state === "handed_over"
-                    ? "Handed over"
-                    : humanize(claim.status);
+                const status = window.privateFind.adminClaimStatus(claim);
                 const link = createText("a", "Claim #" + claim.id + " · " + status);
                 link.href = "/admin/claims?id=" + encodeURIComponent(claim.id);
                 row.append(
@@ -607,6 +605,13 @@
                     row.append(
                         createText("span", "Private identifying details", "item-label"),
                         createText("p", claim.owner_identifying_details, "item-value")
+                    );
+                }
+                const reason = claim.decision_note || claim.verification_reason;
+                if (reason) {
+                    row.append(
+                        createText("span", "Verification reason", "item-label"),
+                        createText("p", reason, "item-value")
                     );
                 }
                 container.appendChild(row);

@@ -28,6 +28,13 @@
             <a class="pf-button pf-secondary" href="/admin/lockers">View lockers &amp; devices</a>
         </section>
     </div>
+    <section class="pf-card overview-list" aria-labelledby="recent-decisions">
+        <div class="section-title">
+            <h2 id="recent-decisions">Recent claim decisions</h2>
+            <a class="pf-button pf-secondary" href="/admin/claims?status=decided">View decision history</a>
+        </div>
+        <div id="decisions-list"></div>
+    </section>
     <section class="pf-card overview-list" aria-labelledby="recent-items">
         <div class="section-title">
             <h2 id="recent-items">Recent finds</h2>
@@ -44,6 +51,7 @@
     const refreshButton = document.getElementById("refresh-dashboard");
     const statusBox = document.getElementById("dashboard-status");
     const content = document.getElementById("dashboard-content");
+    const {adminClaimStatus} = window.privateFind;
 
     async function getJson(url) {
         const response = await fetch(url, {cache:"no-store"});
@@ -92,10 +100,11 @@
         refreshButton.disabled = true;
         statusBox.textContent = "Loading overview…";
         try {
-            const [items, claims, lockers] = await Promise.all([
+            const [items, claims, lockers, decisions] = await Promise.all([
                 getJson("/api/admin/items"),
                 getJson("/api/admin/claims?status=in_review"),
-                getJson("/api/admin/lockers")
+                getJson("/api/admin/lockers"),
+                getJson("/api/admin/claims?status=decided&limit=6")
             ]);
             const activePhotoFailures = items.filter(item =>
                 item.ai_status === "failed" && ["open", "awaiting_deposit"].includes(item.status)
@@ -122,6 +131,13 @@
                     free + " of " + locker.compartments.length + " compartments available",
                     null, locker.code);
             }), "No lockers configured.");
+
+            showRows("decisions-list", decisions.map(claim => row(
+                "Claim #" + claim.id + " · Item #" + claim.found_item_id,
+                claim.decision_note || claim.verification_reason || "No decision reason was recorded.",
+                "/admin/claims?status=decided&id=" + claim.id,
+                adminClaimStatus(claim)
+            )), "No claim decisions have been recorded yet.");
 
             showRows("items-list", items.slice(0, 4).map(item => row(
                 label(item.category || "Found item") + " #" + item.id, label(item.location),

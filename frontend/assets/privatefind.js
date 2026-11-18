@@ -4,6 +4,12 @@ window.privateFind = {
             .replaceAll("_", " ")
             .replace(/\b\w/g, letter => letter.toUpperCase());
     },
+    adminClaimStatus(claim) {
+        if (claim.verification_state === "handed_over") return "Handed over";
+        if (claim.status === "approved" && claim.item_status === "returned") return "Returned";
+        if (claim.status === "approved" && claim.item_status === "expired") return "Pickup cancelled";
+        return window.privateFind.humanize(claim.status);
+    },
     createText(tag, value, className = "") {
         const element = document.createElement(tag);
         element.textContent = String(value ?? "");
