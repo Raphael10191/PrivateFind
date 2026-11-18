@@ -63,19 +63,6 @@
         margin-bottom: 9px;
     }
 
-    .finder-field input,
-    .finder-field select,
-    .finder-field textarea {
-        display: block;
-        width: 100%;
-        padding: 14px;
-        border: 1px solid var(--field-border);
-        border-radius: 10px;
-        background: var(--paper);
-        color: var(--ink);
-        font: inherit;
-    }
-
     .photo-field {
         min-width: 0;
         border: 0;
@@ -271,10 +258,6 @@
 
     .instructions li {
         margin-bottom: 8px;
-    }
-
-    [hidden] {
-        display: none !important;
     }
 
     @media (max-width: 600px) {
@@ -510,11 +493,7 @@
     let submitted = false;
 
     function humanize(value) {
-        return String(value || "")
-            .replaceAll("_", " ")
-            .replace(/\b\w/g, letter =>
-                letter.toUpperCase()
-            );
+        return window.privateFind.humanize(value || "");
     }
 
     function showError(message) {

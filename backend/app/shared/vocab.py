@@ -22,8 +22,6 @@ EvidenceType = Literal[
 Visibility = Literal["public", "private"]
 Strength = Literal["strong", "distinctive", "generic"]
 
-STRENGTH_WEIGHT = {"strong": 3, "distinctive": 2, "generic": 1}
-
 # Evidence types that must match exactly; a mismatch is a critical conflict.
 CRITICAL_TYPES = {"serial_suffix"}
 

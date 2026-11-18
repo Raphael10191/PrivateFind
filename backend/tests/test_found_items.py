@@ -7,7 +7,7 @@ from app.modules.found_items.models import FoundItem
 from app.modules.locker.models import AccessCode
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import set_ai_provider
-from tests.conftest import deposit, deposit_and_store
+from tests.conftest import deposit
 
 
 async def item(session, item_id) -> FoundItem:
@@ -27,14 +27,6 @@ async def test_deposit_returns_code_and_runs_ai(client, session, locker):
     assert it.category == "phone"
     assert it.attr("color") == "black"
     assert {a.name for a in it.private_attributes()} == {"serial_suffix", "sticker_or_mark"}
-
-
-async def test_full_flow_to_stored(client, session, locker):
-    _, h = locker
-    item_id = await deposit_and_store(client, h)
-    assert (await item(session, item_id)).status == "open"
-    r = await client.get("/api/lockers/L1")
-    assert r.json()["free_compartments"] == 1
 
 
 async def test_empty_after_open_cancels_deposit(client, session, locker):

@@ -3,7 +3,7 @@
 import re
 from typing import get_args
 
-from app.shared.ai.provider import DetailAttribute, DetailScores, Photo
+from app.shared.ai.provider import Photo
 from app.shared.ai.schemas import Extraction, PrivateAttribute
 from app.shared.vocab import Category, Color
 
@@ -93,18 +93,3 @@ class MockAIProvider:
     async def compare_texts(self, query: str, candidates: list[str]) -> list[float]:
         q = _words(query)
         return [_similarity(q, _words(candidate)) for candidate in candidates]
-
-    async def verify_details(
-        self, attrs: list[DetailAttribute], evidence: list[str]
-    ) -> DetailScores:
-        evidence_words = [_words(value) for value in evidence]
-        scores = {}
-        for attr in attrs:
-            words = _words(attr["value"])
-            scores.update(
-                {
-                    (attr["id"], index): _similarity(words, claimed)
-                    for index, claimed in enumerate(evidence_words)
-                }
-            )
-        return scores

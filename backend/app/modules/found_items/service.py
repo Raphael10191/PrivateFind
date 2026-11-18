@@ -119,7 +119,7 @@ async def read_draft(session, item_id: int, token: str, *, lock: bool = False):
     draft = await session.scalar(query.with_for_update() if lock else query)
     if draft is None:
         raise not_found("Photo review")
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     if item.status != "awaiting_deposit" or item.compartment_id is not None:
         raise not_found("Photo review")
     return draft, item
@@ -350,21 +350,14 @@ async def requeue_pending() -> int:
 # ---------- status changes (called by locker and claims) ----------
 
 
-async def _get(session: AsyncSession, item_id: int) -> FoundItem:
-    item = await session.get(FoundItem, item_id)
-    if item is None:
-        raise not_found("Item")
-    return item
-
-
 async def mark_stored(session: AsyncSession, item_id: int) -> None:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     item.status = "open"
     audit.log(session, "item_stored", "found_item", item_id, actor_type="device")
 
 
 async def mark_deposit_cancelled(session: AsyncSession, item_id: int, reason: str) -> None:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     item.status = "expired"
     audit.log(session, "deposit_cancelled", "found_item", item_id, reason=reason)
 
@@ -372,7 +365,7 @@ async def mark_deposit_cancelled(session: AsyncSession, item_id: int, reason: st
 async def mark_returned(
     session: AsyncSession, item_id: int, *, actor_type: str = "device", actor_id: int | None = None
 ) -> None:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     item.status = "returned"
     from app.modules.claims.models import Claim
     from app.modules.lost_reports.models import LostReport
@@ -403,7 +396,10 @@ async def try_reserve(session: AsyncSession, item_id: int) -> bool:
 
 
 async def get_item(session: AsyncSession, item_id: int) -> FoundItem:
-    return await _get(session, item_id)
+    item = await session.get(FoundItem, item_id)
+    if item is None:
+        raise not_found("Item")
+    return item
 
 
 async def stored_items(session: AsyncSession, found_after: datetime | None) -> list[FoundItem]:
@@ -417,7 +413,7 @@ async def stored_items(session: AsyncSession, found_after: datetime | None) -> l
 
 
 async def remove_item(session: AsyncSession, item_id: int, admin_id: int) -> None:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     compartment = await locker_service.compartment_for_item(session, item_id, lock=True)
     await session.refresh(item, ["status"], with_for_update=True)
     was_active = item.status in ACTIVE_ITEM_STATUSES
@@ -448,7 +444,7 @@ async def replace_attributes(
     public_summary: str | None,
     attributes: list[dict],
 ) -> FoundItem:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     item.category = category
     if public_summary is not None:
         item.public_summary = public_summary
@@ -472,7 +468,7 @@ async def replace_attributes(
 
 
 async def reset_for_retry(session: AsyncSession, item_id: int, admin_id: int) -> None:
-    item = await _get(session, item_id)
+    item = await get_item(session, item_id)
     if item.ai_status == "done":
         raise AppError(409, "ai_already_done", "Attributes already extracted.")
     item.ai_status = "pending"

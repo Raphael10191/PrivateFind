@@ -10,14 +10,6 @@
         margin: 0 auto;
     }
 
-    .items-heading {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 26px;
-    }
-
     .items-heading h1 {
         margin: 0 0 8px;
         font-size: clamp(2.25rem, 5vw, 3.3rem);
@@ -77,21 +69,6 @@
         font-size: 14px;
     }
 
-    .items-grid {
-        display: grid;
-        grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-        gap: 20px;
-        align-items: start;
-    }
-
-    .items-panel {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 24px;
-        min-width: 0;
-    }
-
     .items-panel h2 {
         margin: 0 0 18px;
         font-size: 19px;
@@ -134,13 +111,6 @@
 
     .item-field {
         margin-bottom: 18px;
-    }
-
-    .item-label {
-        display: block;
-        color: var(--muted);
-        font-size: 13px;
-        margin-bottom: 6px;
     }
 
     .item-value {
@@ -202,13 +172,6 @@
         background: var(--paper);
     }
 
-    .item-message {
-        padding: 14px;
-        border-radius: 10px;
-        margin-bottom: 18px;
-        line-height: 1.5;
-    }
-
     .item-error {
         background: var(--danger-bg);
         color: var(--danger);
@@ -236,26 +199,9 @@
         line-height: 1.6;
     }
 
-    [hidden] {
-        display: none !important;
-    }
-
     @media (max-width: 700px) {
-        .items-heading {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
         .items-heading h1 {
             font-size: clamp(2.25rem, 5vw, 3.3rem);
-        }
-
-        .items-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .items-panel {
-            padding: 20px;
         }
 
         .items-filters {
@@ -441,30 +387,14 @@
     const aiFilter = document.getElementById("ai-filter");
 
     let selectedItemId = null;
-    let selectedItemStatus = null;
     let retrying = false;
     let requestVersion = 0;
 
-    function humanize(value) {
-        return String(value ?? "Unknown")
-            .replaceAll("_", " ")
-            .replace(/\b\w/g, letter => letter.toUpperCase());
-    }
+    const {humanize, createText, requestJSON} = window.privateFind;
 
     function setText(id, value) {
         document.getElementById(id).textContent =
             String(value ?? "Not available");
-    }
-
-    function createText(tag, value, className = "") {
-        const element = document.createElement(tag);
-        element.textContent = String(value ?? "");
-
-        if (className) {
-            element.className = className;
-        }
-
-        return element;
     }
 
     function clearMessages() {
@@ -477,58 +407,15 @@
         errorBox.hidden = false;
     }
 
-    function getApiError(data, fallback) {
-        if (typeof data?.error?.message === "string") {
-            return data.error.message;
-        }
-
-        if (typeof data?.detail === "string") {
-            return data.detail;
-        }
-
-        return fallback;
-    }
-
-    async function apiRequest(url, options = {}) {
-        const response = await fetch(url, {
-            credentials: "same-origin",
-            cache: "no-store",
-            ...options
+    function apiRequest(url, options) {
+        return requestJSON(url, options, {
+            admin: true,
         });
-
-        if (response.status === 401) {
-            window.location.replace("/login");
-            throw new Error("Please sign in again.");
-        }
-
-        if (response.status === 403) {
-            throw new Error("Admin access required.");
-        }
-
-        let data = null;
-
-        try {
-            data = await response.json();
-        } catch {
-            // Non-JSON server response.
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                getApiError(
-                    data,
-                    "Request failed (HTTP " + response.status + ")."
-                )
-            );
-        }
-
-        return data;
     }
 
     function resetDetails() {
         requestVersion += 1;
         selectedItemId = null;
-        selectedItemStatus = null;
         detailsBox.hidden = true;
         placeholder.hidden = false;
         placeholder.textContent =
@@ -737,7 +624,6 @@
         const version = ++requestVersion;
 
         selectedItemId = null;
-        selectedItemStatus = null;
 
         detailsBox.hidden = true;
         placeholder.hidden = false;
@@ -752,7 +638,6 @@
             if (version !== requestVersion) return;
 
             selectedItemId = item.id;
-            selectedItemStatus = item.status;
 
             renderItemDetails(item);
             void loadItemClaims(item.id, version);

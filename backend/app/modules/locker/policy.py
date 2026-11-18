@@ -14,15 +14,6 @@ _ON_REPORT = {
     ("pickup_open", True): ("occupied", "pickup_incomplete"),
 }
 
-# LCD texts (max 16 characters)
-MESSAGES = {
-    "deposited": "Item stored",
-    "deposit_cancelled": "Deposit cancel",
-    "picked_up": "Thank you!",
-    "pickup_incomplete": "Item still in",
-}
-
-
 def next_state_on_code(state: str, purpose: str) -> str | None:
     return _ON_CODE.get((state, purpose))
 

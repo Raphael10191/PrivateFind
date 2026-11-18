@@ -42,12 +42,10 @@ enum Occupancy { SENSOR_UNKNOWN = -1, EMPTY = 0, OCCUPIED = 1 };
 
 LockerMode lockerMode = ENTER_CODE;
 String enteredCode = "";
-String activeAction = "";
 unsigned long lastSensorRead = 0;
 unsigned long lastWifiRetry = 0;
 Occupancy candidateState = SENSOR_UNKNOWN;
 byte stableSamples = 0;
-float lastDistanceCm = -1;
 
 
 void setup() {
@@ -201,7 +199,6 @@ bool validateCodeWithBackend(const String& code, String& action) {
 
 
 void openCompartment(const String& action) {
-  activeAction = action;
   lockerServo.write(SERVO_OPEN_ANGLE);
   lockerMode = DOOR_OPEN;
 
@@ -230,11 +227,11 @@ void refreshSensors() {
   }
   lastSensorRead = millis();
 
-  lastDistanceCm = readDistanceCm();
-  renderSensorLine(lastDistanceCm);
+  float distance = readDistanceCm();
+  renderSensorLine(distance);
 
   if (lockerMode == VERIFYING_STATE) {
-    verifyAndReportState(lastDistanceCm);
+    verifyAndReportState(distance);
   }
 }
 
@@ -291,7 +288,6 @@ void verifyAndReportState(float distance) {
   if (reportCompartmentState(occupied)) {
     lockerServo.write(SERVO_CLOSED_ANGLE);
     lockerMode = ENTER_CODE;
-    activeAction = "";
     showStatus(occupied ? "Item sicher drin" : "Fach ist leer");
     Serial.println("Status gesendet. Fach 1 geschlossen.");
   } else {

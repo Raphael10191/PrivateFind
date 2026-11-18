@@ -10,14 +10,6 @@
         margin: 12px auto;
     }
 
-    .claim-back {
-        display: inline-block;
-        color: var(--ink);
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 24px;
-    }
-
     .claim-heading h1 {
         margin: 0 0 10px;
         font-size: clamp(2.25rem, 5vw, 3.3rem);
@@ -50,13 +42,6 @@
 
     .claim-field {
         margin: 22px 0;
-    }
-
-    .claim-field label {
-        display: block;
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 9px;
     }
 
     .claim-field textarea {
@@ -145,17 +130,6 @@
         font-weight: 700;
         color: var(--ink);
         overflow-wrap: anywhere;
-    }
-
-    .result-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 18px;
-    }
-
-    [hidden] {
-        display: none !important;
     }
 
     @media (max-width: 600px) {
@@ -346,36 +320,8 @@
         claimError.hidden = false;
     }
 
-    async function api(url, options = {}) {
-        const response = await fetch(url, {
-            credentials: "same-origin",
-            cache: "no-store",
-            ...options
-        });
-
-        if (response.status === 401) {
-            window.location.replace("/login");
-            throw new Error("Please sign in again.");
-        }
-
-        if (!response.ok) {
-            let message = "Request failed.";
-
-            try {
-                const data = await response.json();
-                if (data.error?.code === "ai_unavailable") {
-                    document.dispatchEvent(new Event("privatefind-ai-unavailable"));
-                }
-
-                message = data.error?.message || message;
-            } catch {
-                // Keep default message.
-            }
-
-            throw new Error(message);
-        }
-
-        return response.json();
+    function api(url, options) {
+        return window.privateFind.requestJSON(url, options, {failure: "Request failed.", ai: true});
     }
 
     function showPickup(code, compartment, expiry) {

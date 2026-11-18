@@ -5,24 +5,6 @@
 
 {% block head %}
 <style>
-    .login-page {
-        max-width: 440px;
-        margin: 60px auto;
-        padding: 0 16px;
-    }
-
-    .login-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 32px;
-    }
-
-    .login-card h1 {
-        margin: 0 0 8px;
-        font-size: clamp(2.25rem, 5vw, 3.3rem);
-    }
-
     .login-subtitle {
         color: var(--muted);
         font-size: 14px;
@@ -30,88 +12,11 @@
         line-height: 1.5;
     }
 
-    .login-field {
-        margin-bottom: 20px;
-    }
-
-    .login-field label {
-        display: block;
-        font-weight: 600;
-        font-size: 14px;
-        margin-bottom: 8px;
-    }
-
-    .login-field input {
-        display: block;
-        width: 100%;
-        padding: 13px;
-        border: 1px solid var(--field-border);
-        border-radius: 10px;
-        background: var(--paper);
-        color: var(--ink);
-        font: inherit;
-    }
-
-    .login-field input:focus {
-        outline: 2px solid var(--ink);
-        outline-offset: 1px;
-    }
-
-    .login-button {
-        display: block;
-        width: 100%;
-        padding: 14px;
-        border: 0;
-        border-radius: 10px;
-        background: var(--ink);
-        color: white;
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .login-button:hover {
-        background: var(--green);
-    }
-
-    .login-button:disabled {
-        opacity: 0.65;
-        cursor: wait;
-    }
-
-    .login-error {
-        margin: 0 0 16px;
-        padding: 12px;
-        border-radius: 10px;
-        background: var(--danger-bg);
-        color: var(--danger);
-        font-size: 14px;
-    }
-
     .login-error[hidden] {
         display: none;
     }
 
-    .register-link {
-        margin: 24px 0 0;
-        text-align: center;
-        font-size: 14px;
-        color: var(--muted);
-    }
-
-    .register-link a {
-        color: var(--ink);
-        font-weight: 600;
-    }
-
     @media (max-width: 600px) {
-        .login-page {
-            margin: 24px auto;
-        }
-
-        .login-card {
-            padding: 24px 20px;
-        }
     }
 </style>
 {% endblock %}

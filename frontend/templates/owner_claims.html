@@ -85,13 +85,6 @@
         white-space: nowrap;
     }
 
-    .claim-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 18px;
-    }
-
     .report-link {
         display: inline-flex;
         align-items: center;
@@ -135,10 +128,6 @@
     .feedback.error {
         background: var(--danger-bg);
         color: var(--danger);
-    }
-
-    [hidden] {
-        display: none !important;
     }
 
     @media (max-width: 600px) {
@@ -220,32 +209,8 @@
         return labels[status] || "Unknown Status";
     }
 
-    async function api(url, options = {}) {
-        const response = await fetch(url, {
-            credentials: "same-origin",
-            cache: "no-store",
-            ...options
-        });
-
-        if (response.status === 401) {
-            window.location.replace("/login");
-            throw new Error("Please sign in again.");
-        }
-
-        if (!response.ok) {
-            let message = "Unable to complete the request.";
-
-            try {
-                const data = await response.json();
-                message = data.error?.message || message;
-            } catch {
-                // Keep the default error.
-            }
-
-            throw new Error(message);
-        }
-
-        return response.json();
+    function api(url, options) {
+        return window.privateFind.requestJSON(url, options, {failure: "Unable to complete the request."});
     }
 
     function paragraph(text, className = "") {

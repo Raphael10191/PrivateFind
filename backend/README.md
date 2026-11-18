@@ -1,107 +1,59 @@
 # PrivateFind backend
 
-FastAPI (async) · SQLAlchemy 2 · MySQL 8 · Python 3.13. Design: [architecture](../docs/design/architecture.md), [API contract](../docs/design/api-contract.md).
+The [main README](../README.md) covers the Docker, frontend, Qwen and ESP32
+setup. Use the steps below when working directly on the FastAPI backend.
 
-## Run everything with Docker
+## Run locally
 
-Only Docker Desktop is needed on the host. From the repository root:
-
-```bash
-docker compose up --build
-```
-
-Compose waits for MySQL, then the backend applies migrations, seeds an admin and
-one-compartment locker, and starts on port 8000. Open http://localhost:8000/docs.
-The app currently provides an API interface; there is no merged frontend yet.
-
-Defaults: `AI_PROVIDER=mock`, admin `admin@example.com` / `changeme123`, locker `L1`,
-device `locker_01`. Configure a real AI provider for Finder and Owner submissions. The
-application reports availability at `/api/ai/status` and pauses AI-dependent actions when
-the provider is unavailable. Automated tests use the mock provider.
-
-The seed is safe to run repeatedly and keeps the existing device key. Save the key
-printed on the **first** startup for the ESP32. View logs with:
+Start Docker and install [uv](https://docs.astral.sh/uv/). Run from the
+repository root:
 
 ```bash
-docker compose logs backend
-```
-
-Database data and photos are kept in `mysql-data` and `photo-data` volumes.
-`docker compose down` stops the app and retains both volumes. Start in the
-background with `docker compose up --build -d`; inspect health with `docker compose ps`.
-
-Optional environment variables can be set in a root `.env` file or the shell:
-`SECRET_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT` (host port), `AI_PROVIDER`,
-`ANTHROPIC_API_KEY`, and `CLAUDE_MODEL`. Set the Qwen URL, model and API key in the environment for a Qwen demo.
-Changing admin defaults after the database is seeded does not reset an existing
-account's password. Container database/storage paths are configured by Compose;
-the local `backend/.env` is excluded from the image.
-
-To connect the physical ESP32, use the laptop's LAN IP and published port in its
-backend URLs, and the saved device key. The firmware runs on the ESP32 itself.
-
-## Run the backend locally
-Requires [uv](https://docs.astral.sh/uv/) and Docker.
-
-```bash
-docker compose up -d mysql                  # from the repo root
+docker compose up -d mysql
 cd backend
-cp .env.example .env                        # then edit SECRET_KEY
-uv sync
-uv run alembic upgrade head                 # create tables
+cp -n .env.example .env
+uv sync --locked
+uv run alembic upgrade head
 uv run python -m scripts.seed --admin-email admin@privatefind.local --admin-password changeme123
 uv run uvicorn app.main:app --reload
 ```
 
-The interactive API docs are at http://localhost:8000/docs.
+Edit `backend/.env` for this local setup. Configure a real AI provider for
+AI-dependent submissions in the browser. The mock provider is used by the
+automated suite. `GET /api/ai/status` reports availability. Failed extraction
+can be retried from the operator's found-items page. The interactive API docs
+are at [localhost:8000/docs](http://localhost:8000/docs).
 
-For frontend integration, see the [complete API guide](../docs/api/frontend-integration.md),
-[OpenAPI snapshot](../docs/api/openapi.json), and [Postman collection](../docs/api/postman-collection.json).
-Regenerate the JSON exports from this directory with `uv run python -m scripts.export_api_docs`.
-
-## Tests and lint
-```bash
-uv run pytest        # in-memory SQLite + mock AI: no MySQL or API key needed
-uv run ruff check .
-uv run ruff format .
-```
-
-## Layout
-```
-app/
-  core/       config, async DB session, error shape
-  shared/     audit log, private photo storage, rate limits, vocabularies, ai/ (mock + Claude)
-  modules/    one folder per domain: router.py, service.py, models.py, schemas.py, policy.py
-    identity/  locker/  found_items/  lost_reports/  matching/  claims/
-migrations/   Alembic
-scripts/      seed.py
-tests/
-```
-
-Rules:
-- Use domain services for workflows; ORM relationships follow Simon's shared database schema.
-- Business rules live in `policy.py` as pure functions with unit tests.
-
-## Schema changes
-After changing a model:
+To seed a separate virtual locker with five items for a demo, run from the
+repository root:
 
 ```bash
-uv run alembic revision --autogenerate -m "describe change"
-uv run alembic upgrade head
+docker compose exec -T backend python -m scripts.demo_seed
 ```
 
-Review the generated file before committing it.
+## Code and tests
 
-## Real AI
-Set `AI_PROVIDER=claude` and `ANTHROPIC_API_KEY` in `.env`. If the AI is down, extraction is retried 3 times. After that, the item shows up under `GET /api/admin/items?ai_status=FAILED`, where an admin can retry or correct it.
+Each domain folder in `app/modules/` contains its API routes, data models and
+workflow. Matching, claims and locker policies keep their decision rules
+separate from database writes. Configuration and database sessions live in
+`app/core/`. The domains share AI, photo storage, auditing and rate limiting
+through `app/shared/`.
 
-## Team integration (2026-11-10)
+From `backend/`:
 
-The database baseline is Simon's 13-table migration `c37e42452449`, followed by the
-additive backend revision `c3c3ff57c7f3`. Keep the existing asynchronous services.
-See [integration notes](../docs/design/team-integration.md) for fresh and existing team DB setup.
+```bash
+uv run --locked pytest
+uv run --locked ruff check .
+```
 
-The ESP32 API now uses Raphael's `{device_id, code}` / `{authorized, compartment, action}`
-contract. State reporting uses `{device_id, occupied}` / `{compartment, state}`.
-The seed defaults to device `locker_01`, locker code `L1`, and one physical compartment.
-All stored lifecycle/status values now use Simon's lowercase vocabulary.
+Tests use temporary SQLite databases and cover the API, AI contracts and ESP32
+requests. The [team integration notes](../docs/design/team-integration.md)
+describe the MySQL migration chain and device payloads.
+
+When a database model changes, create and review a migration with
+`uv run alembic revision --autogenerate -m "describe change"`. Apply it with
+`uv run alembic upgrade head`.
+
+When an API contract changes, update the
+[frontend integration guide](../docs/api/frontend-integration.md) and use
+`uv run python -m scripts.export_api_docs` to regenerate the checked-in exports.

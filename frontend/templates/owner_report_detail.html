@@ -10,14 +10,6 @@
         margin: 12px auto;
     }
 
-    .detail-back {
-        display: inline-block;
-        color: var(--ink);
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 24px;
-    }
-
     .detail-heading {
         display: flex;
         justify-content: space-between;
@@ -153,10 +145,6 @@
         padding: 14px;
         border-radius: 10px;
         line-height: 1.5;
-    }
-
-    [hidden] {
-        display: none !important;
     }
 
     @media (max-width: 600px) {
@@ -312,11 +300,7 @@
     }
 
     function humanize(value) {
-        return String(value || "")
-            .replaceAll("_", " ")
-            .replace(/\b\w/g, character =>
-                character.toUpperCase()
-            );
+        return window.privateFind.humanize(value || "");
     }
 
     function setField(id, value) {
@@ -324,31 +308,8 @@
             value || "Not specified";
     }
 
-    async function requestJson(url) {
-        const response = await fetch(url, {
-            credentials: "same-origin",
-            cache: "no-store"
-        });
-
-        if (response.status === 401) {
-            window.location.replace("/login");
-            throw new Error("Please sign in again.");
-        }
-
-        if (!response.ok) {
-            let message = "Unable to load information.";
-
-            try {
-                const data = await response.json();
-                message = data.error?.message || message;
-            } catch {
-                // Retain the default message.
-            }
-
-            throw new Error(message);
-        }
-
-        return response.json();
+    function requestJson(url, options) {
+        return window.privateFind.requestJSON(url, options, {failure: "Unable to load information."});
     }
 
     async function loadReport() {

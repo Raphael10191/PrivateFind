@@ -5,56 +5,11 @@
 
 {% block head %}
 <style>
-    .register-page {
-        max-width: 440px;
-        margin: 60px auto;
-        padding: 0 16px;
-    }
-
-    .register-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 32px;
-    }
-
-    .register-card h1 {
-        margin: 0 0 8px;
-        font-size: clamp(2.25rem, 5vw, 3.3rem);
-    }
-
     .register-subtitle {
         margin: 0 0 28px;
         color: var(--muted);
         font-size: 14px;
         line-height: 1.5;
-    }
-
-    .register-field {
-        margin-bottom: 20px;
-    }
-
-    .register-field label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    .register-field input {
-        display: block;
-        width: 100%;
-        padding: 13px;
-        border: 1px solid var(--field-border);
-        border-radius: 10px;
-        background: var(--paper);
-        color: var(--ink);
-        font: inherit;
-    }
-
-    .register-field input:focus {
-        outline: 2px solid var(--ink);
-        outline-offset: 1px;
     }
 
     .field-help {
@@ -63,61 +18,11 @@
         color: var(--muted);
     }
 
-    .register-button {
-        display: block;
-        width: 100%;
-        padding: 14px;
-        border: 0;
-        border-radius: 10px;
-        background: var(--ink);
-        color: white;
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .register-button:hover {
-        background: var(--green);
-    }
-
-    .register-button:disabled {
-        opacity: 0.65;
-        cursor: wait;
-    }
-
-    .register-error {
-        margin: 0 0 16px;
-        padding: 12px;
-        border-radius: 10px;
-        background: var(--danger-bg);
-        color: var(--danger);
-        font-size: 14px;
-    }
-
     .register-error[hidden] {
         display: none;
     }
 
-    .login-link {
-        margin: 24px 0 0;
-        text-align: center;
-        font-size: 14px;
-        color: var(--muted);
-    }
-
-    .login-link a {
-        color: var(--ink);
-        font-weight: 600;
-    }
-
     @media (max-width: 600px) {
-        .register-page {
-            margin: 24px auto;
-        }
-
-        .register-card {
-            padding: 24px 20px;
-        }
     }
 </style>
 {% endblock %}

@@ -11,7 +11,6 @@ def test_policy_transitions():
     assert policy.next_state_on_code("occupied", "deposit") is None
     assert policy.next_state_on_report("deposit_open", True) == ("occupied", "deposited")
     assert policy.next_state_on_report("free", True) is None
-    assert all(len(m) <= 16 for m in policy.MESSAGES.values())
 
 
 async def test_locker_info(client, session):

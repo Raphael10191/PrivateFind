@@ -22,6 +22,24 @@ from app.shared.ratelimit import deposit_limiter
 router = APIRouter(tags=["found items"])
 
 
+async def _read_deposit_photos(
+    request: Request, photos: list[UploadFile]
+) -> list[tuple[bytes, str | None]]:
+    ip = request.client.host if request.client else "unknown"
+    if not deposit_limiter.hit(ip):
+        raise AppError(429, "rate_limited", "Too many deposits. Please try again later.")
+    return [(await photo.read(), photo.content_type) for photo in photos]
+
+
+def _deposit_out(item_id: int, issued: locker_service.IssuedCode) -> DepositOut:
+    return DepositOut(
+        item_id=item_id,
+        compartment=issued.compartment,
+        deposit_code=issued.code,
+        expires_at=issued.expires_at,
+    )
+
+
 @router.post(
     "/api/deposits",
     response_model=DepositOut,
@@ -39,20 +57,12 @@ async def deposit(
     finder_contact: Annotated[str | None, Form(max_length=200)] = None,
 ):
     """Public (finder, no account). AI extraction runs after the response is sent."""
-    ip = request.client.host if request.client else "unknown"
-    if not deposit_limiter.hit(ip):
-        raise AppError(429, "rate_limited", "Too many deposits. Please try again later.")
-    files = [(await p.read(), p.content_type) for p in photos]
+    files = await _read_deposit_photos(request, photos)
     item, issued = await service.submit_deposit(
         session, locker_code, location, note, finder_contact, files
     )
     background.add_task(service.run_extraction, item.id)
-    return DepositOut(
-        item_id=item.id,
-        compartment=issued.compartment,
-        deposit_code=issued.code,
-        expires_at=issued.expires_at,
-    )
+    return _deposit_out(item.id, issued)
 
 
 DraftToken = Annotated[str, Header(alias="X-Deposit-Token", min_length=32, max_length=100)]
@@ -73,10 +83,7 @@ async def start_photo_review(
     photos: Annotated[list[UploadFile], File()],
     note: Annotated[str, Form(max_length=500)] = "",
 ):
-    ip = request.client.host if request.client else "unknown"
-    if not deposit_limiter.hit(ip):
-        raise AppError(429, "rate_limited", "Too many deposits. Please try again later.")
-    files = [(await p.read(), p.content_type) for p in photos]
+    files = await _read_deposit_photos(request, photos)
     item, token = await service.create_draft(session, locker_code, location, note, None, files)
     background.add_task(service.run_extraction, item.id)
     return DraftOut(item_id=item.id, token=token)
@@ -136,12 +143,7 @@ async def confirm_photo_review(
     session: SessionDep,
 ):
     issued = await service.confirm_draft(session, item_id, token, body.category)
-    return DepositOut(
-        item_id=item_id,
-        compartment=issued.compartment,
-        deposit_code=issued.code,
-        expires_at=issued.expires_at,
-    )
+    return _deposit_out(item_id, issued)
 
 
 # ---------- admin ----------

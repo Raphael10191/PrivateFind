@@ -35,6 +35,7 @@ async def test_firmware_contract_and_device_id(client, session, validate_path):
         json={"device_id": "locker_01", "occupied": True},
     )
     assert state.json() == {"compartment": 1, "state": "occupied"}
+    assert (await session.get(FoundItem, data["item_id"])).status == "open"
     assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 0
 
 

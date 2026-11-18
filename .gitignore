@@ -21,14 +21,13 @@ backend/storage/
 uploads/
 
 # Arduino / PlatformIO
+iot/locker_mvp/secrets.h
 .pio/
 build/
 
 # IDE / OS
 .vscode/
 
-# Frontend local environment
-frontend/.venv/
 .idea/
 .DS_Store
 Thumbs.db

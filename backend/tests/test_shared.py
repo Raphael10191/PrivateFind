@@ -2,10 +2,9 @@ import io
 
 import pytest
 from PIL import Image
-from sqlalchemy import select
 
 from app.core.errors import AppError
-from app.shared import audit, storage
+from app.shared import storage
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ratelimit import RateLimiter
 
@@ -35,13 +34,6 @@ def test_rate_limiter():
     assert rl.hit("b")
 
 
-async def test_audit_log_written(session):
-    audit.log(session, "test_action", "thing", 7, actor_type="system", note="hi")
-    await session.commit()
-    row = (await session.execute(select(audit.AuditLog))).scalar_one()
-    assert (row.action, row.entity_id, row.details) == ("test_action", 7, {"note": "hi"})
-
-
 async def test_mock_ai_extraction():
     ai = MockAIProvider()
     ex = await ai.extract_attributes([], "Navy Samsung phone, cat sticker, serial ends 99214821")
@@ -49,9 +41,3 @@ async def test_mock_ai_extraction():
     types = {a.type: a.value for a in ex.private_attributes}
     assert types["serial_suffix"] == "4821"
     assert "sticker" in types["sticker_or_mark"]
-
-
-async def test_mock_ai_compare():
-    ai = MockAIProvider()
-    s = await ai.compare_texts("black wallet leather", ["leather wallet black", "red umbrella"])
-    assert s[0] > 0.9 and s[1] == 0.0

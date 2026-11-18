@@ -153,6 +153,191 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 .pf-secondary:hover { background: var(--sage); }
 .pf-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 
+
+/* Shared form and operator styles */
+.login-page, .register-page {
+    max-width: 440px;
+    margin: 60px auto;
+    padding: 0 16px;
+}
+
+.login-card, .register-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 32px;
+}
+
+.login-card h1, .register-card h1 {
+    margin: 0 0 8px;
+    font-size: clamp(2.25rem, 5vw, 3.3rem);
+}
+
+.login-field, .register-field {
+    margin-bottom: 20px;
+}
+
+.login-field label, .register-field label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.login-field input, .register-field input {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    border: 1px solid var(--field-border);
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+}
+
+.login-field input:focus, .register-field input:focus {
+    outline: 2px solid var(--ink);
+    outline-offset: 1px;
+}
+
+.login-button, .register-button {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ink);
+    color: white;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-button:hover, .register-button:hover {
+    background: var(--green);
+}
+
+.login-button:disabled, .register-button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.login-error, .register-error {
+    margin: 0 0 16px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 14px;
+}
+
+.items-heading, .reviews-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 26px;
+}
+
+.items-grid, .reviews-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.items-panel, .reviews-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 24px;
+    min-width: 0;
+}
+
+.item-label, .review-field-label {
+    display: block;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.item-message, .review-message {
+    padding: 14px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    line-height: 1.5;
+}
+
+.details-field label, .claim-field label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 9px;
+}
+
+.claim-actions, .result-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+.detail-back, .claim-back {
+    display: inline-block;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 24px;
+}
+
+.register-link, .login-link {
+    margin: 24px 0 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.register-link a, .login-link a {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.details-field input, .details-field select, .details-field textarea, .finder-field input, .finder-field select, .finder-field textarea {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--field-border);
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+}
+
+@media (max-width: 600px) {
+    .login-page, .register-page {
+        margin: 24px auto;
+    }
+
+    .login-card, .register-card {
+        padding: 24px 20px;
+    }
+}
+
+@media (max-width: 700px) {
+    .items-heading, .reviews-heading {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .items-grid, .reviews-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .items-panel, .reviews-panel {
+        padding: 20px;
+    }
+}
+
 @media (max-width: 760px) {
     .header-inner { min-height: 62px; padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); }
     .brand-mark { width: 25px; height: 29px; }

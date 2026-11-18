@@ -12,17 +12,12 @@ from urllib.request import ProxyHandler, Request, build_opener
 from app.core.config import Settings
 from app.shared.ai.claude import COMPARE_SYSTEM, EXTRACT_SYSTEM
 from app.shared.ai.provider import (
-    DETAIL_SYSTEM,
     PHOTO_VERIFICATION_SYSTEM,
     AIError,
-    DetailAttribute,
-    DetailScores,
     Photo,
     PhotoAssessment,
     PhotoFinding,
     bounded_score,
-    detail_input,
-    detail_scores,
 )
 from app.shared.ai.schemas import Extraction
 from app.shared.vocab import Category, Color, EvidenceType, Strength, category_key
@@ -228,15 +223,3 @@ class QwenProvider:
             return scores
         except RESPONSE_ERRORS as exc:
             raise AIError("Qwen text comparison failed") from exc
-
-    async def verify_details(
-        self, attrs: list[DetailAttribute], evidence: list[str]
-    ) -> DetailScores:
-        if not attrs or not evidence:
-            return {}
-        try:
-            content = [{"type": "text", "text": detail_input(attrs, evidence)}]
-            raw = await self._chat(DETAIL_SYSTEM, content)
-            return detail_scores(attrs, evidence, raw["scores"])
-        except RESPONSE_ERRORS as exc:
-            raise AIError("Qwen detail comparison failed") from exc

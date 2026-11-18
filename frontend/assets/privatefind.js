@@ -1,3 +1,52 @@
+window.privateFind = {
+    humanize(value) {
+        return String(value ?? "Unknown")
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, letter => letter.toUpperCase());
+    },
+    createText(tag, value, className = "") {
+        const element = document.createElement(tag);
+        element.textContent = String(value ?? "");
+        if (className) element.className = className;
+        return element;
+    },
+    async requestJSON(url, options = {}, messages = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            ...options,
+        });
+        if (response.status === 401) {
+            window.location.replace("/login");
+            throw new Error(messages.session || "Please sign in again.");
+        }
+        if (messages.admin && response.status === 403) {
+            throw new Error("Admin access required.");
+        }
+        if (messages.conflict && response.status === 409) {
+            throw new Error(messages.conflict);
+        }
+        if (response.ok) {
+            return messages.admin ? response.json().catch(() => null) : response.json();
+        }
+
+        const data = await response.json().catch(() => null);
+        if (messages.ai && data?.error?.code === "ai_unavailable") {
+            document.dispatchEvent(new Event("privatefind-ai-unavailable"));
+        }
+        const fallback = messages.failure || "Request failed (HTTP " + response.status + ").";
+        if (messages.admin) {
+            if (messages.allowErrorString && typeof data?.error === "string") {
+                throw new Error(data.error);
+            }
+            if (typeof data?.error?.message === "string") throw new Error(data.error.message);
+            if (typeof data?.detail === "string") throw new Error(data.detail);
+            throw new Error(fallback);
+        }
+        throw new Error(data?.error?.message || fallback);
+    },
+};
+
 const menu = document.querySelector(".mobile-more");
 
 if (menu) {

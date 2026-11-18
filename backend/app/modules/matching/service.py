@@ -28,9 +28,18 @@ SEMANTIC_BATCH = 24
 PAGE_SIZE = 5
 
 
-def _lost_text(r) -> str:
+def _lost_text(report: LostReport) -> str:
     return " ".join(
-        p for p in [r.color, r.brand, r.model, r.material, r.description, r.unique_marks] if p
+        part
+        for part in (
+            report.color,
+            report.brand,
+            report.model,
+            report.material,
+            report.description,
+            report.unique_marks,
+        )
+        if part
     )
 
 
@@ -49,6 +58,31 @@ def _found_text(item: FoundItem) -> str:
             flags=re.IGNORECASE,
         )
     return description
+
+
+def _found_facts(item: FoundItem) -> policy.FoundFacts:
+    reliability = {
+        attr.name: attr.confidence for attr in item.attributes if attr.confidence is not None
+    }
+    confirmed_model = item.observed_model()
+    possible_models = item.model_candidates()
+    less_likely = item.model_candidates(less_likely=True)
+    legacy_guess = item.attr("model")
+    if legacy_guess and not confirmed_model and not (possible_models or less_likely):
+        possible_models = (legacy_guess,)
+    reliability.pop("model", None)
+    return policy.FoundFacts(
+        item.category,
+        item.location,
+        item.found_at,
+        item.attr("color"),
+        item.attr("brand"),
+        confirmed_model,
+        item.attr("material"),
+        reliability,
+        model_candidates=possible_models,
+        less_likely_models=less_likely,
+    )
 
 
 def _pool_snapshot(pool: list[FoundItem]) -> list[tuple]:
@@ -110,28 +144,7 @@ async def candidates(
     scored = []
     shown = set()
     for item, sem in zip(pool, semantic, strict=True):
-        reliability = {
-            attr.name: attr.confidence for attr in item.attributes if attr.confidence is not None
-        }
-        confirmed_model = item.observed_model()
-        candidates = item.model_candidates()
-        less_likely = item.model_candidates(less_likely=True)
-        legacy_guess = item.attr("model")
-        if legacy_guess and not confirmed_model and not (candidates or less_likely):
-            candidates = (legacy_guess,)
-        reliability.pop("model", None)
-        found = policy.FoundFacts(
-            item.category,
-            item.location,
-            item.found_at,
-            item.attr("color"),
-            item.attr("brand"),
-            confirmed_model,
-            item.attr("material"),
-            reliability,
-            model_candidates=candidates,
-            less_likely_models=less_likely,
-        )
+        found = _found_facts(item)
         frequency = colors[found.color] / color_count if color_count >= 5 else None
         scored.append((item.id, policy.score(lost, found, sem, frequency)))
         if policy.plausible(lost, found, sem):
