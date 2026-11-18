@@ -13,12 +13,14 @@ from app.modules.identity.router import router as identity_router
 from app.modules.locker.router import router as locker_router
 from app.modules.lost_reports.router import router as lost_reports_router
 from app.modules.matching.router import router as matching_router
+from app.shared.ai.readiness import ai_status
 from app.shared.audit_router import router as audit_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await found_items_service.requeue_pending()
+    if get_settings().ai_provider != "mock":
+        await found_items_service.requeue_pending()
     yield
 
 
@@ -45,6 +47,7 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    app.get("/api/ai/status", tags=["health"])(ai_status)
     return app
 
 

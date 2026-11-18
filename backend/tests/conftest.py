@@ -19,6 +19,7 @@ from app.modules.identity import service as identity  # noqa: E402
 from app.modules.locker import service as locker_service  # noqa: E402
 from app.shared import ratelimit  # noqa: E402
 from app.shared.ai.provider import set_ai_provider  # noqa: E402
+from app.shared.ai.readiness import require_ai_ready  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +41,9 @@ async def session():
 
 @pytest.fixture
 def app():
-    return create_app()
+    application = create_app()
+    application.dependency_overrides[require_ai_ready] = lambda: None
+    return application
 
 
 @pytest.fixture

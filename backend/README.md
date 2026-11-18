@@ -15,8 +15,9 @@ one-compartment locker, and starts on port 8000. Open http://localhost:8000/docs
 The app currently provides an API interface; there is no merged frontend yet.
 
 Defaults: `AI_PROVIDER=mock`, admin `admin@example.com` / `changeme123`, locker `L1`,
-device `locker_01`. With mock AI, use a finder note such as
-`Black Samsung phone, cat sticker, serial ends 4821` for the test flow.
+device `locker_01`. Configure a real AI provider for Finder and Owner submissions. The
+application reports availability at `/api/ai/status` and pauses AI-dependent actions when
+the provider is unavailable. Automated tests use the mock provider.
 
 The seed is safe to run repeatedly and keeps the existing device key. Save the key
 printed on the **first** startup for the ESP32. View logs with:
@@ -31,7 +32,7 @@ background with `docker compose up --build -d`; inspect health with `docker comp
 
 Optional environment variables can be set in a root `.env` file or the shell:
 `SECRET_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT` (host port), `AI_PROVIDER`,
-`ANTHROPIC_API_KEY`, and `CLAUDE_MODEL`. No `.env` file is required for the demo.
+`ANTHROPIC_API_KEY`, and `CLAUDE_MODEL`. Set the Qwen URL, model and API key in the environment for a Qwen demo.
 Changing admin defaults after the database is seeded does not reset an existing
 account's password. Container database/storage paths are configured by Compose;
 the local `backend/.env` is excluded from the image.

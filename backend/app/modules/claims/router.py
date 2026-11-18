@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.modules.found_items.models import FoundItem
 from app.modules.found_items.schemas import AttributeIO
 from app.modules.identity.deps import AdminUser, CurrentUser, SessionDep
 from app.modules.lost_reports.models import LostReport
+from app.shared.ai.readiness import require_ai_ready
 from app.shared.ratelimit import claim_limiter
 
 router = APIRouter(tags=["claims"])
@@ -45,7 +46,12 @@ def _out(claim: Claim, issued=None, *, pickup_revoked: bool = False) -> ClaimOut
     )
 
 
-@router.post("/api/claims", response_model=ClaimOut, status_code=201)
+@router.post(
+    "/api/claims",
+    response_model=ClaimOut,
+    status_code=201,
+    dependencies=[Depends(require_ai_ready)],
+)
 async def submit(body: ClaimIn, user: CurrentUser, session: SessionDep):
     if not claim_limiter.hit(str(user.id)):
         raise AppError(429, "claim_cooldown", "Too many attempts. Please try again later.")

@@ -56,7 +56,7 @@ async def test_photo_review_precedes_reservation_and_protects_private_details(cl
     assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 1
 
 
-async def test_provider_failure_can_be_retried_or_manually_corrected(client, locker, admin):
+async def test_provider_failure_requires_successful_retry_before_confirming(client, locker):
     ai = MockAIProvider()
     ai.extract_attributes = AsyncMock(side_effect=AIError("Disconnected"))
     set_ai_provider(ai)
@@ -66,9 +66,9 @@ async def test_provider_failure_can_be_retried_or_manually_corrected(client, loc
     assert (await client.post(url + "/retry", headers=headers)).status_code == 204
     assert ai.extract_attributes.await_count == 6
     result = await client.post(url + "/confirm", headers=headers, json={"category": "keys"})
-    assert result.status_code == 201, result.text
-    stored = (await admin.get(f"/api/admin/items/{result.json()['item_id']}")).json()
-    assert stored["ai_status"] == "failed" and stored["category"] == "keys"
+    assert result.status_code == 503
+    assert result.json()["error"]["code"] == "ai_unavailable"
+    assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 2
 
 
 async def test_editing_photos_discards_old_draft_and_file(client, locker, session):

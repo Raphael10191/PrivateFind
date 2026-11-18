@@ -25,6 +25,7 @@ from app.shared.ai.provider import (
     PhotoFinding,
     get_ai_provider,
 )
+from app.shared.ai.readiness import OFFLINE_MESSAGE, mark_ai_unavailable
 from app.shared.vocab import CRITICAL_TYPES
 
 log = logging.getLogger("uvicorn.error")
@@ -75,7 +76,6 @@ async def submit(
     visual = getattr(get_ai_provider(), "verify_photos", None)
     original: list[PhotoFinding] = []
     additional: list[PhotoFinding] = []
-    photo_failure = False
     await session.commit()
     if callable(visual) and item.photos:
         try:
@@ -95,11 +95,11 @@ async def submit(
                             model_observed=item.observed_model() is not None,
                         )
                     )
-        except (AIError, OSError, ValueError):
+        except (AIError, OSError, ValueError) as exc:
             log.warning("[VERIFY] Photo check unavailable for item %s", item.id)
-            original.clear()
-            additional.clear()
-            photo_failure = True
+            if isinstance(exc, AIError):
+                mark_ai_unavailable()
+            raise AppError(503, "ai_unavailable", OFFLINE_MESSAGE) from exc
 
     # Serialize pickup decisions and attempts before trusting an earlier snapshot.
     await session.scalar(select(User.id).where(User.id == user_id).with_for_update())
@@ -153,9 +153,6 @@ async def submit(
         competing=competing is not None,
         exposed=item.owner_details_exposed,
     )
-    if photo_failure and verdict.state != "refuted":
-        verdict = policy.Verdict("unresolved", "retry_photo_check")
-
     new_claim = claim is None
     if new_claim:
         claim = Claim(user_id=user_id, match_candidate=match, attempt_no=1)

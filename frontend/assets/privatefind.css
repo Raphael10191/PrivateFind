@@ -380,3 +380,17 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 @media (max-width: 760px) {
     html { scroll-padding-bottom: calc(83px + env(safe-area-inset-bottom)); }
 }
+
+.ai-status {
+    margin: 0 0 16px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    background: var(--sage);
+    color: var(--ink);
+    font-size: .9rem;
+}
+.ai-status[data-available="false"] {
+    background: #f8e7e1;
+    color: #7a2e1a;
+}
+[data-requires-ai][inert] { opacity: .55; }

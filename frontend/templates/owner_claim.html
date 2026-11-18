@@ -197,7 +197,7 @@
         Checking the selected item...
     </section>
 
-    <form id="claim-form"
+    <form id="claim-form" data-requires-ai inert
           class="claim-card"
           hidden>
 
@@ -259,7 +259,7 @@
         </div>
 
         <div class="result-actions">
-            <button type="button" id="retry-claim" class="secondary-button" hidden>
+            <button type="button" id="retry-claim" class="secondary-button" data-requires-ai inert hidden>
                 Add More Detail
             </button>
             <button type="button"
@@ -363,6 +363,9 @@
 
             try {
                 const data = await response.json();
+                if (data.error?.code === "ai_unavailable") {
+                    document.dispatchEvent(new Event("privatefind-ai-unavailable"));
+                }
 
                 message = data.error?.message || message;
             } catch {
@@ -514,7 +517,7 @@
         async (event) => {
             event.preventDefault();
 
-            if (submitting || claimCreated) {
+            if (claimForm.inert || submitting || claimCreated) {
                 return;
             }
 

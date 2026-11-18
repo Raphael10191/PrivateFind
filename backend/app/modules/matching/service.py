@@ -19,6 +19,7 @@ from app.modules.matching.models import MatchCandidate
 from app.modules.matching.schemas import CandidateOut
 from app.shared import audit
 from app.shared.ai.provider import AIError, get_ai_provider
+from app.shared.ai.readiness import mark_ai_unavailable
 from app.shared.vocab import Category, Color
 
 log = logging.getLogger(__name__)
@@ -98,6 +99,7 @@ async def candidates(
                 for item, value in zip(batch, values, strict=True)
             )
         except AIError:
+            mark_ai_unavailable()
             log.warning(
                 "Semantic ranking unavailable for report %s; using observed fields", report.id
             )

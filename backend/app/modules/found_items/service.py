@@ -21,7 +21,8 @@ from app.modules.found_items.models import (
 from app.modules.locker import service as locker_service
 from app.modules.locker.models import Locker
 from app.shared import audit, storage
-from app.shared.ai.provider import Photo, get_ai_provider
+from app.shared.ai.provider import AIError, Photo, get_ai_provider
+from app.shared.ai.readiness import OFFLINE_MESSAGE, mark_ai_unavailable
 from app.shared.ai.schemas import Extraction
 
 log = logging.getLogger(__name__)
@@ -128,6 +129,8 @@ async def confirm_draft(session, item_id: int, token: str, category: str | None)
     draft, item = await read_draft(session, item_id, token, lock=True)
     if item.ai_status == "pending":
         raise AppError(409, "analysis_pending", "Wait for the photo check to finish.")
+    if item.ai_status == "failed":
+        raise AppError(503, "ai_unavailable", OFFLINE_MESSAGE)
     if category is not None:
         item.attributes = [a for a in item.attributes if a.name != "category"]
         item.category = category
@@ -214,6 +217,8 @@ async def run_extraction(item_id: int) -> None:
                     else AI_TIMEOUT_S,
                 )
             except Exception as exc:  # noqa: BLE001 - any provider failure is retried
+                if isinstance(exc, (AIError, TimeoutError)):
+                    mark_ai_unavailable()
                 log.warning(
                     "AI extraction failed for item %s (attempt %s): %s", item_id, attempt, exc
                 )

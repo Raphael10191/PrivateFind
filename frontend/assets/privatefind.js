@@ -26,3 +26,50 @@ document.querySelectorAll("[data-signout]").forEach(button => {
         }
     });
 });
+
+const aiStatus = document.getElementById("ai-status");
+if (aiStatus) {
+    let statusVersion = 0;
+
+    function showAIStatus({provider, available}) {
+        const ready = available && ["qwen", "claude"].includes(provider);
+        const name = {qwen: "Qwen", claude: "Claude"}[provider];
+        const message = ready
+            ? name + " online · Real AI"
+            : provider === "mock"
+                ? "Technical issue: Mock AI is configured. A real AI provider is required."
+                : "Technical issue: " + (name || "AI") + " is unavailable. Try again when it is back.";
+        if (aiStatus.textContent !== message) aiStatus.textContent = message;
+        aiStatus.dataset.available = String(ready);
+        for (const control of document.querySelectorAll("[data-requires-ai]")) {
+            control.inert = !ready;
+        }
+    }
+
+    async function refreshAIStatus() {
+        const version = ++statusVersion;
+        let state = {available: false};
+        try {
+            const response = await fetch("/api/ai/status", {cache: "no-store"});
+            if (response.ok) state = await response.json();
+        } catch {
+            // A disconnected browser cannot submit an AI-dependent form.
+        }
+        if (version === statusVersion) showAIStatus(state);
+    }
+
+    document.addEventListener("privatefind-ai-unavailable", () => {
+        statusVersion += 1;
+        showAIStatus({available: false});
+    });
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) void refreshAIStatus();
+    });
+    window.addEventListener("pageshow", event => {
+        if (event.persisted) void refreshAIStatus();
+    });
+    setInterval(() => {
+        if (!document.hidden) void refreshAIStatus();
+    }, 15000);
+    void refreshAIStatus();
+}

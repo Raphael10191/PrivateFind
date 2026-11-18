@@ -333,8 +333,10 @@ async def test_low_risk_handover_requires_operator_and_no_competing_claim(
 async def test_outage_and_legacy_disclosures_do_not_issue_codes(client, owner, locker, session):
     item_id, report_id, _ = await setup_candidate(client, owner, locker, BACK + ". " + FRONT)
     visual_provider(fail=True)
-    failed = (await claim(owner, report_id, item_id)).json()
-    assert failed["next_action"] == "retry_photo_check" and failed["pickup_code"] is None
+    failed = await claim(owner, report_id, item_id)
+    assert failed.status_code == 503
+    assert failed.json()["error"]["code"] == "ai_unavailable"
+    assert (await owner.get("/api/claims")).json() == []
     visual_provider()
     item = await session.get(FoundItem, item_id)
     item.owner_details_exposed = True

@@ -301,7 +301,7 @@
         <p>No account needed.</p>
     </div>
 
-    <form id="locker-entry" method="get" action="/found/new" class="finder-card" hidden>
+    <form id="locker-entry" method="get" action="/found/new" class="finder-card" data-requires-ai inert hidden>
         <h2>Choose the locker</h2>
         <p>Scan the QR code on the locker with your phone camera or enter the printed locker code.</p>
         <div class="finder-field">
@@ -325,6 +325,7 @@
 
     <form id="deposit-form"
           class="finder-card"
+          data-requires-ai inert
           novalidate
           hidden>
 
@@ -388,7 +389,7 @@
     <section id="photo-review" class="finder-card" hidden>
         <h2 tabindex="-1">Check the item type</h2>
         <p id="review-status" role="status"></p>
-        <div id="review-fields" class="finder-field" hidden>
+        <div id="review-fields" class="finder-field" data-requires-ai inert hidden>
             <label for="review-category">Item type</label>
             <select id="review-category">
                 <option value="other">Other or unsure</option>
@@ -403,7 +404,7 @@
             </select>
             <button type="button" id="confirm-draft" class="submit-button">Get Deposit Code</button>
         </div>
-        <button type="button" id="retry-draft" hidden>Retry Photo Check</button>
+        <button type="button" id="retry-draft" data-requires-ai inert hidden>Retry Photo Check</button>
         <button type="button" id="edit-photos">Edit Photos</button>
     </section>
     <section id="deposit-success"
@@ -527,6 +528,9 @@
 
         try {
             const data = await response.json();
+            if (data.error?.code === "ai_unavailable") {
+                document.dispatchEvent(new Event("privatefind-ai-unavailable"));
+            }
 
             message =
                 data.error?.message || message;
@@ -764,7 +768,7 @@
             const result = await getDraft();
             if (current !== draft) return;
             const pending = result.status === "pending";
-            fields.hidden = pending;
+            fields.hidden = result.status !== "done";
             retryDraft.hidden = result.status !== "failed";
             if (pending) {
                 reviewStatus.textContent = "Checking your photos…";
@@ -773,7 +777,7 @@
             }
             category.value = result.category || "other";
             if (result.status === "failed") {
-                reviewStatus.textContent = "Photo analysis is unavailable. Retry or select the item type to continue.";
+                reviewStatus.textContent = "Photo analysis was unavailable. Retry the photo check when the AI service is ready.";
             } else if (result.suggest_photo) {
                 reviewStatus.textContent = "An extra photo could help the owner claim this item. Try a close-up of a personal mark, repair, or unusual accessory. You can edit the photos or continue.";
             } else {
@@ -838,7 +842,7 @@
 
     form.addEventListener("submit", async event => {
         event.preventDefault();
-        if (submitting || submitted || processingPhotos) return;
+        if (form.inert || submitting || submitted || processingPhotos) return;
         errorBox.hidden = true;
         showPhotoError();
         if (!selectedPhotos.length) {

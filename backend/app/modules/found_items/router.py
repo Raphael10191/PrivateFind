@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Header, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from app.core.errors import AppError
@@ -16,12 +16,18 @@ from app.modules.found_items.schemas import (
 )
 from app.modules.identity.deps import AdminUser, SessionDep
 from app.modules.locker import service as locker_service
+from app.shared.ai.readiness import require_ai_ready
 from app.shared.ratelimit import deposit_limiter
 
 router = APIRouter(tags=["found items"])
 
 
-@router.post("/api/deposits", response_model=DepositOut, status_code=201)
+@router.post(
+    "/api/deposits",
+    response_model=DepositOut,
+    status_code=201,
+    dependencies=[Depends(require_ai_ready)],
+)
 async def deposit(
     request: Request,
     background: BackgroundTasks,
@@ -52,7 +58,12 @@ async def deposit(
 DraftToken = Annotated[str, Header(alias="X-Deposit-Token", min_length=32, max_length=100)]
 
 
-@router.post("/api/deposit-drafts", response_model=DraftOut, status_code=201)
+@router.post(
+    "/api/deposit-drafts",
+    response_model=DraftOut,
+    status_code=201,
+    dependencies=[Depends(require_ai_ready)],
+)
 async def start_photo_review(
     request: Request,
     background: BackgroundTasks,
@@ -99,7 +110,9 @@ async def discard_photo_review(item_id: int, token: DraftToken, session: Session
     await service.discard_draft(session, item_id, token)
 
 
-@router.post("/api/deposit-drafts/{item_id}/retry", status_code=204)
+@router.post(
+    "/api/deposit-drafts/{item_id}/retry", status_code=204, dependencies=[Depends(require_ai_ready)]
+)
 async def retry_photo_review(
     item_id: int,
     token: DraftToken,
@@ -110,7 +123,12 @@ async def retry_photo_review(
     background.add_task(service.run_extraction, item_id)
 
 
-@router.post("/api/deposit-drafts/{item_id}/confirm", response_model=DepositOut, status_code=201)
+@router.post(
+    "/api/deposit-drafts/{item_id}/confirm",
+    response_model=DepositOut,
+    status_code=201,
+    dependencies=[Depends(require_ai_ready)],
+)
 async def confirm_photo_review(
     item_id: int,
     token: DraftToken,
@@ -170,7 +188,12 @@ async def replace_attributes(
     return await _admin_out(session, item)
 
 
-@router.post("/api/admin/items/{item_id}/retry-ai", status_code=202, tags=["admin"])
+@router.post(
+    "/api/admin/items/{item_id}/retry-ai",
+    status_code=202,
+    tags=["admin"],
+    dependencies=[Depends(require_ai_ready)],
+)
 async def retry_ai(
     item_id: int, admin: AdminUser, session: SessionDep, background: BackgroundTasks
 ):
