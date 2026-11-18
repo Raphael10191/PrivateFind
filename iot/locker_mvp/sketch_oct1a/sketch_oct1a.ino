@@ -20,6 +20,7 @@ const int SERVO_OPEN_ANGLE = 90;
 const float ITEM_DISTANCE_THRESHOLD_CM = 15.0f;
 const unsigned long SENSOR_REFRESH_MS = 250;
 const unsigned long WIFI_RETRY_MS = 10000;
+const unsigned long STATUS_DISPLAY_MS = 4000;
 const byte REQUIRED_STABLE_SAMPLES = 4;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -46,13 +47,17 @@ unsigned long lastSensorRead = 0;
 unsigned long lastWifiRetry = 0;
 Occupancy candidateState = SENSOR_UNKNOWN;
 byte stableSamples = 0;
+String transientStatus = "";
+String persistentStatus = "";
+unsigned long transientStatusStarted = 0;
+String lastTopLine = "";
+String lastBottomLine = "";
 
 
 void setup() {
   Serial.begin(115200);
   initializeHardware();
   connectWifi();
-  showStatus("Code eingeben");
 }
 
 
@@ -81,8 +86,7 @@ void initializeHardware() {
 
 
 void connectWifi() {
-  lcd.setCursor(0, 0);
-  lcd.print("WLAN verbindet");
+  showStatus("Joining WiFi");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startedAt = millis();
@@ -94,9 +98,10 @@ void connectWifi() {
   Serial.println();
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("WLAN verbunden.");
+    showStatus("Ready");
   } else {
     Serial.println("WLAN Fehler. Neuer Versuch folgt.");
-    showStatus("WLAN Fehler");
+    showStatus("WiFi retrying");
   }
 }
 
@@ -135,26 +140,26 @@ void handleKeypad() {
   if (key >= '0' && key <= '9') {
     if (enteredCode.length() < 12) {
       enteredCode += key;
-      showStatus("Code: " + maskedCode());
     }
     return;
   }
 
   if (key == '*') {
     enteredCode = "";
-    showStatus("Eingabe geloescht");
+    showStatus("Code cleared");
     return;
   }
 
   if (key == '#' && enteredCode.length() > 0) {
     String action = "";
-    bool authorized = validateCodeWithBackend(enteredCode, action);
+    String code = enteredCode;
     enteredCode = "";
+    bool authorized = validateCodeWithBackend(code, action);
 
     if (authorized) {
       openCompartment(action);
     } else {
-      showStatus("Zugriff abgelehnt");
+      showStatus(WiFi.status() == WL_CONNECTED ? "Access denied" : "WiFi unavailable");
     }
   }
 }
@@ -162,11 +167,10 @@ void handleKeypad() {
 
 bool validateCodeWithBackend(const String& code, String& action) {
   if (WiFi.status() != WL_CONNECTED) {
-    showStatus("WLAN nicht bereit");
     return false;
   }
 
-  showStatus("Code wird geprueft");
+  showStatus("Checking code");
   HTTPClient http;
   http.begin(BACKEND_URL);
   http.addHeader("Content-Type", "application/json");
@@ -203,9 +207,9 @@ void openCompartment(const String& action) {
   lockerMode = DOOR_OPEN;
 
   if (action == "deposit") {
-    showStatus("Item rein, dann #");
+    showPersistentStatus("Put item in + #");
   } else {
-    showStatus("Item raus, dann #");
+    showPersistentStatus("Take item out #");
   }
   Serial.println("Fach 1 offen. Nach dem Schliessen # druecken.");
 }
@@ -216,7 +220,7 @@ void beginStateVerification() {
   lockerMode = VERIFYING_STATE;
   candidateState = SENSOR_UNKNOWN;
   stableSamples = 0;
-  showStatus("Sensor pruefen...");
+  showPersistentStatus("Checking sensors");
   Serial.println("Pruefe beide Sensoren vor dem Schliessen.");
 }
 
@@ -228,11 +232,10 @@ void refreshSensors() {
   lastSensorRead = millis();
 
   float distance = readDistanceCm();
-  renderSensorLine(distance);
-
   if (lockerMode == VERIFYING_STATE) {
     verifyAndReportState(distance);
   }
+  renderDisplay();
 }
 
 
@@ -248,17 +251,37 @@ float readDistanceCm() {
 }
 
 
-void renderSensorLine(float distance) {
-  lcd.setCursor(0, 0);
-  lcd.print("                ");
-  lcd.setCursor(0, 0);
-  if (distance < 0) {
-    lcd.print("Dist: -- cm");
-  } else {
-    lcd.print("Dist:");
-    lcd.print(distance, 1);
-    lcd.print("cm");
+void renderDisplay() {
+  String topLine = "PrivateFind L1";
+
+  String bottomLine = "Enter code + #";
+  if (persistentStatus.length() > 0) {
+    bottomLine = persistentStatus;
+  } else if (lockerMode == ENTER_CODE && enteredCode.length() > 0) {
+    bottomLine = "Code: " + maskedCode();
+  } else if (transientStatus.length() > 0 && millis() - transientStatusStarted < STATUS_DISPLAY_MS) {
+    bottomLine = transientStatus;
   }
+
+  writeDisplayLine(0, topLine, lastTopLine);
+  writeDisplayLine(1, bottomLine, lastBottomLine);
+}
+
+
+// Writing only changed text prevents visible LCD flicker.
+void writeDisplayLine(byte row, String text, String& previousText) {
+  text = text.substring(0, 16);
+  while (text.length() < 16) {
+    text += ' ';
+  }
+
+  if (text == previousText) {
+    return;
+  }
+
+  lcd.setCursor(0, row);
+  lcd.print(text);
+  previousText = text;
 }
 
 
@@ -268,7 +291,7 @@ void verifyAndReportState(float distance) {
   if (observation == SENSOR_UNKNOWN) {
     candidateState = SENSOR_UNKNOWN;
     stableSamples = 0;
-    showStatus("Sensoren pruefen");
+    showPersistentStatus("Check sensors");
     return;
   }
 
@@ -280,7 +303,7 @@ void verifyAndReportState(float distance) {
   }
 
   if (stableSamples < REQUIRED_STABLE_SAMPLES) {
-    showStatus("Messung bestaetigen");
+    showPersistentStatus("Confirming state");
     return;
   }
 
@@ -288,10 +311,11 @@ void verifyAndReportState(float distance) {
   if (reportCompartmentState(occupied)) {
     lockerServo.write(SERVO_CLOSED_ANGLE);
     lockerMode = ENTER_CODE;
-    showStatus(occupied ? "Item sicher drin" : "Fach ist leer");
+    clearPersistentStatus();
+    showStatus(occupied ? "Item stored" : "Locker empty");
     Serial.println("Status gesendet. Fach 1 geschlossen.");
   } else {
-    showStatus("Backend Fehler");
+    showPersistentStatus("Backend error");
   }
 }
 
@@ -336,10 +360,19 @@ bool reportCompartmentState(bool occupied) {
 
 
 void showStatus(const String& message) {
-  lcd.setCursor(0, 1);
-  lcd.print("                ");
-  lcd.setCursor(0, 1);
-  lcd.print(message.substring(0, 16));
+  transientStatus = message;
+  transientStatusStarted = millis();
+  renderDisplay();
+}
+
+
+void showPersistentStatus(const String& message) {
+  persistentStatus = message;
+}
+
+
+void clearPersistentStatus() {
+  persistentStatus = "";
 }
 
 
