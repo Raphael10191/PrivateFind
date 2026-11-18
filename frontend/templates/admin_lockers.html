@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% from "icons.html" import icon %}
 {% block title %}Lockers & Devices | PrivateFind{% endblock %}
+{% block head %}
+<style>
+    .compartment-reset { margin-top: 4px; padding: 6px; }
+    .compartment-reset:disabled { opacity: .6; }
+</style>
+{% endblock %}
 {% block content %}
 <header class="workspace-title">
     <h1>Lockers & devices.</h1>
@@ -15,6 +21,7 @@
     const list = document.getElementById("lockers-list");
     const notice = document.getElementById("lockers-status");
     const refresh = document.getElementById("refresh-lockers");
+    let resetting = false;
 
     const states = {
         free: "Available",
@@ -50,6 +57,18 @@
             slot.dataset.state = compartment.state;
             text(slot, "span", "Compartment " + compartment.number);
             text(slot, "strong", states[compartment.state] || "Unknown");
+            if (compartment.active_item_id != null) {
+                const item = text(slot, "a", "Item #" + compartment.active_item_id);
+                item.href = "/admin/items?id=" + encodeURIComponent(compartment.active_item_id);
+            }
+            if (compartment.state !== "free" || compartment.active_item_id != null) {
+                const button = text(slot, "button", "Mark as empty",
+                    "pf-button pf-secondary compartment-reset");
+                button.type = "button";
+                button.setAttribute("aria-label",
+                    "Mark compartment " + compartment.number + " in " + locker.code + " as empty");
+                button.addEventListener("click", () => resetCompartment(locker, compartment));
+            }
             slots.append(slot);
         }
         if (slots.children.length) card.append(slots);
@@ -57,7 +76,53 @@
         return card;
     }
 
-    async function loadLockers() {
+    async function resetCompartment(locker, compartment) {
+        if (resetting || refresh.disabled) return;
+        const label = locker.code + ", compartment " + compartment.number;
+        const item = compartment.active_item_id == null
+            ? ""
+            : " Item #" + compartment.active_item_id + " will be removed from active inventory.";
+        const confirmed = window.confirm(
+            "Confirm " + label + " is physically empty and closed." +
+            item + " Existing codes for this compartment will be cancelled."
+        );
+        if (!confirmed) return;
+
+        resetting = true;
+        refresh.disabled = true;
+        notice.textContent = "Updating compartment…";
+        const buttons = list.querySelectorAll(".compartment-reset");
+        buttons.forEach(button => { button.disabled = true; });
+        try {
+            const url = "/api/admin/lockers/" + encodeURIComponent(locker.code) +
+                "/compartments/" + encodeURIComponent(compartment.number) + "/reset";
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    expected_state: compartment.state,
+                    expected_item_id: compartment.active_item_id ?? null,
+                }),
+            });
+            if (response.status === 401) { location.replace("/login"); return; }
+            if (!response.ok) {
+                const error = await response.json().catch(() => null);
+                const message = error?.error?.message || "Could not mark the compartment as empty.";
+                if (response.status !== 409) throw new Error(message);
+                await loadLockers(message);
+                return;
+            }
+            await loadLockers(label + " is now available.");
+        } catch (error) {
+            notice.textContent = error.message;
+        } finally {
+            resetting = false;
+            refresh.disabled = false;
+            buttons.forEach(button => { button.disabled = false; });
+        }
+    }
+
+    async function loadLockers(message = "") {
         refresh.disabled = true;
         notice.textContent = "Loading locker status…";
         try {
@@ -66,7 +131,7 @@
             if (!response.ok) throw new Error("Could not load lockers. Try refreshing.");
             const lockers = await response.json();
             list.replaceChildren(...lockers.map(renderLocker));
-            notice.textContent = lockers.length ? "" : "No lockers are configured.";
+            notice.textContent = message || (lockers.length ? "" : "No lockers are configured.");
         } catch (error) {
             notice.textContent = error.message;
         } finally {
@@ -74,7 +139,7 @@
         }
     }
 
-    refresh.addEventListener("click", loadLockers);
+    refresh.addEventListener("click", () => loadLockers());
     loadLockers();
 </script>
 {% endblock %}

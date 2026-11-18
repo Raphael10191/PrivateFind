@@ -1,4 +1,7 @@
+from sqlalchemy import update
+
 from app.modules.locker import service
+from app.modules.locker.models import Compartment
 from tests.conftest import deposit, jpeg
 from tests.test_claims import GOOD, claim, setup_candidate
 
@@ -80,3 +83,73 @@ async def test_reset_locker_expires_all_active_items_only_in_selected_locker(
     entries = (await admin.get("/api/admin/audit")).json()
     reset = next(entry for entry in entries if entry["action"] == "admin_locker_reset")
     assert reset["actor_type"] == "admin"
+
+
+async def test_mark_one_compartment_empty(client, owner, admin, locker):
+    item_id, report_id, headers = await setup_candidate(client, owner, locker)
+    pickup = (await claim(owner, report_id, item_id, GOOD)).json()
+    adjacent = (await deposit(client)).json()
+    [overview] = (await admin.get("/api/admin/lockers")).json()
+    slot = next(
+        slot for slot in overview["compartments"] if slot["number"] == pickup["compartment"]
+    )
+    assert slot == {
+        "number": pickup["compartment"],
+        "state": "pickup_reserved",
+        "active_item_id": item_id,
+    }
+    request = {"expected_state": slot["state"], "expected_item_id": slot["active_item_id"]}
+    url = f"/api/admin/lockers/L1/compartments/{slot['number']}/reset"
+    assert (await client.post(url, json=request)).status_code == 401
+    assert (await owner.post(url, json=request)).status_code == 403
+    assert (
+        await admin.post(url, json={**request, "expected_item_id": adjacent["item_id"]})
+    ).status_code == 409
+    assert (
+        await admin.post(url, json={**request, "expected_state": "occupied"})
+    ).status_code == 409
+    assert (await admin.post(url, json=request)).json() == {
+        "compartment": slot["number"],
+        "state": "free",
+    }
+
+    [overview] = (await admin.get("/api/admin/lockers")).json()
+    slots = {slot["number"]: slot for slot in overview["compartments"]}
+    assert slots[pickup["compartment"]]["active_item_id"] is None
+    assert slots[adjacent["compartment"]]["active_item_id"] == adjacent["item_id"]
+    assert not await validate(client, headers, pickup["pickup_code"])
+    assert await validate(client, headers, adjacent["deposit_code"])
+    item = (await admin.get(f"/api/admin/items/{item_id}")).json()
+    assert item["status"] == "expired" and item["photo_ids"]
+    assert (await owner.post(f"/api/claims/{pickup['id']}/pickup-code")).status_code == 409
+
+    replacement = (await deposit(client)).json()
+    assert replacement["compartment"] == slot["number"]
+    assert (await admin.post(url, json=request)).status_code == 409
+    assert await validate(client, headers, replacement["deposit_code"])
+
+    entries = (await admin.get("/api/admin/audit")).json()
+    [reset] = [entry for entry in entries if entry["action"] == "admin_compartment_reset"]
+    assert reset["actor_type"] == "admin" and reset["details"]["found_item_id"] == item_id
+
+
+async def test_mark_empty_when_no_active_item_is_linked(client, admin, locker, session):
+    locker_record, headers = locker
+    await session.execute(
+        update(Compartment)
+        .where(Compartment.locker_id == locker_record.id, Compartment.number == 1)
+        .values(state="occupied")
+    )
+    await session.commit()
+    response = await admin.post(
+        "/api/admin/lockers/L1/compartments/1/reset",
+        json={"expected_state": "occupied", "expected_item_id": None},
+    )
+    assert response.json() == {"compartment": 1, "state": "free"}
+
+    reported = await client.post(
+        "/api/device/compartments/1/state",
+        headers=headers,
+        json={"device_id": "locker_01", "occupied": True},
+    )
+    assert reported.json() == {"compartment": 1, "state": "free"}

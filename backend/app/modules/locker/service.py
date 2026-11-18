@@ -112,6 +112,20 @@ async def compartment_for_item(
     return await session.scalar(query)
 
 
+async def _get_compartment_for_update(
+    session: AsyncSession, locker_id: int, number: int
+) -> Compartment:
+    compartment = await session.scalar(
+        select(Compartment)
+        .where(Compartment.locker_id == locker_id, Compartment.number == number)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if compartment is None:
+        raise not_found("Compartment")
+    return compartment
+
+
 # ---------- codes ----------
 
 
@@ -294,15 +308,7 @@ async def report_state(session: AsyncSession, locker: Locker, number: int, occup
     from app.modules.found_items import service as items  # lazy: found_items also uses locker
 
     await _lock_locker(session, locker.id)
-    compartment = await session.scalar(
-        select(Compartment)
-        .where(Compartment.locker_id == locker.id, Compartment.number == number)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-    if compartment is None:
-        raise not_found("Compartment")
-
+    compartment = await _get_compartment_for_update(session, locker.id, number)
     item_id = await _current_item_id(session, compartment.id)
     transition = policy.next_state_on_report(compartment.state, occupied)
     if transition is None:
@@ -357,6 +363,8 @@ async def _current_item_id(session: AsyncSession, compartment_id: int) -> int | 
             FoundItem.compartment_id == compartment_id,
             FoundItem.status.in_(ACTIVE_ITEM_STATUSES),
         )
+        .order_by(FoundItem.id.desc())
+        .limit(1)
         .with_for_update()
     )
 
@@ -377,9 +385,42 @@ async def clear_item_access(
         compartment.state = "free"
 
 
-async def reset_locker(session: AsyncSession, code: str, admin_id: int) -> None:
-    from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem
+async def reset_compartment(
+    session: AsyncSession,
+    code: str,
+    number: int,
+    admin_id: int,
+    expected_state: str,
+    expected_item_id: int | None,
+) -> None:
+    locker = await get_locker(session, code)
+    await _lock_locker(session, locker.id)
+    compartment = await _get_compartment_for_update(session, locker.id, number)
+    item_id = await _current_item_id(session, compartment.id)
+    if compartment.state != expected_state or item_id != expected_item_id:
+        raise AppError(
+            409, "compartment_changed", "This compartment changed. Check its latest status."
+        )
+    if compartment.state == "free" and item_id is None:
+        return
 
+    await _reset_compartments(session, [compartment.id])
+    audit.log(
+        session,
+        "admin_compartment_reset",
+        "compartment",
+        compartment.id,
+        actor_type="admin",
+        actor_id=admin_id,
+        locker_code=locker.code,
+        compartment_number=number,
+        found_item_id=item_id,
+        previous_state=expected_state,
+    )
+    await session.commit()
+
+
+async def reset_locker(session: AsyncSession, code: str, admin_id: int) -> None:
     locker = await get_locker(session, code)
     await _lock_locker(session, locker.id)
     compartments = (
@@ -387,6 +428,22 @@ async def reset_locker(session: AsyncSession, code: str, admin_id: int) -> None:
             select(Compartment.id).where(Compartment.locker_id == locker.id).with_for_update()
         )
     ).all()
+    expired = await _reset_compartments(session, compartments)
+    audit.log(
+        session,
+        "admin_locker_reset",
+        "locker",
+        locker.id,
+        actor_type="admin",
+        actor_id=admin_id,
+        items=expired,
+    )
+    await session.commit()
+
+
+async def _reset_compartments(session: AsyncSession, compartments: list[int]) -> int:
+    from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem
+
     expired = await session.execute(
         update(FoundItem)
         .where(
@@ -403,13 +460,4 @@ async def reset_locker(session: AsyncSession, code: str, admin_id: int) -> None:
     await session.execute(
         update(Compartment).where(Compartment.id.in_(compartments)).values(state="free")
     )
-    audit.log(
-        session,
-        "admin_locker_reset",
-        "locker",
-        locker.id,
-        actor_type="admin",
-        actor_id=admin_id,
-        items=expired.rowcount,
-    )
-    await session.commit()
+    return expired.rowcount

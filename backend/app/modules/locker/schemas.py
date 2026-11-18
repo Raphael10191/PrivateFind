@@ -15,6 +15,12 @@ class LockerInfo(BaseModel):
 class CompartmentOverview(BaseModel):
     number: int
     state: str
+    active_item_id: int | None = None
+
+
+class CompartmentResetIn(BaseModel):
+    expected_state: str
+    expected_item_id: int | None
 
 
 class LockerOverview(BaseModel):

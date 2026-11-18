@@ -94,8 +94,8 @@ async def test_operator_overview_uses_real_compartments_and_heartbeat(client, ow
     before = (await admin.get(url)).json()
     assert len(before) == 1 and before[0]["code"] == "L1"
     assert before[0]["compartments"] == [
-        {"number": 1, "state": "free"},
-        {"number": 2, "state": "free"},
+        {"number": 1, "state": "free", "active_item_id": None},
+        {"number": 2, "state": "free", "active_item_id": None},
     ]
     assert before[0]["last_seen_at"] is None
     assert "device_key_hash" not in before[0]

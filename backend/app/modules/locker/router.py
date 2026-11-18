@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.modules.found_items.models import ACTIVE_ITEM_STATUSES, FoundItem
 from app.modules.identity.deps import AdminUser, SessionDep
 from app.modules.locker import service
 from app.modules.locker.models import Compartment, Locker
@@ -12,6 +13,7 @@ from app.modules.locker.schemas import (
     CodeIn,
     CodeResult,
     CompartmentOverview,
+    CompartmentResetIn,
     HeartbeatIn,
     LockerInfo,
     LockerOverview,
@@ -52,14 +54,24 @@ async def locker_info(locker_code: str, session: SessionDep):
 
 @router.get("/api/admin/lockers", response_model=list[LockerOverview], tags=["admin"])
 async def locker_overview(_: AdminUser, session: SessionDep):
+    active_item = (
+        select(FoundItem.id)
+        .where(
+            FoundItem.compartment_id == Compartment.id,
+            FoundItem.status.in_(ACTIVE_ITEM_STATUSES),
+        )
+        .order_by(FoundItem.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
     rows = await session.execute(
-        select(Locker, Compartment)
+        select(Locker, Compartment, active_item)
         .outerjoin(Compartment, Compartment.locker_id == Locker.id)
         .where(Locker.code.is_not(None))
         .order_by(Locker.code, Compartment.number)
     )
     overview: dict[int, LockerOverview] = {}
-    for locker, slot in rows:
+    for locker, slot, item_id in rows:
         if locker.id not in overview:
             overview[locker.id] = LockerOverview(
                 code=locker.code,
@@ -70,9 +82,23 @@ async def locker_overview(_: AdminUser, session: SessionDep):
             )
         if slot is not None:
             overview[locker.id].compartments.append(
-                CompartmentOverview(number=slot.number, state=slot.state)
+                CompartmentOverview(number=slot.number, state=slot.state, active_item_id=item_id)
             )
     return list(overview.values())
+
+
+@router.post(
+    "/api/admin/lockers/{code}/compartments/{number}/reset",
+    response_model=StateResult,
+    tags=["admin"],
+)
+async def reset_compartment(
+    code: str, number: int, body: CompartmentResetIn, admin: AdminUser, session: SessionDep
+):
+    await service.reset_compartment(
+        session, code, number, admin.id, body.expected_state, body.expected_item_id
+    )
+    return StateResult(compartment=number, state="free")
 
 
 @router.post("/api/admin/lockers/{code}/reset", tags=["admin"])
