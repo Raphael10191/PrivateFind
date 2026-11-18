@@ -63,6 +63,7 @@ class AdminClaimOut(BaseModel):
     critical_conflict: bool
     created_at: datetime
     decision_note: str | None
+    verification_reason: str | None = None
     owner_description: str | None
     owner_identifying_details: str | None
     evidence: list[EvidenceOut]

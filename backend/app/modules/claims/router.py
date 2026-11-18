@@ -20,6 +20,7 @@ from app.modules.found_items.schemas import AttributeIO
 from app.modules.identity.deps import AdminUser, CurrentUser, SessionDep
 from app.modules.lost_reports.models import LostReport
 from app.shared.ai.readiness import require_ai_ready
+from app.shared.audit import AuditLog
 from app.shared.ratelimit import claim_limiter
 
 router = APIRouter(tags=["claims"])
@@ -144,7 +145,39 @@ async def admin_list(
 
 @router.get("/api/admin/claims/{claim_id}", response_model=AdminClaimOut, tags=["admin"])
 async def admin_get(claim_id: int, _: AdminUser, session: SessionDep):
-    return await _admin_out(session, await service.get(session, claim_id))
+    claim = await service.get(session, claim_id)
+    response = await _admin_out(session, claim)
+    if claim.decided_by is not None:
+        response.verification_reason = "The operator recorded this decision after a manual review."
+        return response
+    if claim.status == "rejected" and claim.verification_state == "unresolved":
+        response.verification_reason = claim.decision_note
+        return response
+    details = await session.scalar(
+        select(AuditLog.details)
+        .where(
+            AuditLog.entity_type == "claim",
+            AuditLog.entity_id == claim.id,
+            AuditLog.action == "claim_submitted",
+        )
+        .order_by(AuditLog.id.desc())
+        .limit(1)
+    )
+    if details and details.get("decision") == claim.verification_state:
+        response.verification_reason = details.get("verification_reason")
+    if response.verification_reason is None and claim.status == "approved":
+        confirmed = [
+            entry.value
+            for entry in claim.evidence
+            if entry.result == "match"
+            and entry.type not in {"common", "model"}
+            and entry.attempt_no in (None, claim.attempt_no)
+        ]
+        response.verification_reason = "The reason was not recorded for this earlier approval."
+        if confirmed:
+            details_text = "; ".join(dict.fromkeys(confirmed))
+            response.verification_reason += f" Recorded photo matches: {details_text}."
+    return response
 
 
 @router.post("/api/admin/claims/{claim_id}/decision", response_model=ClaimOut, tags=["admin"])

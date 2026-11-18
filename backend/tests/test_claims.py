@@ -205,6 +205,13 @@ async def test_approved_claim_to_pickup(client, owner, admin, session, locker):
     body = response.json()
     assert body["verification_state"] == "verified"
     assert len(body["pickup_code"]) == 6
+    assert "verification_reason" not in body
+    detail_url = f"/api/admin/claims/{body['id']}"
+    assert (await owner.get(detail_url)).status_code == 403
+    reason = (await admin.get(detail_url)).json()["verification_reason"]
+    assert "Pickup code issued" in reason
+    assert "two different parts" in reason
+    assert BACK in reason and FRONT in reason
     pickup = await client.post(
         "/api/device/codes/validate",
         headers=headers,

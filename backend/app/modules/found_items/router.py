@@ -82,8 +82,11 @@ async def start_photo_review(
     location: Annotated[str, Form(max_length=50)],
     photos: Annotated[list[UploadFile], File()],
     note: Annotated[str, Form(max_length=500)] = "",
+    location_detail: Annotated[str, Form(max_length=120)] = "",
 ):
     files = await _read_deposit_photos(request, photos)
+    if location == "other" and (detail := location_detail.strip()):
+        note = "\n".join(filter(None, (f"Found at: {detail}", note.strip())))
     item, token = await service.create_draft(session, locker_code, location, note, None, files)
     background.add_task(service.run_extraction, item.id)
     return DraftOut(item_id=item.id, token=token)
@@ -96,19 +99,20 @@ async def photo_review(item_id: int, token: DraftToken, session: SessionDep):
     state = next(
         (a.observation_state for a in item.attributes if a.name == "category"), "unreadable"
     )
-    return DraftReview(
-        status=item.ai_status,
-        category=category,
-        category_state=state,
-        suggest_photo=item.ai_status == "done"
-        and len(item.photos) < 3
-        and category in {"phone", "laptop", "tablet", "headphones", "watch"}
-        and not any(
+    photo_count = len(item.photos)
+    suggest_photo = photo_count == 1
+    if photo_count == 2 and category in {"phone", "laptop", "tablet", "headphones", "watch"}:
+        suggest_photo = not any(
             attribute.name
             in {"damage", "engraving", "sticker_or_mark", "accessory", "contents", "other"}
             and attribute.strength in {"distinctive", "strong"}
             for attribute in item.private_attributes()
-        ),
+        )
+    return DraftReview(
+        status=item.ai_status,
+        category=category,
+        category_state=state,
+        suggest_photo=item.ai_status == "done" and suggest_photo,
     )
 
 

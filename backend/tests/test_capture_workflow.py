@@ -6,7 +6,7 @@ from app.modules.found_items.models import DepositSession, FoundItem
 from app.shared import storage
 from app.shared.ai.mock import MockAIProvider
 from app.shared.ai.provider import AIError, set_ai_provider
-from app.shared.ai.schemas import Extraction
+from app.shared.ai.schemas import Extraction, PrivateAttribute
 from tests.conftest import jpeg
 
 
@@ -54,6 +54,43 @@ async def test_photo_review_precedes_reservation_and_protects_private_details(cl
     assert confirmed.json()["deposit_code"]
     assert (await client.post(url + "/confirm", headers=headers, json={})).status_code == 404
     assert (await client.get("/api/lockers/L1")).json()["free_compartments"] == 1
+
+
+async def test_one_phone_photo_suggests_another_angle_and_records_other_location(
+    client, admin, locker
+):
+    ai = MockAIProvider()
+    ai.extract_attributes = AsyncMock(
+        return_value=Extraction(
+            category="phone",
+            public_summary="Black phone",
+            description="Black phone screen with a customized wallpaper",
+            private_attributes=[
+                PrivateAttribute(
+                    type="other", value="custom wallpaper", strength="distinctive", confidence=1.0
+                )
+            ],
+            confidence=1.0,
+        )
+    )
+    set_ai_provider(ai)
+    capture = await client.post(
+        "/api/deposit-drafts",
+        data={
+            "locker_code": "L1",
+            "location": "other",
+            "location_detail": "West bus stop",
+            "note": "Under the bench",
+        },
+        files=[("photos", ("front.jpg", jpeg(), "image/jpeg"))],
+    )
+    url, headers = open_draft(capture)
+    assert (await client.get(url, headers=headers)).json()["suggest_photo"] is True
+    confirmed = await client.post(url + "/confirm", headers=headers, json={"category": "phone"})
+    assert confirmed.status_code == 201, confirmed.text
+    item = (await admin.get(f"/api/admin/items/{capture.json()['item_id']}")).json()
+    assert item["location"] == "other"
+    assert item["note"] == "Found at: West bus stop\nUnder the bench"
 
 
 async def test_provider_failure_requires_successful_retry_before_confirming(client, locker):

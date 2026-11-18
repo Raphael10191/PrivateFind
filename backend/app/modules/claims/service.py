@@ -196,6 +196,7 @@ async def submit(
         actor_type="user",
         actor_id=user_id,
         decision=verdict.state,
+        verification_reason=verdict.reason,
         observations=[
             {
                 "part": f.part,

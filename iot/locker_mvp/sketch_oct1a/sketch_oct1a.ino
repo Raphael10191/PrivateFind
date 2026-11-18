@@ -43,13 +43,15 @@ enum Occupancy { SENSOR_UNKNOWN = -1, EMPTY = 0, OCCUPIED = 1 };
 
 LockerMode lockerMode = ENTER_CODE;
 String enteredCode = "";
+String activeAction = "";
 unsigned long lastSensorRead = 0;
 unsigned long lastWifiRetry = 0;
 Occupancy candidateState = SENSOR_UNKNOWN;
 byte stableSamples = 0;
+float lastDistanceCm = -1;
 String transientStatus = "";
 String persistentStatus = "";
-unsigned long transientStatusStarted = 0;
+unsigned long transientStatusUntil = 0;
 String lastTopLine = "";
 String lastBottomLine = "";
 
@@ -58,6 +60,7 @@ void setup() {
   Serial.begin(115200);
   initializeHardware();
   connectWifi();
+  showStatus("Ready");
 }
 
 
@@ -86,7 +89,8 @@ void initializeHardware() {
 
 
 void connectWifi() {
-  showStatus("Joining WiFi");
+  lcd.setCursor(0, 0);
+  lcd.print("WLAN verbindet");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startedAt = millis();
@@ -98,10 +102,9 @@ void connectWifi() {
   Serial.println();
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("WLAN verbunden.");
-    showStatus("Ready");
   } else {
     Serial.println("WLAN Fehler. Neuer Versuch folgt.");
-    showStatus("WiFi retrying");
+    showStatus("WiFi reconnecting");
   }
 }
 
@@ -152,14 +155,13 @@ void handleKeypad() {
 
   if (key == '#' && enteredCode.length() > 0) {
     String action = "";
-    String code = enteredCode;
+    bool authorized = validateCodeWithBackend(enteredCode, action);
     enteredCode = "";
-    bool authorized = validateCodeWithBackend(code, action);
 
     if (authorized) {
       openCompartment(action);
     } else {
-      showStatus(WiFi.status() == WL_CONNECTED ? "Access denied" : "WiFi unavailable");
+      showStatus("Access denied");
     }
   }
 }
@@ -167,6 +169,7 @@ void handleKeypad() {
 
 bool validateCodeWithBackend(const String& code, String& action) {
   if (WiFi.status() != WL_CONNECTED) {
+    showStatus("WiFi unavailable");
     return false;
   }
 
@@ -203,13 +206,14 @@ bool validateCodeWithBackend(const String& code, String& action) {
 
 
 void openCompartment(const String& action) {
+  activeAction = action;
   lockerServo.write(SERVO_OPEN_ANGLE);
   lockerMode = DOOR_OPEN;
 
   if (action == "deposit") {
     showPersistentStatus("Put item in + #");
   } else {
-    showPersistentStatus("Take item out #");
+    showPersistentStatus("Remove item + #");
   }
   Serial.println("Fach 1 offen. Nach dem Schliessen # druecken.");
 }
@@ -231,11 +235,12 @@ void refreshSensors() {
   }
   lastSensorRead = millis();
 
-  float distance = readDistanceCm();
-  if (lockerMode == VERIFYING_STATE) {
-    verifyAndReportState(distance);
-  }
+  lastDistanceCm = readDistanceCm();
   renderDisplay();
+
+  if (lockerMode == VERIFYING_STATE) {
+    verifyAndReportState(lastDistanceCm);
+  }
 }
 
 
@@ -259,7 +264,7 @@ void renderDisplay() {
     bottomLine = persistentStatus;
   } else if (lockerMode == ENTER_CODE && enteredCode.length() > 0) {
     bottomLine = "Code: " + maskedCode();
-  } else if (transientStatus.length() > 0 && millis() - transientStatusStarted < STATUS_DISPLAY_MS) {
+  } else if (millis() < transientStatusUntil) {
     bottomLine = transientStatus;
   }
 
@@ -311,6 +316,7 @@ void verifyAndReportState(float distance) {
   if (reportCompartmentState(occupied)) {
     lockerServo.write(SERVO_CLOSED_ANGLE);
     lockerMode = ENTER_CODE;
+    activeAction = "";
     clearPersistentStatus();
     showStatus(occupied ? "Item stored" : "Locker empty");
     Serial.println("Status gesendet. Fach 1 geschlossen.");
@@ -361,8 +367,7 @@ bool reportCompartmentState(bool occupied) {
 
 void showStatus(const String& message) {
   transientStatus = message;
-  transientStatusStarted = millis();
-  renderDisplay();
+  transientStatusUntil = millis() + STATUS_DISPLAY_MS;
 }
 
 

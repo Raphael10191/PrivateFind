@@ -262,6 +262,11 @@
                          class="review-field-value"></div>
                 </div>
 
+                <div class="evidence-row" id="verification-reason-box" hidden>
+                    <strong>Verification reason</strong>
+                    <p id="detail-verification-reason" class="review-field-value"></p>
+                </div>
+
                 <div class="review-field">
                     <span class="review-field-label">
                         Critical Conflict
@@ -488,6 +493,10 @@
                 refuted: "Ownership not verified",
                 handed_over: "Handed over in person",
             }[claim.verification_state] || humanize(claim.status);
+
+            document.getElementById("detail-verification-reason").textContent =
+                claim.verification_reason || "";
+            document.getElementById("verification-reason-box").hidden = !claim.verification_reason;
 
             document.getElementById(
                 "detail-conflict"

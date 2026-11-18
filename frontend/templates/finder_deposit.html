@@ -354,6 +354,12 @@
             </p>
         </div>
 
+        <div class="finder-field" id="location-detail-field" hidden>
+            <label for="location-detail">Where exactly? (optional)</label>
+            <input id="location-detail" name="location_detail" maxlength="120"
+                   placeholder="For example, by the west bus stop">
+        </div>
+
         <details class="finder-field optional-note">
             <summary>Add a note <span>(optional)</span></summary>
             <label for="note">Where you found it or details that might help</label>
@@ -464,6 +470,13 @@
     const form = document.getElementById(
         "deposit-form"
     );
+
+    const locationDetailField = document.getElementById("location-detail-field");
+    const updateLocationDetail = () => {
+        locationDetailField.hidden = form.elements.location.value !== "other";
+    };
+    form.elements.location.addEventListener("change", updateLocationDetail);
+    window.addEventListener("pageshow", updateLocationDetail);
 
     const loadingBox = document.getElementById(
         "loading-locker"
@@ -596,6 +609,7 @@
                 return;
             }
 
+            updateLocationDetail();
             form.hidden = false;
 
         } catch (error) {
@@ -758,7 +772,11 @@
             if (result.status === "failed") {
                 reviewStatus.textContent = "Photo analysis was unavailable. Retry the photo check when the AI service is ready.";
             } else if (result.suggest_photo) {
-                reviewStatus.textContent = "An extra photo could help the owner claim this item. Try a close-up of a personal mark, repair, or unusual accessory. You can edit the photos or continue.";
+                if (selectedPhotos.length === 1) {
+                    reviewStatus.textContent = "Only one photo was uploaded. Add another angle to help check ownership later. For a phone, include the back if the first photo shows the screen. You can edit the photos or continue.";
+                } else {
+                    reviewStatus.textContent = "A close-up of a personal mark, repair or unusual accessory could help check ownership. You can edit the photos or continue.";
+                }
             } else {
                 reviewStatus.textContent = "Confirm the item type or correct it below.";
             }
@@ -833,6 +851,9 @@
         const data = new FormData();
         data.append("locker_code", lockerCode);
         data.append("location", form.elements.location.value);
+        if (form.elements.location.value === "other") {
+            data.append("location_detail", form.elements.location_detail.value.trim());
+        }
         data.append("note", form.elements.note.value.trim());
         selectedPhotos.forEach(({blob}, index) => data.append("photos", blob, `photo${index + 1}.jpg`));
         submitting = true;
