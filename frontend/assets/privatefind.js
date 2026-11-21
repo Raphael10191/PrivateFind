@@ -17,6 +17,10 @@ window.privateFind = {
         return element;
     },
     async requestJSON(url, options = {}, messages = {}) {
+        if (/^\/api\/lost-reports\/\d+\/candidates(?:\?|$)/.test(url) &&
+            window.privateFind.aiStatusCheck && !(await window.privateFind.aiStatusCheck)) {
+            throw new Error("Service availability could not be confirmed. Please try again later.");
+        }
         const response = await fetch(url, {
             credentials: "same-origin",
             cache: "no-store",
@@ -85,32 +89,66 @@ document.querySelectorAll("[data-signout]").forEach(button => {
 const aiStatus = document.getElementById("ai-status");
 if (aiStatus) {
     let statusVersion = 0;
+    let simulatedReportingSeen = false;
+    const isOperator = document.body.classList.contains("role-admin");
+    if (!isOperator && document.querySelector("[data-requires-ai]")) {
+        aiStatus.hidden = false;
+    }
 
-    function showAIStatus({provider, available}) {
+    function showAIStatus({provider, available, mock_reporting_enabled}, availabilityError = "") {
         const ready = available && ["qwen", "claude"].includes(provider);
+        const simulatedReporting = provider === "mock" && mock_reporting_enabled === true;
+        if (simulatedReporting) simulatedReportingSeen = true;
+        const staleSimulation = simulatedReportingSeen && !simulatedReporting;
+        const simulationNotice = "Local development · Simulated matching. Test reports use a temporary test database. Ownership verification, deposits, pickup codes and hardware actions are disabled.";
         const name = {qwen: "Qwen", claude: "Claude"}[provider];
-        const message = ready
+        const operatorMessage = ready
             ? name + " online · Real AI"
             : provider === "mock"
                 ? "Technical issue: Mock AI is configured. A real AI provider is required."
                 : "Technical issue: " + (name || "AI") + " is unavailable. Try again when it is back.";
+        const message = simulatedReporting
+            ? simulationNotice
+            : staleSimulation
+                ? simulationNotice + " Test-mode availability changed or could not be confirmed. Submissions are paused; reload before continuing."
+            : isOperator
+            ? availabilityError || operatorMessage
+            : availabilityError
+                ? "We can’t check service availability right now. Submission is paused. Please try again later."
+                : "This service is temporarily unavailable. Your form is paused. Please try again later.";
+        const hasVisibleForm = [...document.querySelectorAll("[data-requires-ai]")]
+            .some(control => !control.closest("[hidden]"));
+        aiStatus.hidden = !simulatedReportingSeen && !isOperator && (ready || !hasVisibleForm);
         if (aiStatus.textContent !== message) aiStatus.textContent = message;
         aiStatus.dataset.available = String(ready);
         for (const control of document.querySelectorAll("[data-requires-ai]")) {
-            control.inert = !ready;
+            control.inert = !((ready && !staleSimulation) ||
+                (simulatedReporting && control.dataset.aiScope === "report"));
         }
     }
 
     async function refreshAIStatus() {
         const version = ++statusVersion;
         let state = {available: false};
+        let availabilityError = "Service availability could not be checked.";
         try {
             const response = await fetch("/api/ai/status", {cache: "no-store"});
-            if (response.ok) state = await response.json();
+            if (response.ok) {
+                state = await response.json();
+                availabilityError = "";
+            } else {
+                availabilityError = "Service availability could not be checked (HTTP " + response.status + ").";
+            }
         } catch {
             // A disconnected browser cannot submit an AI-dependent form.
         }
-        if (version === statusVersion) showAIStatus(state);
+        if (version === statusVersion) showAIStatus(state, availabilityError);
+        return version === statusVersion && !availabilityError &&
+            ["mock", "qwen", "claude"].includes(state.provider);
+    }
+
+    function checkAIStatus() {
+        window.privateFind.aiStatusCheck = refreshAIStatus();
     }
 
     document.addEventListener("privatefind-ai-unavailable", () => {
@@ -118,13 +156,13 @@ if (aiStatus) {
         showAIStatus({available: false});
     });
     document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) void refreshAIStatus();
+        if (!document.hidden) checkAIStatus();
     });
     window.addEventListener("pageshow", event => {
-        if (event.persisted) void refreshAIStatus();
+        if (event.persisted) checkAIStatus();
     });
     setInterval(() => {
-        if (!document.hidden) void refreshAIStatus();
+        if (!document.hidden) checkAIStatus();
     }, 15000);
-    void refreshAIStatus();
+    checkAIStatus();
 }

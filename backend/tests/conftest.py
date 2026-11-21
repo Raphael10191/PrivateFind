@@ -6,6 +6,8 @@ import tempfile
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["STORAGE_DIR"] = tempfile.mkdtemp(prefix="pf-photos-")
 os.environ["AI_PROVIDER"] = "mock"
+os.environ["APP_ENV"] = "test"
+os.environ["ALLOW_MOCK_AI_REPORTS"] = "false"
 os.environ["AI_RETRY_BASE_DELAY_S"] = "0"
 os.environ["SECRET_KEY"] = "test-secret"
 
@@ -19,7 +21,7 @@ from app.modules.identity import service as identity  # noqa: E402
 from app.modules.locker import service as locker_service  # noqa: E402
 from app.shared import ratelimit  # noqa: E402
 from app.shared.ai.provider import set_ai_provider  # noqa: E402
-from app.shared.ai.readiness import require_ai_ready  # noqa: E402
+from app.shared.ai.readiness import require_ai_ready, require_report_ai_ready  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +45,7 @@ async def session():
 def app():
     application = create_app()
     application.dependency_overrides[require_ai_ready] = lambda: None
+    application.dependency_overrides[require_report_ai_ready] = lambda: None
     return application
 
 

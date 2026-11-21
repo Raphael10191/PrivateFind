@@ -34,6 +34,36 @@ Docker publishes `http://localhost:8000` by default. For a shared server, replac
 
 Always use the same hostname for login and later calls. `localhost` and `127.0.0.1` are different cookie hosts.
 
+### Optional local simulated reporting capability
+
+The normal `GET /api/ai/status` response and real-provider readiness checks are
+unchanged. An explicitly configured **development-only**, **in-memory database**
+sandbox can additionally return:
+
+```json
+{"provider":"mock","available":false,"mock_reporting_enabled":true}
+```
+
+This optional field grants only report creation and cached candidate reads
+(`GET /api/lost-reports/{id}/candidates?refresh=false`). It never means real AI,
+ownership verification, deposits, pickup, admin operations, or device activity
+are available. Those operations are rejected server-side in the sandbox.
+The frontend enables only the reporting form, retains all existing API URLs and
+payloads, and continuously labels the results **Local development · Simulated
+matching**, including after a failed availability refresh. A mode change pauses
+submission until the page is reloaded. Candidate loading waits for the existing
+availability check so simulated results cannot appear before their label.
+Missing/false capability fields leave
+mock AI blocked. Clients must not enable this permission via URL parameters,
+browser storage, or a general mock-provider fallback.
+
+Normal authentication is retained, with a separate `privatefind_mock_session`
+cookie only inside the sandbox. The sandbox cannot use production or shared data:
+startup requires `APP_ENV=development`, `ALLOW_MOCK_AI_REPORTS=true`,
+`AI_PROVIDER=mock`, and exactly `DATABASE_URL=sqlite+aiosqlite:///:memory:`.
+The flag is disabled by default. Activation, isolation, shutdown, and focused
+tests are documented in [the backend README](../../backend/README.md#local-simulated-reporting-sandbox).
+
 ### Browser login
 
 - Register/login sets a signed cookie named `session`. No JWT or bearer token is returned.

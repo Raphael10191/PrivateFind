@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.modules.identity.deps import CurrentUser, SessionDep
 from app.modules.matching import service
 from app.modules.matching.schemas import CandidateOut
-from app.shared.ai.readiness import require_ai_ready
+from app.shared.ai.readiness import require_report_ai_ready
 
 router = APIRouter(tags=["matching"])
 
@@ -11,7 +11,7 @@ router = APIRouter(tags=["matching"])
 @router.get(
     "/api/lost-reports/{report_id}/candidates",
     response_model=list[CandidateOut],
-    dependencies=[Depends(require_ai_ready)],
+    dependencies=[Depends(require_report_ai_ready)],
 )
 async def candidates(
     report_id: int,

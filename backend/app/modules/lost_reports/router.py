@@ -4,13 +4,16 @@ from app.modules.identity.deps import CurrentUser, SessionDep
 from app.modules.lost_reports import service
 from app.modules.lost_reports.schemas import LostReportIn, LostReportOut
 from app.modules.matching.service import refresh_for_report
-from app.shared.ai.readiness import require_ai_ready
+from app.shared.ai.readiness import require_report_ai_ready
 
 router = APIRouter(prefix="/api/lost-reports", tags=["lost reports"])
 
 
 @router.post(
-    "", response_model=LostReportOut, status_code=201, dependencies=[Depends(require_ai_ready)]
+    "",
+    response_model=LostReportOut,
+    status_code=201,
+    dependencies=[Depends(require_report_ai_ready)],
 )
 async def create(
     body: LostReportIn, user: CurrentUser, session: SessionDep, background: BackgroundTasks

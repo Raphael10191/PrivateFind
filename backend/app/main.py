@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 import app.models  # noqa: F401  (registers all tables)
+from app.core import db
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.modules.claims.router import router as claims_router
@@ -13,23 +14,33 @@ from app.modules.identity.router import router as identity_router
 from app.modules.locker.router import router as locker_router
 from app.modules.lost_reports.router import router as lost_reports_router
 from app.modules.matching.router import router as matching_router
-from app.shared.ai.readiness import ai_status
+from app.shared.ai.readiness import ai_status, require_mock_reporting_scope
 from app.shared.audit_router import router as audit_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if get_settings().ai_provider != "mock":
+    settings = get_settings()
+    if settings.mock_reporting_enabled:
+        # Only the validated, fresh in-memory database; never run migrations or seed lockers.
+        async with db.engine.begin() as connection:
+            await connection.run_sync(db.Base.metadata.create_all)
+    elif settings.ai_provider != "mock":
         await found_items_service.requeue_pending()
     yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    app = FastAPI(
+        title=settings.app_name,
+        lifespan=lifespan,
+        dependencies=[Depends(require_mock_reporting_scope)],
+    )
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
+        session_cookie="privatefind_mock_session" if settings.mock_reporting_enabled else "session",
         max_age=settings.session_max_age_s,
         same_site="lax",
         https_only=False,  # demo runs on plain HTTP (D11)
