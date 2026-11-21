@@ -3,16 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#F7F5EF">
+    <meta name="theme-color" content="#142B5C">
     <title>{% block title %}PrivateFind{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&amp;family=Nunito+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="/assets/privatefind.css">
 </head>
 {% from "icons.html" import icon %}
+{% from "doodles.html" import mascot %}
 {% set owner_nav = [
     ('home', '/owner', 'Home', 'home'),
-    ('reports', '/owner/reports', 'Searches', 'search'),
-    ('claims', '/owner/claims', 'Claims', 'shield'),
+    ('reports', '/owner/reports', 'My Reports', 'search'),
+    ('claims', '/owner/claims', 'My Claims', 'shield'),
     ('account', '/owner/account', 'Profile', 'person')
 ] %}
 {% set admin_nav = [
@@ -32,7 +36,7 @@
         </a>
     {% endfor %}
 {%- endmacro %}
-<body class="role-{{ role | default('guest') }}">
+<body class="role-{{ role | default('guest') }} {% block body_class %}{% endblock %}">
     <a href="#main-content" class="skip-link">Skip to content</a>
     <header class="site-header">
         <div class="header-inner">
@@ -56,10 +60,15 @@
                     {{ nav_links(role_links) }}
                     {% if role == 'admin' %}{{ nav_links(operations_nav) }}{% endif %}
                 </nav>
+                {% if role == 'owner' %}
+                <div class="sidebar-companion" aria-hidden="true" data-mascot-motion>
+                    {{ mascot('keeper', 'sidebar-keeper') }}
+                </div>
+                {% endif %}
             </aside>
         {% endif %}
         <main id="main-content" tabindex="-1">
-            <p id="ai-status" class="ai-status" role="status">Checking AI availability…</p>
+            <p id="ai-status" class="ai-status" role="status"{% if role != 'admin' %} hidden{% endif %}>Checking service availability…</p>
             {% block content %}{% endblock %}
         </main>
     </div>

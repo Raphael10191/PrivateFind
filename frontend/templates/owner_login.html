@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import mascot %}
 
 {% block title %}Sign In | PrivateFind{% endblock %}
 
@@ -23,11 +24,15 @@
 
 {% block content %}
 <section class="login-page">
+    <div class="login-layout" data-chirp-lookout>
+    <div class="login-illustration" aria-hidden="true" data-mascot-motion>
+        {{ mascot('chirp', 'login-chirp') }}
+    </div>
     <div class="login-card">
         <h1>Welcome back</h1>
 
         <p class="login-subtitle">
-            Sign in to your PrivateFind account.
+            Sign in to manage your reports and claims.
         </p>
 
         <form id="login-form">
@@ -39,6 +44,7 @@
                     type="email"
                     autocomplete="username"
                     placeholder="you@example.com"
+                    autocapitalize="none" spellcheck="false"
                     required
                 >
             </div>
@@ -63,7 +69,7 @@
             <button id="login-button"
                     class="login-button"
                     type="submit">
-                Sign In
+                Sign in
             </button>
         </form>
 
@@ -71,6 +77,7 @@
             Don't have an account?
             <a href="/register">Create an account</a>
         </p>
+    </div>
     </div>
 </section>
 {% endblock %}

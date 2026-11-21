@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import mascot %}
 
 {% block title %}Deposit a Found Item | PrivateFind{% endblock %}
 
@@ -280,8 +281,8 @@
 <section class="finder-page">
 
     <div class="finder-heading">
-        <h1>Return a found item.</h1>
-        <p>No account needed.</p>
+        <h1>Return a found item</h1>
+        <p>Add photos, get a deposit code, then place the item in the locker. No account needed.</p>
     </div>
 
     <form id="locker-entry" method="get" action="/found/new" class="finder-card" data-requires-ai inert hidden>
@@ -313,8 +314,11 @@
           hidden>
 
         <div class="locker-info">
-            <strong id="locker-name"></strong>
-            <p id="locker-availability"></p>
+            <div>
+                <strong id="locker-name"></strong>
+                <p id="locker-availability"></p>
+            </div>
+            {{ mascot('keeper', 'mascot-small') }}
         </div>
 
         <fieldset class="finder-field photo-field" aria-describedby="photo-hint photo-error">
@@ -325,10 +329,13 @@
             </div>
             <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
             <input type="file" id="gallery-input" accept="image/*" multiple hidden>
-            <p id="photo-hint" class="field-hint">
-                Add 1–3 photos. For a phone, show the front and back. Include a close-up
-                of an unusual detail if visible. A visible lock-screen wallpaper is optional.
-            </p>
+            <div class="photo-guidance">
+                {{ mascot('snap', 'mascot-mini') }}
+                <p id="photo-hint" class="field-hint">
+                    Add 1–3 photos. For a phone, show the front and back. Include a close-up
+                    of an unusual detail if visible. A visible lock-screen wallpaper is optional.
+                </p>
+            </div>
             <p id="photo-count" class="field-hint" role="status">0/3 photos</p>
             <ul id="photo-grid" class="photo-grid" aria-label="Selected photos" hidden></ul>
             <p id="photo-error" class="photo-error" role="alert" hidden></p>
@@ -406,9 +413,7 @@
         </h2>
 
         <p class="success-description">
-            Your deposit request was accepted.
-            Follow the instructions below to
-            place the item in the locker.
+            Keep this page open. Use the code before it expires, then follow the steps below to store the item.
         </p>
 
         <div class="deposit-code">
@@ -602,6 +607,7 @@
                 !Array.isArray(locker.locations) ||
                 locker.locations.length === 0
             ) {
+                lockerEntry.hidden = false;
                 showError(
                     "Campus locations are unavailable. " +
                     "Please try again later."
@@ -614,6 +620,7 @@
 
         } catch (error) {
             loadingBox.hidden = true;
+            lockerEntry.hidden = false;
             showError(
                 error.message ||
                 "Could not connect to the locker."
@@ -652,7 +659,7 @@
             const remove = document.createElement("button");
             remove.type = "button";
             remove.className = "photo-remove";
-            remove.textContent = "✕";
+            remove.textContent = "Remove";
             remove.setAttribute("aria-label", "Remove " + image.alt);
             remove.addEventListener("click", () => {
                 URL.revokeObjectURL(previewUrl);
@@ -744,6 +751,7 @@
     const editPhotos = document.getElementById("edit-photos");
     let draft;
     let pollTimer;
+    let reviewNeedsRefresh = false;
 
     async function getDraft(path = "", options = {}) {
         const response = await fetch("/api/deposit-drafts/" + draft.item_id + path, {
@@ -760,6 +768,8 @@
         try {
             const result = await getDraft();
             if (current !== draft) return;
+            reviewNeedsRefresh = false;
+            retryDraft.textContent = "Retry Photo Check";
             const pending = result.status === "pending";
             fields.hidden = result.status !== "done";
             retryDraft.hidden = result.status !== "failed";
@@ -770,7 +780,7 @@
             }
             category.value = result.category || "other";
             if (result.status === "failed") {
-                reviewStatus.textContent = "Photo analysis was unavailable. Retry the photo check when the AI service is ready.";
+                reviewStatus.textContent = "We couldn’t check the photos. Keep your photos here and retry when service is available.";
             } else if (result.suggest_photo) {
                 if (selectedPhotos.length === 1) {
                     reviewStatus.textContent = "Only one photo was uploaded. Add another angle to help check ownership later. For a phone, include the back if the first photo shows the screen. You can edit the photos or continue.";
@@ -782,7 +792,10 @@
             }
         } catch (error) {
             if (current !== draft) return;
-            reviewStatus.textContent = error.message;
+            reviewNeedsRefresh = true;
+            retryDraft.hidden = false;
+            retryDraft.textContent = "Check Photo Status";
+            reviewStatus.textContent = error.message + " Check photo status again, or use Edit Photos to start over.";
         }
     }
 
@@ -799,7 +812,7 @@
     retryDraft.addEventListener("click", async () => {
         retryDraft.disabled = true;
         try {
-            await getDraft("/retry", {method: "POST"});
+            if (!reviewNeedsRefresh) await getDraft("/retry", {method: "POST"});
             await pollReview();
         } catch (error) {
             reviewStatus.textContent = error.message;
@@ -823,7 +836,7 @@
             selectedPhotos.length = 0;
             document.getElementById("result-code").textContent = result.deposit_code;
             document.getElementById("result-compartment").textContent = result.compartment;
-            document.getElementById("result-expiry").textContent = result.expires_at;
+            document.getElementById("result-expiry").textContent = window.privateFind.formatExpiry(result.expires_at);
             review.hidden = true;
             successBox.hidden = false;
             successBox.querySelector("h2").focus();

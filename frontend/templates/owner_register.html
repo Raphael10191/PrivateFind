@@ -33,8 +33,7 @@
         <h1>Create your account</h1>
 
         <p class="register-subtitle">
-            Join PrivateFind to report lost items
-            and manage your claims.
+            Report lost items and keep track of your ownership claims.
         </p>
 
         <form id="register-form">
@@ -61,6 +60,7 @@
                     name="email"
                     type="email"
                     placeholder="you@example.com"
+                    autocapitalize="none" spellcheck="false"
                     autocomplete="email"
                     required
                 >
@@ -74,13 +74,13 @@
                     id="password"
                     name="password"
                     type="password"
-                    minlength="8"
+                    minlength="8" aria-describedby="password-help"
                     maxlength="128"
                     placeholder="Create a password"
                     autocomplete="new-password"
                     required
                 >
-                <p class="field-help">
+                <p class="field-help" id="password-help">
                     Use at least 8 characters.
                 </p>
             </div>
@@ -97,7 +97,7 @@
                 class="register-button"
                 type="submit"
             >
-                Create Account
+                Create account
             </button>
         </form>
 

@@ -1,0 +1,34 @@
+{# One original mascot family; all characters reuse the same transparent atlas. #}
+{% macro mascot(name, class_name="") -%}
+<span class="mascot mascot-{{ name }} {{ class_name }}" data-mascot="{{ name }}" aria-hidden="true"></span>
+{%- endmacro %}
+
+{% macro finding_crew() -%}
+<div class="home-doodle mascot-crew" aria-hidden="true">
+    {{ mascot('scout') }}{{ mascot('pip') }}{{ mascot('keeper') }}{{ mascot('chirp') }}
+</div>
+{%- endmacro %}
+
+{% macro scout_search() -%}
+<div class="home-doodle scout-search" aria-hidden="true">
+    {{ mascot('scout') }}
+    <svg class="mascot-box" viewBox="60 170 190 120" fill="none" focusable="false" aria-hidden="true">
+        <g stroke="#1A1A1F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M87 217L150 194L218 216L156 242Z" fill="#FAFAF8"/>
+            <path d="M87 217L87 259L155 284L156 242Z" fill="#A3BFD9"/>
+            <path d="M156 242L218 216L218 259L155 284Z" fill="#DADFF2"/>
+            <path d="M87 217L65 197L126 176L150 194Z" fill="#DADFF2"/>
+            <path d="M150 194L176 176L242 198L218 216Z" fill="#FAFAF8"/>
+            <path d="M87 217L156 242L137 259L68 233Z" fill="#FAFAF8"/>
+            <path d="M156 242L218 216L241 232L177 260Z" fill="#A3BFD9"/>
+            <path d="M103 247L115 251M104 256L124 263" stroke-width="2.5"/>
+        </g>
+    </svg>
+</div>
+{%- endmacro %}
+
+{% macro helping_friend(scene) -%}
+<div class="empty-mascot empty-mascot-{{ scene }}" aria-hidden="true" data-mascot-motion>
+    {{ mascot('nibbles' if scene == 'reports' else 'pip', 'empty-doodle') }}
+</div>
+{%- endmacro %}

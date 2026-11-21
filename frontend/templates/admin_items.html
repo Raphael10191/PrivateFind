@@ -250,7 +250,7 @@
             <select id="status-filter">
                 <option value="">All items</option>
                 <option value="awaiting_deposit">Awaiting Deposit</option>
-                <option value="open">Open</option>
+                <option value="open">Stored / available</option>
                 <option value="reserved">Reserved</option>
                 <option value="returned">Returned</option>
                 <option value="expired">Expired</option>
@@ -258,11 +258,11 @@
         </label>
 
         <label for="ai-filter">
-            AI processing
+            Photo processing
             <select id="ai-filter">
                 <option value="">All statuses</option>
                 <option value="pending">Pending</option>
-                <option value="done">Done</option>
+                <option value="done">Checked</option>
                 <option value="failed">Failed</option>
             </select>
         </label>
@@ -289,6 +289,9 @@
 
                 <span id="detail-status"
                       class="item-status"></span>
+
+                <h3>Item photos</h3>
+                <div id="detail-photos" class="photo-grid"></div>
 
                 <div class="item-field">
                     <span class="item-label">Item</span>
@@ -355,11 +358,6 @@
 
                 <h3>Owner Claims</h3>
                 <div id="detail-claims" aria-live="polite"></div>
-
-                <hr class="item-divider">
-
-                <h3>Uploaded Photos</h3>
-                <div id="detail-photos" class="photo-grid"></div>
 
                 <hr class="item-divider">
 
@@ -526,7 +524,8 @@
     }
 
     function renderItemDetails(item) {
-        setText("detail-status", humanize(item.status));
+        setText("detail-status", item.status === "open" ? "Stored / available" : humanize(item.status));
+        document.getElementById("detail-status").dataset.status = item.status;
         setText("detail-id", "Found Item #" + item.id);
         setText("detail-category", humanize(item.category));
         setText(
@@ -646,11 +645,12 @@
 
             renderItemDetails(item);
             void loadItemClaims(item.id, version);
-            if (window.matchMedia("(max-width: 760px)").matches) detailsBox.focus();
+            if (window.matchMedia("(max-width: 1100px)").matches) detailsBox.focus();
 
             itemsList.querySelectorAll(
                 ".item-option"
             ).forEach(button => {
+                button.setAttribute("aria-pressed", String(button.dataset.itemId === String(item.id)));
                 button.classList.toggle(
                     "selected",
                     button.dataset.itemId === String(item.id)

@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import helping_friend %}
 
 {% block title %}My Reports | PrivateFind{% endblock %}
 
@@ -185,11 +186,12 @@
         </p>
     </div>
 
-    <a href="/owner/report/new" class="new-report">
-        + New Report
+    <a href="/owner/report/new" class="new-report pf-button">
+        Report a Lost Item
     </a>
 </section>
 
+{% if reports %}
 <div class="filters"
      role="group"
      aria-label="Filter reports">
@@ -218,6 +220,7 @@
         Completed
     </button>
 </div>
+{% endif %}
 
 <div id="reports-list">
 
@@ -241,6 +244,8 @@
                             {{ report.category | replace('_', ' ') | title }}
                         {% endif %}
 
+                    {% elif report.category == 'other' %}
+                        {{ report.model or (report.description or '')[:70] or 'Lost item' }}
                     {% else %}
                         {% if report.color %}
                             {{ report.color | title }}
@@ -251,19 +256,18 @@
                 </h2>
 
                 {% if is_completed %}
-                    <span class="status completed">
+                    <span class="status completed" data-status="{{ report.status }}">
                         {{ report.status | title }}
                     </span>
                 {% else %}
-                    <span class="status searching">
+                    <span class="status searching" data-status="{{ report.status }}">
                         Searching
                     </span>
                 {% endif %}
             </div>
 
             <p class="report-location">
-                Lost at
-                {{ report.location | replace('_', ' ') | title }}
+                {{ 'Location not specified' if not report.location or report.location == 'other' else 'Last seen: ' ~ (report.location | replace('_', ' ') | title) }}
             </p>
 
             <div class="report-bottom">
@@ -285,13 +289,14 @@
 </div>
 
 <div id="filter-empty"
-     class="empty-message"
+     class="empty-message empty-state{% if not reports %} mascot-empty{% endif %}"
      {% if reports %}hidden{% endif %}>
 
     {% if reports %}
         No reports in this category.
     {% else %}
-        No reports yet. Create your first lost-item report.
+        {{ helping_friend('reports') }}
+        <p>No reports yet. Use “Report a Lost Item” above to get started.</p>
     {% endif %}
 
 </div>
@@ -345,7 +350,7 @@
 
             emptyMessage.textContent = hasReports
                 ? "No reports in this category."
-                : "No reports yet. Create your first lost-item report.";
+                : "No reports yet. Use “Report a Lost Item” above to get started.";
         });
     });
 </script>

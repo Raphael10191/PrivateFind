@@ -128,6 +128,7 @@
 <section class="details-page">
     <div class="details-heading">
         <h1>What did you lose?</h1>
+        <p class="muted-text">Describe your item to create a report and check for possible matches.</p>
     </div>
     <form id="details-form" class="details-card" data-requires-ai data-ai-scope="report" inert>
         <div class="details-field">
@@ -170,20 +171,20 @@
                 <input id="lost-date" name="lost_date" type="date" lang="en">
             </div>
             <div class="details-field">
-                <label for="brand">Brand</label>
+                <label for="brand">Brand (optional)</label>
                 <input id="brand" name="brand" maxlength="50">
             </div>
             <div class="details-field">
-                <label for="model">Model</label>
+                <label for="model">Model (optional)</label>
                 <input id="model" name="model" maxlength="100">
             </div>
             <div class="details-field">
-                <label for="material">Material</label>
+                <label for="material">Material (optional)</label>
                 <input id="material" name="material" maxlength="50">
             </div>
         </details>
         <div class="details-actions">
-            <button type="submit" class="submit-action" id="submit-report">Find My Item</button>
+            <button type="submit" class="submit-action" id="submit-report">Save report &amp; check matches</button>
         </div>
         <p id="form-error" class="form-error" role="alert" hidden></p>
     </form>
@@ -231,10 +232,12 @@
             if (!response.ok || !body.id) throw new Error(body.error?.message || "Could not save your report.");
             window.location.replace("/owner/report/view?id=" + encodeURIComponent(body.id));
         } catch (error) {
-            errorBox.textContent = error.message;
+            errorBox.textContent = error instanceof SyntaxError
+                ? "We couldn’t read the server response. Check My Reports before submitting again. Your form details are still here."
+                : error.message;
             errorBox.hidden = false;
             submitButton.disabled = false;
-            submitButton.textContent = "Find My Item";
+            submitButton.textContent = "Save report & check matches";
         }
     });
 </script>

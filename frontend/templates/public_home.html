@@ -1,20 +1,24 @@
 {% extends "base.html" %}
 {% from "icons.html" import icon %}
+{% from "doodles.html" import finding_crew %}
+{% block title %}Campus Lost & Found | PrivateFind{% endblock %}
 {% block content %}
 <section class="public-hero">
     <div>
+        <p class="home-eyebrow">Your campus lost &amp; found</p>
         <h1>Lost things.<br><em>Found again.</em></h1>
-        <p>Report a lost item or return something you found at a campus locker.</p>
+        <p>Looking for something? Report your lost item. Found something? Help it get home through a campus locker.</p>
         <div class="public-actions">
             <a class="pf-button" href="/owner/report/new">{{ icon('search') }} I lost something</a>
             <a class="pf-button pf-secondary" href="/found/new">{{ icon('box') }} I found something</a>
         </div>
     </div>
-    <section class="public-guide pf-card" aria-labelledby="public-guide-heading">
+    <div class="public-art">{{ finding_crew() }}</div>
+</section>
+<section class="public-guide pf-card" aria-labelledby="public-guide-heading">
         <h2 id="public-guide-heading">How it works</h2>
-        <div>{{ icon('box') }}<p><strong>Hand it in</strong><span>Scan the QR code on the locker and take a photo.</span></p></div>
-        <div>{{ icon('search') }}<p><strong>Search for it</strong><span>Describe the lost item to see possible matches.</span></p></div>
-        <div>{{ icon('shield') }}<p><strong>Collect it</strong><span>Verify ownership to receive a pickup code.</span></p></div>
-    </section>
+        <div>{{ icon('search') }}<p><strong>Lost an item?</strong><span>Sign in and describe it to check for possible matches. Identifying details stay private.</span></p></div>
+        <div>{{ icon('box') }}<p><strong>Found an item?</strong><span>Scan a locker’s QR code, add photos, and follow the deposit instructions. No account needed.</span></p></div>
+        <div>{{ icon('shield') }}<p><strong>Get it back safely</strong><span>Owners verify their claim before receiving a pickup code. Some claims need an operator’s review.</span></p></div>
 </section>
 {% endblock %}

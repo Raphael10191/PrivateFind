@@ -1,7 +1,9 @@
 
 {% extends "base.html" %}
 
-{% block title %}My Account | PrivateFind{% endblock %}
+{% from "icons.html" import icon %}
+{% from "doodles.html" import mascot %}
+{% block title %}Profile | PrivateFind{% endblock %}
 
 {% block head %}
 <style>
@@ -126,13 +128,14 @@
 {% block content %}
 <section class="account-page">
     <div class="account-heading">
-        <h1>My Account</h1>
+        <h1>Profile</h1>
         <p>Your PrivateFind account information</p>
     </div>
 
     <div class="account-card">
+        <div class="profile-companion" aria-hidden="true">{{ mascot('keeper') }}</div>
         <div class="account-avatar" aria-hidden="true">
-            &#128100;
+            {{ icon('person') }}
         </div>
 
         <div class="account-field">

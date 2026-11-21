@@ -45,6 +45,8 @@ templates.filters["english_date"] = english_date
 ASSETS = {
     "/assets/privatefind.css": ("privatefind.css", "text/css"),
     "/assets/privatefind.js": ("privatefind.js", "text/javascript"),
+    "/assets/privatefind-mascots.png": ("privatefind-mascots.png", "image/png"),
+    "/assets/privatefind-pip-calm.png": ("privatefind-pip-calm.png", "image/png"),
 }
 
 PAGES = {

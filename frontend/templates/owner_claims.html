@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import helping_friend %}
 
 {% block title %}My Claims | PrivateFind{% endblock %}
 
@@ -156,7 +157,7 @@
     <header class="claims-heading">
         <div>
             <h1>My Claims</h1>
-            <p>Track your ownership verification requests.</p>
+            <p>Check ownership reviews, respond to requests, and collect approved items.</p>
         </div>
 
         <button id="refresh-claims"
@@ -166,10 +167,13 @@
         </button>
     </header>
 
+    <div class="claims-state">
+    <div id="claims-empty-art" hidden>{{ helping_friend('claims') }}</div>
     <div id="claims-feedback"
          class="feedback"
          role="status">
         Loading your claims...
+    </div>
     </div>
 
     <div id="claims-list" hidden></div>
@@ -257,7 +261,13 @@
         status.className = "claim-status";
         status.textContent = statusLabel(claim.status);
 
-        header.append(title, status);
+        const identity = document.createElement("div");
+        identity.className = "claim-card-identity";
+        const art = document.createElement("span");
+        art.className = "mascot claim-mascot";
+        art.setAttribute("aria-hidden", "true");
+        identity.append(art, title);
+        header.append(identity, status);
         card.appendChild(header);
 
         card.appendChild(paragraph(
@@ -272,6 +282,7 @@
         );
 
         card.appendChild(message);
+        message.setAttribute("role", "status");
 
         const actions = document.createElement("div");
         actions.className = "claim-actions";
@@ -295,7 +306,14 @@
         errorMessage.hidden = true;
 
         function showStatus(updated) {
+            const character = window.privateFind.claimMascot(updated.status);
+            art.className = "mascot claim-mascot" + (character ? " mascot-" + character : "");
+            art.hidden = !character;
             status.textContent = statusLabel(updated.status);
+            status.dataset.status = updated.status;
+            if (updated.status === "in_review" && updated.verification_state === "needs_more_evidence") {
+                status.textContent = "More evidence needed";
+            }
             message.textContent = updated.message || "";
 
             while (actions.children.length > 1) {
@@ -305,6 +323,16 @@
             pickupPanel.hidden = true;
             pickupPanel.replaceChildren();
             errorMessage.hidden = true;
+
+            if (["pending", "in_review"].includes(updated.status) &&
+                ["another_detail", "retry_photo_check"].includes(updated.next_action)) {
+                const continueLink = document.createElement("a");
+                continueLink.className = "claim-link";
+                continueLink.href = "/owner/claim?report_id=" + encodeURIComponent(updated.lost_report_id) +
+                    "&item_id=" + encodeURIComponent(updated.found_item_id);
+                continueLink.textContent = updated.next_action === "another_detail" ? "Add requested detail" : "Continue ownership check";
+                actions.appendChild(continueLink);
+            }
 
             if (
                 updated.status === "in_review" ||
@@ -377,7 +405,7 @@
                                     ),
                                     paragraph(
                                         "Expires: " +
-                                        result.expires_at
+                                        window.privateFind.formatExpiry(result.expires_at)
                                     ),
                                     paragraph(
                                         "Enter this code at the locker. " +
@@ -407,6 +435,7 @@
 
     async function loadClaims() {
         refreshButton.disabled = true;
+        document.getElementById("claims-empty-art").hidden = true;
         claimsList.hidden = true;
         setFeedback("Loading your claims...");
 
@@ -422,12 +451,17 @@
             claimsList.replaceChildren();
 
             if (claims.length === 0) {
+                document.getElementById("claims-empty-art").hidden = false;
                 setFeedback(
-                    "No ownership claims yet. " +
-                    "Claims will appear here after you " +
-                    "select a possible match and " +
-                    "submit ownership evidence."
+                    "No claims yet. Open a report in "
                 );
+                const reportsLink = document.createElement("a");
+                reportsLink.href = "/owner/reports";
+                reportsLink.className = "claims-reports-link";
+                reportsLink.textContent = "My Reports";
+                feedback.append(reportsLink, document.createTextNode(
+                    ", then choose a possible match to check ownership."
+                ));
                 return;
             }
 

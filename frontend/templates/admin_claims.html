@@ -294,13 +294,14 @@
 
                 <div id="review-decision">
                     <label for="proof-method" class="review-note-label">Proof checked</label>
-                    <select id="proof-method">
+                    <select id="proof-method" aria-describedby="decision-help">
                         <option value="">Choose the proof you checked</option>
                         <option value="dated_identifier_record">Dated purchase or device record with matching identifier</option>
                         <option value="live_device_control">Observed live control of this device</option>
                         <option value="independent_record">Other independent ownership record</option>
                         <option value="in_person_low_risk">Completed in-person handover for a low-risk item</option>
                     </select>
+                    <p id="decision-help" class="field-help">To approve or record a completed handover, select the proof checked and write a note of at least 10 characters. Handover is for eligible low-risk items only.</p>
                     <label for="decision-note"
                            class="review-note-label">
                         Decision note
@@ -309,6 +310,7 @@
                     <textarea
                         id="decision-note"
                         class="review-note"
+                        aria-describedby="decision-help"
                         maxlength="500"
                         placeholder="Explain the review decision..."></textarea>
 
@@ -350,6 +352,12 @@
     const rejectButton = document.getElementById("reject-claim");
     const proofInput = document.getElementById("proof-method");
     const noteInput = document.getElementById("decision-note");
+    function updateDecisionLabel() {
+        approveButton.textContent = proofInput.value === "in_person_low_risk"
+            ? "Record completed handover" : "Approve claim";
+    }
+    proofInput.addEventListener("change", updateDecisionLabel);
+    updateDecisionLabel();
 
     let selectedClaimId = null;
     let submitting = false;
@@ -396,6 +404,7 @@
             "Select a claim to view its ownership evidence.";
         proofInput.value = "";
         noteInput.value = "";
+        updateDecisionLabel();
     }
 
     function setDecisionButtons(disabled) {
@@ -482,6 +491,7 @@
 
             selectedClaimId = claim.id;
             document.getElementById("detail-status").textContent = adminClaimStatus(claim);
+            document.getElementById("detail-status").dataset.status = claim.status;
 
             document.getElementById(
                 "detail-claim-id"
@@ -512,6 +522,7 @@
             ).textContent = claim.critical_conflict
                 ? "Yes — review carefully"
                 : "No critical conflict reported";
+            document.getElementById("detail-conflict").parentElement.classList.toggle("conflict-warning", claim.critical_conflict);
 
             document.getElementById("detail-description").textContent =
                 claim.owner_description || "None provided.";
@@ -536,13 +547,15 @@
 
             proofInput.value = "";
             noteInput.value = "";
+            updateDecisionLabel();
             placeholder.hidden = true;
             reviewDetails.hidden = false;
-            if (window.matchMedia("(max-width: 760px)").matches) reviewDetails.focus();
+            if (window.matchMedia("(max-width: 1100px)").matches) reviewDetails.focus();
 
             reviewsList.querySelectorAll(
                 ".claim-list-item"
             ).forEach(button => {
+                button.setAttribute("aria-pressed", String(button.dataset.claimId === String(claim.id)));
                 button.classList.toggle(
                     "selected",
                     button.dataset.claimId === String(claim.id)
@@ -621,6 +634,7 @@
         refreshButton.disabled = true;
         noteInput.disabled = true;
         proofInput.disabled = true;
+        let decisionSaved = false;
 
         try {
             await apiRequest(
@@ -640,6 +654,7 @@
                 }
             );
 
+            decisionSaved = true;
             resetDetails();
             renderClaims(await apiRequest(claimsUrl));
 
@@ -651,7 +666,9 @@
             successBox.hidden = false;
 
         } catch (error) {
-            showError(error.message);
+            showError(decisionSaved
+                ? "The decision was saved, but the review list could not refresh. Use Refresh to load the latest status."
+                : error.message);
         } finally {
             submitting = false;
             setDecisionButtons(false);

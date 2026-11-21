@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import mascot %}
 
 {% block title %}Report Details | PrivateFind{% endblock %}
 
@@ -205,8 +206,18 @@
 
     <div id="report-content" hidden>
 
-        <section class="detail-card">
-            <h2>Lost Item Information</h2>
+        <section class="detail-card" aria-labelledby="matches-heading">
+            <div class="matches-heading">
+                <h2 id="matches-heading">Possible matches</h2>
+                <span id="matches-mascots" class="mascot-pair" hidden aria-hidden="true">{{ mascot('scout', 'mascot-mini') }}{{ mascot('pip', 'mascot-mini') }}</span>
+            </div>
+            <p id="matches-message" class="match-message" role="status" aria-live="polite"></p>
+            <div id="matches-list"></div>
+            <button type="button" id="more-matches" class="claim-link" hidden>Show more matches</button>
+        </section>
+
+        <details class="detail-card report-summary">
+            <summary>Your report details</summary>
 
             <div class="detail-grid">
                 <div class="detail-field">
@@ -245,26 +256,9 @@
                          class="detail-value"></div>
                 </div>
             </div>
-        </section>
-
-        <section class="detail-card">
-            <h2>Item Description</h2>
-
             <div id="field-description"
                  class="description"></div>
-        </section>
-
-        <section class="detail-card">
-            <h2>Possible Matches</h2>
-
-            <p id="matches-message"
-               class="match-message"
-               role="status"
-               aria-live="polite"></p>
-
-            <div id="matches-list"></div>
-            <button type="button" id="more-matches" class="claim-link" hidden>Show more</button>
-        </section>
+        </details>
 
     </div>
 
@@ -314,6 +308,7 @@
 
     async function loadReport() {
         if (!validId(reportId)) {
+            document.getElementById("report-subtitle").textContent = "This report link is not valid. Return to My Reports to choose a report.";
             reportError.textContent = "Invalid report ID.";
             reportError.hidden = false;
             return;
@@ -348,7 +343,8 @@
                 "report-status"
             );
 
-            status.textContent = humanize(report.status);
+            status.textContent = report.status === "open" ? "Searching" : humanize(report.status);
+            status.dataset.status = report.status;
             status.hidden = false;
 
             setField(
@@ -396,10 +392,11 @@
                 matchesMessage.textContent = "Looking for possible matches…";
                 refreshMatches();
             } else {
-                matchesMessage.textContent = "Matching is available for open reports.";
+                matchesMessage.textContent = "This report is " + humanize(report.status).toLowerCase() + ". Possible matches are shown only for active reports.";
             }
 
         } catch (error) {
+            document.getElementById("report-subtitle").textContent = "Your report could not be loaded. Return to My Reports or try again later.";
             reportError.textContent =
                 error.message || "Could not load report.";
 
@@ -456,9 +453,17 @@
     let pages = 1;
     const moreMatches = document.getElementById("more-matches");
     const matchesUrl = "/api/lost-reports/" + encodeURIComponent(reportId) + "/candidates?refresh=false";
-    moreMatches.addEventListener("click", () => {
+    moreMatches.addEventListener("click", async () => {
+        if (moreMatches.disabled) return;
+        moreMatches.disabled = true;
         pages += 1;
-        updateMatches().catch(error => { matchesMessage.textContent = error.message; });
+        try {
+            await updateMatches();
+        } catch (error) {
+            matchesMessage.textContent = error.message;
+        } finally {
+            moreMatches.disabled = false;
+        }
     });
 
     async function updateMatches() {
@@ -466,6 +471,7 @@
             {length: pages}, (_, page) => requestJson(matchesUrl + "&offset=" + page * 5)
         ));
         const matches = [...new Map(responses.flat().map(item => [item.found_item_id, item])).values()];
+        document.getElementById("matches-mascots").hidden = matches.length === 0;
         moreMatches.hidden = responses.at(-1).length < 5;
         matchesMessage.textContent = matches.length
             ? "Select the item you think is yours."

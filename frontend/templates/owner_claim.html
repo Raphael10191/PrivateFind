@@ -156,7 +156,7 @@
     <div class="claim-heading">
         <h1>Verify Your Ownership</h1>
         <p>
-            We use the details you already provided to check the item.
+            We’ll compare your report with the selected item. You may be asked for another detail or an operator’s review.
         </p>
     </div>
 
@@ -197,7 +197,10 @@
              role="status"
              hidden>
 
-        <h2 id="result-heading"></h2>
+        <div class="claim-result-heading">
+            <h2 id="result-heading" tabindex="-1"></h2>
+            <span id="claim-mascot" class="mascot claim-mascot" aria-hidden="true" hidden></span>
+        </div>
 
         <p id="result-message"
            class="claim-hint"></p>
@@ -336,7 +339,7 @@
 
         document.getElementById(
             "pickup-expiry"
-        ).textContent = String(expiry);
+        ).textContent = window.privateFind.formatExpiry(expiry);
 
         pickupDetails.hidden = false;
         pickupButton.hidden = true;
@@ -374,6 +377,11 @@
         const heading = document.getElementById(
             "result-heading"
         );
+        heading.dataset.status = claim.status;
+        const character = window.privateFind.claimMascot(claim.status);
+        const art = document.getElementById("claim-mascot");
+        art.className = "mascot claim-mascot" + (character ? " mascot-" + character : "");
+        art.hidden = !character;
 
         const message = document.getElementById(
             "result-message"
@@ -486,7 +494,7 @@
 
             submitting = true;
             submitButton.disabled = true;
-            submitButton.textContent = "Checking the Finder Photos…";
+            submitButton.textContent = "Checking ownership…";
 
             try {
                 const claim = await api(
