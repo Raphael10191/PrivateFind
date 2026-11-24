@@ -7,7 +7,8 @@
 <div class="home-doodle mascot-crew" aria-hidden="true" data-mascot-motion>
     {{ mascot('scout', 'crew-scout') }}{{ mascot('pip', 'crew-pip') }}{{ mascot('keeper', 'crew-keeper') }}{{ mascot('chirp', 'crew-chirp') }}
     <svg class="composition-ground" viewBox="0 0 400 30" fill="none" focusable="false">
-        <path d="M12 22Q94 13 168 21T388 20M30 20L23 10M34 20L42 12M370 20L377 9"/>
+        <defs><linearGradient id="pf-mascot-accent" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:var(--brand-purple, #9161e8)"/><stop offset="50%" style="stop-color:var(--brand-blue, #527cf4)"/><stop offset="100%" style="stop-color:var(--brand-cyan, #00a9e8)"/></linearGradient></defs>
+        <path class="pf-gradient-stroke" d="M12 22Q94 13 168 21T388 20M30 20L23 10M34 20L42 12M370 20L377 9"/>
     </svg>
 </div>
 {%- endmacro %}

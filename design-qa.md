@@ -1,6 +1,14 @@
 # PrivateFind redesign verification
 
-## Latest scoped update: report action cards — 2026-11-24
+## Latest update: gradient typography — 2026-11-25
+
+Visual and regression checks passed for the requested gradient refinement. The complete source comparison, screenshots, color ratios, resolved findings and test results are in [the gradient typography review](docs/design/gradient-typography-2026-11-25.md).
+
+Reusable static text/accent/wash tokens were added; selected branding and hero/public phrases use the gradient. The requested original light-blue/warm-white base surfaces and Montserrat/Nunito Sans type are restored. Backend, application JavaScript, approved mascot bitmaps and animation logic are unchanged. The user authorized a local commit if the audit passed. The [fresh audit](docs/design/gradient-audit-2026-11-25.md) passed with no blocking issue in the changed surfaces; no push, merge or deployment is authorized.
+
+final result: passed
+
+## Report action cards — 2026-11-24 (historical)
 
 Branch: `feature/iot-ui-redesign`. Scope: the annotated Lost/Found action-card pair only. Backend/API, links and submission behavior preserved; no commit, push, merge or deployment.
 

@@ -7,7 +7,7 @@
     <title>{% block title %}PrivateFind{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900;1000&amp;family=Nunito+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&amp;family=Nunito+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     {% block head %}{% endblock %}
     <link rel="stylesheet" href="/assets/privatefind.css">
     <link rel="stylesheet" href="/assets/privatefind-theme.css">
@@ -43,7 +43,7 @@
         <div class="header-inner">
             <a class="brand" href="{{ '/admin' if role == 'admin' else '/owner' if role == 'owner' else '/' }}"
                aria-label="PrivateFind home">
-                <span class="wordmark" aria-hidden="true">PrivateFind<span>ˊ</span></span>
+                <span class="wordmark pf-gradient-text" aria-hidden="true">PrivateFind<span>ˊ</span></span>
             </a>
             {% if role in ('owner', 'admin') %}
                 <div class="workspace-topbar">

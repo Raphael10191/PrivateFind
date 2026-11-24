@@ -6,17 +6,17 @@
 <section class="public-hero">
     <div>
         <p class="home-eyebrow">Your campus lost &amp; found</p>
-        <h1>Lost things.<br><em>Found again.</em></h1>
+        <h1>Lost things.<br><em class="pf-gradient-text">Found again.</em></h1>
         <p>Looking for something? Report your lost item. Found something? Help it get home through a campus locker.</p>
         <div class="public-actions">
             <a class="pf-button" href="/owner/report/new">{{ icon('search') }} I lost something</a>
             <a class="pf-button pf-secondary" href="/found/new">{{ icon('box') }} I found something</a>
         </div>
     </div>
-    <div class="public-art">{{ finding_crew() }}</div>
+    <div class="public-art pf-gradient-wash">{{ finding_crew() }}</div>
 </section>
 <section class="public-guide pf-card" aria-labelledby="public-guide-heading">
-        <h2 id="public-guide-heading">How it works</h2>
+        <h2 id="public-guide-heading"><span class="pf-gradient-text">How it works</span></h2>
         <div>{{ icon('search') }}<p><strong>Lost an item?</strong><span>Sign in and describe it to check for possible matches. Identifying details stay private.</span></p></div>
         <div>{{ icon('box') }}<p><strong>Found an item?</strong><span>Scan a locker’s QR code, add photos, and follow the deposit instructions. No account needed.</span></p></div>
         <div>{{ icon('shield') }}<p><strong>Get it back safely</strong><span>Owners verify their claim before receiving a pickup code. Some claims need an operator’s review.</span></p></div>

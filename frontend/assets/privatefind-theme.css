@@ -1,9 +1,9 @@
 /* PrivateFind reference theme. Shared presentation; endpoint and workflow logic live elsewhere. */
 :root {
-    --paper: #fdfcff;
+    --paper: #fafaf8;
     --surface: #fff;
     --sky: #e9e5ff;
-    --sidebar-bg: #f0efff;
+    --sidebar-bg: #e3f1fc;
     --lavender: #e5deff;
     --hero-bg: #f8f7ff;
     --cream: #f2efff;
@@ -29,12 +29,22 @@
     --radius-lg: 26px;
     --shadow: 0 3px 8px rgb(39 32 91 / 4%), 0 10px 28px rgb(39 32 91 / 3%);
     --sans: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-    --heading: "Nunito", var(--sans);
+    --heading: "Montserrat", var(--sans);
     --serif: var(--heading);
     --sidebar-width: 246px;
     --header-height: 88px;
+    --brand-purple: #9161e8;
+    --brand-blue: #527cf4;
+    --brand-cyan: #00a9e8;
+    /* Darker cyan clears 3:1 on the blue sidebar as well as warm white.
+       Gradient text is reserved for bold display type of at least 25px. */
+    --brand-text-cyan: #008bc4;
+    --brand-solid: #305b93;
+    --brand-gradient: linear-gradient(90deg, var(--brand-purple) 0%, var(--brand-blue) 50%, var(--brand-cyan) 100%);
+    --brand-gradient-text: linear-gradient(90deg, var(--brand-purple) 0%, var(--brand-blue) 50%, var(--brand-text-cyan) 100%);
+    --brand-gradient-soft: linear-gradient(90deg, #9161e80e 0%, #527cf410 50%, #00a9e812 100%);
 }
-body, body.owner-home, body:is(.role-owner, .role-admin) { --sans: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --heading: "Nunito", var(--sans); }
+body, body.owner-home, body:is(.role-owner, .role-admin) { --sans: "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --heading: "Montserrat", var(--sans); }
 body { background: var(--paper); font-size: 15px; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, a { touch-action: manipulation; }
@@ -44,7 +54,7 @@ button, a, input, select, textarea, summary { transition: background-color .16s,
 .site-header { position: relative; z-index: 30; border: 0; background: var(--surface); }
 .header-inner, :is(.role-owner, .role-admin) .header-inner { max-width: none; min-height: var(--header-height); padding: 0 28px; gap: 24px; }
 .brand { min-height: var(--header-height); flex-shrink: 0; }
-.wordmark, .owner-home .wordmark { color: var(--ink); font: 1000 33px/1 var(--heading); letter-spacing: -1.5px; }
+.wordmark, .owner-home .wordmark { font: 900 33px/1.15 var(--heading); letter-spacing: -1.5px; }
 .wordmark > span { display: none; }
 .workspace-topbar { display: flex; align-items: center; gap: 22px; width: 100%; min-width: 0; }
 .workspace-search { display: flex; align-items: center; gap: 12px; max-width: 635px; flex: 1; min-width: 100px; min-height: 49px; padding: 0 12px 0 18px; background: #f7f5ff; border: 1.5px solid #d8d3ee; border-radius: 28px; }
@@ -162,7 +172,7 @@ main [data-status="rejected"] { background: var(--danger-bg); color: var(--dange
 .register-link a, .login-link a { color: var(--accent); }
 .public-hero { margin-top: 24px; padding: 34px 0; }
 .public-hero h1 { font: 1000 clamp(2.7rem, 5vw, 4.6rem)/1.12 var(--heading); letter-spacing: -.045em; }
-.public-hero h1 em { color: var(--accent); font-style: normal; }
+.public-hero h1 em { font-style: normal; }
 .public-hero > div > p:not(.home-eyebrow) { color: var(--muted); max-width: 46ch; font-size: 17px; }
 .public-art::before { background: #ebe5ff; }
 .public-guide { border-radius: 24px; }
@@ -176,7 +186,7 @@ main [data-status="rejected"] { background: var(--danger-bg); color: var(--dange
 .dashboard-welcome { display: grid; grid-template-columns: minmax(285px, .8fr) minmax(0, 1fr); align-items: center; min-height: 253px; gap: 0; margin-bottom: 18px; }
 .dashboard-welcome-copy { position: relative; z-index: 1; align-self: start; padding: 10px 0 0 16px; }
 .dashboard-welcome h1 { margin: 0; font: 800 clamp(30px, 2.7vw, 42px)/1.12 var(--heading); letter-spacing: -.035em; overflow-wrap: normal; }
-.dashboard-welcome h1 span { display: inline-block; margin-top: 2px; font-size: clamp(42px, 4.3vw, 68px); font-weight: 900; color: #384bc2; letter-spacing: -.055em; }
+.dashboard-welcome h1 span { display: inline-block; margin-top: 2px; font-size: clamp(42px, 4.3vw, 68px); font-weight: 900; letter-spacing: -.055em; }
 .dashboard-welcome-copy > p:last-child { margin: 21px 0 0; font-size: 19px; line-height: 1.5; color: #4f4b6b; }
 .dashboard-crew { display: block; width: 116%; max-width: 116%; height: 258px; margin-left: -12%; object-fit: contain; }
 .dashboard-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 34px; }
@@ -186,7 +196,7 @@ main [data-status="rejected"] { background: var(--danger-bg); color: var(--dange
 .report-action-found { background: radial-gradient(ellipse at 28% 0%, #f6f2ffb0, transparent 75%), linear-gradient(145deg, #e7e1ff, #d9d1fa); color: var(--ink); border-color: #d9d0ff; }
 .report-action-found:hover { border-color: #b6a6eb; box-shadow: 0 8px 20px #514bbe1a; }
 .report-action:focus-visible { outline: 3px solid #7563da; outline-offset: 4px; }
-.report-action strong { display: block; font: 800 23px/1.25 var(--heading); letter-spacing: -.025em; }
+.report-action strong { display: block; font: 800 23px/1.25 var(--sans); letter-spacing: -.025em; }
 .report-action > span:nth-child(2) { align-self: start; }
 .report-action > span > span { display: block; margin-top: 7px; font-size: 15px; line-height: 1.5; }
 .report-action-icon .ui-icon { width: 49px; height: 49px; stroke-width: 1.6; }
@@ -297,7 +307,7 @@ main [data-status="rejected"] { background: var(--danger-bg); color: var(--dange
     .dashboard-glance h2 { font-size: 20px; }
     .dashboard-glance > a { font-size: 13px; }
     .dashboard-help { padding-inline: 22px; }
-    .dashboard-help h2 { font-size: 23px; }
+    .dashboard-help h2 { font-size: 21px; }
     .workspace-topbar { gap: 14px; padding-inline: 24px; }
     .profile-greeting { font-size: 15px; max-width: 150px; }
     .header-help { display: none; }
@@ -494,3 +504,35 @@ main [data-status="rejected"] { background: var(--danger-bg); color: var(--dange
     .claims-state .claims-reports-link { width: 100%; font-size: 14px; }
 }
 @media (max-width: 350px) { .dashboard-returning .report-action { gap: 7px; padding: 13px 9px; } .dashboard-returning .report-action strong { font-size: 14px; } .dashboard-report { gap: 8px; padding: 12px; } .mobile-nav a { font-size: 10px; } }
+
+
+/* Opt-in display treatments; semantic UI colors remain solid. */
+/* Color intentionally wins older component-specific ink rules. */
+.pf-gradient-text { color: var(--brand-solid) !important; display: inline-block; width: fit-content; }
+.pf-gradient-accent { background-color: var(--brand-solid); background-image: var(--brand-gradient); }
+.pf-gradient-wash { --composition-wash: var(--brand-gradient-soft); }
+.public-art.pf-gradient-wash::before { background-color: var(--sidebar-bg); background-image: var(--composition-wash); }
+.pf-gradient-stroke { stroke: url(#pf-mascot-accent) var(--brand-solid); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    .pf-gradient-text {
+        background-color: var(--brand-solid);
+        background-image: var(--brand-gradient-text);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent !important;
+        -webkit-text-fill-color: transparent;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+    }
+}
+/* Solid text survives printing, forced colors and explicit higher contrast. */
+@media print, (forced-colors: active), (prefers-contrast: more) {
+    .pf-gradient-text { background: none; color: var(--brand-solid) !important; -webkit-text-fill-color: currentColor; }
+    .pf-gradient-stroke { stroke: var(--brand-solid); }
+    .pf-gradient-accent { background-image: none; }
+    .public-art.pf-gradient-wash::before { background-image: none; }
+}
+@media (forced-colors: active) {
+    .pf-gradient-text { color: CanvasText !important; }
+    .pf-gradient-stroke { stroke: CanvasText; }
+}
