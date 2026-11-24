@@ -1,22 +1,30 @@
 :root {
     color-scheme: light;
     --paper: #fafaf8;
-    --cream: #f0f2fc;
+    --sky: #7cc4f8;
+    --sidebar-bg: #e3f1fc;
+    --lavender: #dbdff7;
+    --hero-bg: #f5f9fd;
+    --cream: var(--lavender);
     --surface: #fff;
-    --ink: #1a1a1f;
-    --navy: #142b5c;
-    --green: #324ab2; /* Compatibility with the existing page styles. */
+    --ink: #20233d;
+    --navy: var(--ink); /* Compatibility for existing text styles. */
+    --green: var(--accent); /* Compatibility with the existing page styles. */
     --muted: #606371;
-    --line: #e3e6ef;
-    --field-border: #8995b4;
-    --sage: #edf0fb;
-    --accent: #324ab2;
+    --line: #dbe5ee;
+    --field-border: #7e91a8;
+    --sage: #edf5fc;
+    --accent: #305b93;
+    --action-bg: var(--sky);
+    --action-hover: #a0d5fa;
+    --action-ink: var(--ink);
+    --action-border: #5684aa;
     --success: #256044;
     --danger: #943447;
     --danger-bg: #fceef0;
     --warning: #80510e;
     --warning-bg: #fff4dd;
-    --nav-active: #edf0fb;
+    --nav-active: #b9dffb;
     --radius: 14px;
     --radius-lg: 20px;
     --shadow: 0 4px 18px rgb(20 43 92 / 3%);
@@ -75,8 +83,8 @@ img { max-width: 100%; }
     width: 32px;
     height: 32px;
     border-radius: 9px;
-    background: var(--navy);
-    color: #fff;
+    background: var(--sky);
+    color: var(--ink);
     font: 800 1rem/1 var(--heading);
 }
 .wordmark { color: var(--navy); font: 800 clamp(1.45rem, 4vw, 1.85rem)/1 var(--heading); letter-spacing: -.055em; }
@@ -143,15 +151,15 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
     gap: 9px;
     min-height: 48px;
     padding: 10px 17px;
-    border: 1px solid var(--accent);
+    border: 1px solid var(--action-border);
     border-radius: 12px;
-    background: var(--accent);
-    color: #fff;
+    background: var(--action-bg);
+    color: var(--action-ink);
     text-align: center;
     font-weight: 700;
     line-height: 1.35;
 }
-.pf-button:hover { background: #273d97; }
+.pf-button:hover { background: var(--action-hover); }
 .pf-secondary { background: var(--surface); color: var(--ink); border-color: var(--field-border); }
 .pf-secondary:hover { background: var(--sage); }
 .pf-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -209,15 +217,15 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
     padding: 14px;
     border: 0;
     border-radius: 10px;
-    background: var(--ink);
-    color: white;
+    background: var(--action-bg);
+    color: var(--action-ink);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
 }
 
 .login-button:hover, .register-button:hover {
-    background: var(--green);
+    background: var(--action-hover);
 }
 
 .login-button:disabled, .register-button:disabled {
@@ -562,19 +570,8 @@ main :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 }
 [data-requires-ai][inert] { opacity: .55; }
 
-/* Owner Home: page-scoped foundations for the screen-by-screen redesign. */
+/* Owner Home inherits the shared palette; only typography is page-scoped. */
 body.owner-home {
-    --paper: #fafaf8;
-    --surface: #fff;
-    --ink: #1a1a1f;
-    --green: #324ab2;
-    --accent: #324ab2;
-    --cream: #dadff2;
-    --sage: #edf0fb;
-    --muted: #606371;
-    --line: #e3e6ef;
-    --field-border: #8995b4;
-    --nav-active: #edf0fb;
     --sans: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --serif: var(--heading);
 }
@@ -583,14 +580,14 @@ body.owner-home {
 .owner-home .site-header { background: var(--surface); }
 .owner-home .wordmark { font-weight: 800; letter-spacing: -.055em; }
 .owner-home .pf-button {
-    border-color: var(--accent);
+    border-color: var(--action-border);
     border-radius: 12px;
-    background: var(--accent);
-    color: white;
+    background: var(--action-bg);
+    color: var(--action-ink);
     font-size: .94rem;
     font-weight: 800;
 }
-.owner-home .pf-button:hover { background: #273d97; border-color: #273d97; }
+.owner-home .pf-button:hover { background: var(--action-hover); border-color: var(--action-border); }
 .owner-home .pf-button.pf-secondary { background: var(--surface); border-color: var(--field-border); color: var(--ink); }
 .owner-home .pf-button.pf-secondary:hover { background: var(--sage); border-color: #a7b4dc; }
 
@@ -768,9 +765,6 @@ body.owner-home {
 
 /* Shared authenticated shell; the existing mobile navigation stays in place. */
 body:is(.role-owner, .role-admin) {
-    --paper: #fafaf8;
-    --surface: #fff;
-    --line: #e3e6ef;
     --sans: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --heading: "Montserrat", var(--sans);
 }
@@ -791,16 +785,16 @@ main :is(.details-card, .detail-card, .claim-card, .finder-card, .report-card,
     box-shadow: none;
 }
 main :is(.primary-button, .submit-action, .submit-button, .login-button, .register-button,
-         .check-button, .claim-link, .approve-button) {
-    background: var(--accent);
-    border: 1px solid var(--accent);
-    color: #fff;
+         .check-button, .claim-link, .approve-button, .new-report) {
+    background: var(--action-bg);
+    border: 1px solid var(--action-border);
+    color: var(--action-ink);
     border-radius: 12px;
     font-weight: 750;
     line-height: 1.4;
 }
 main :is(.primary-button, .submit-action, .submit-button, .login-button, .register-button,
-         .check-button, .claim-link, .approve-button):hover { background: #273d97; border-color: #273d97; }
+         .check-button, .claim-link, .approve-button, .new-report):hover { background: var(--action-hover); border-color: var(--action-border); }
 main :is(.secondary-button, .back-action, .reviews-refresh, .items-button, .review-button):not(.approve-button) {
     background: var(--surface);
     border: 1px solid var(--field-border);
@@ -1026,8 +1020,8 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
     }
     :is(.role-owner, .role-admin) .sidebar {
         padding: 28px 16px;
-        border-right: 1px solid #29406c;
-        background: #142b5c;
+        border-right: 1px solid var(--line);
+        background: var(--sidebar-bg);
     }
     :is(.role-owner, .role-admin) .side-nav { top: 24px; gap: 8px; }
     :is(.role-owner, .role-admin) .side-nav a {
@@ -1036,17 +1030,17 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
         border: 1px solid transparent;
         border-radius: 10px;
         background: transparent;
-        color: #dadff2;
+        color: var(--ink);
         box-shadow: none;
     }
-    :is(.role-owner, .role-admin) .side-nav a:hover { color: #fff; }
+    :is(.role-owner, .role-admin) .side-nav a:hover { background: var(--sage); }
     :is(.role-owner, .role-admin) .side-nav a[aria-current="page"] {
-        border-color: #596fc7;
-        background: #324ab2;
-        color: #fff;
+        border-color: #8ab7d8;
+        background: var(--nav-active);
+        color: var(--ink);
         font-weight: 800;
     }
-    :is(.role-owner, .role-admin) .side-nav a:focus-visible { outline-color: #a3bfd9; }
+    :is(.role-owner, .role-admin) .side-nav a:focus-visible { outline-color: var(--accent); }
     :is(.role-owner, .role-admin) .site-layout > main {
         width: 100%;
         max-width: 1200px;
@@ -1220,7 +1214,7 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
     isolation: isolate;
     min-width: 0;
     padding: 28px;
-    background: #eef0fa;
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--line);
     border-radius: 24px 0 0 24px;
     overflow: hidden;
@@ -1232,17 +1226,14 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
     width: 85%;
     aspect-ratio: 1;
     border-radius: 44% 56% 63% 37% / 51% 42% 58% 49%;
-    background: #dadff2;
+    background: var(--lavender);
     transform: rotate(-12deg);
 }
 .login-chirp { position: relative; z-index: 1; width: 100%; max-width: 245px; transform-origin: 50% 85%; }
 @media (min-width: 761px) and (min-height: 560px) {
-    /* Stay in the existing 224px navy column, independent of the main page's height.
+    /* Stay in the existing 224px sidebar, independent of the main page's height.
        At this minimum viewport height, the four navigation rows still have ample room. */
-    .role-owner .sidebar-companion { display: block; position: fixed; left: 52px; bottom: 28px; width: 120px; }
-}
-@media (min-width: 1100px) {
-    .profile-companion { display: block; position: absolute; width: 66px; top: 24px; right: 24px; pointer-events: none; }
+    .role-owner .sidebar-companion { display: block; position: fixed; left: 30px; bottom: 28px; width: 164px; }
 }
 @media (max-width: 600px) {
     .login-page { max-width: 440px; margin-block: 16px; }
@@ -1269,4 +1260,124 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
 @keyframes companion-enter {
     from { transform: translateY(7px) rotate(-2deg); opacity: .5; }
     to { transform: translateY(0) rotate(0); opacity: 1; }
+}
+
+/* Light Blue Playful Premium: connected compositions using the approved atlas. */
+.composition-ground {
+    position: absolute;
+    width: 100%;
+    height: auto;
+    bottom: 0;
+    left: 0;
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+.home-hero-art {
+    position: relative;
+    isolation: isolate;
+    width: min(100%, 370px);
+    aspect-ratio: 1.15;
+    justify-self: center;
+}
+.home-hero-art::before, .public-art::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 10% 0 5%;
+    border-radius: 48% 52% 65% 35% / 58% 50% 50% 42%;
+    background: var(--sidebar-bg);
+    pointer-events: none;
+}
+.owner-home .home-empty.owner-welcome { background: var(--hero-bg); }
+.owner-home .home-hero-art .scout-stage { width: 82%; margin-left: auto; }
+.home-hero-companion { position: absolute; width: 31%; left: 0; bottom: 5%; pointer-events: none; }
+.hero-doodle { position: absolute; width: 54px; top: 0; right: 2%; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; pointer-events: none; }
+.scout-backdrop path:first-child { fill: var(--lavender); }
+.scout-backdrop path:last-child { fill: var(--sky); }
+.owner-home .home-welcome-compact { background: var(--sage); }
+.home-empty-label, .home-item-icon, .home-report-status[data-status="open"] { background: var(--sidebar-bg); }
+.home-report { border-radius: 18px; }
+
+.sidebar-companion { pointer-events: none; isolation: isolate; }
+.sidebar-companion::before { content: ""; position: absolute; inset: 30% -8px 0; z-index: -1; background: var(--lavender); border-radius: 50% 50% 32% 35%; }
+.sidebar-keeper { width: 76%; }
+.sidebar-sage { position: absolute; width: 38%; right: -2%; bottom: 8%; }
+.sidebar-companion .composition-ground { bottom: -5px; }
+@media (min-width: 761px) and (min-height: 700px) {
+    :is(.role-owner, .role-admin) .sidebar-companion { display: block; position: fixed; left: 20px; bottom: 32px; width: 184px; }
+}
+
+.empty-mascot { width: 280px; height: 190px; }
+.empty-mascot::before { inset: 24px 0 6px; background: var(--sidebar-bg); }
+.empty-mascot .empty-doodle { position: absolute; width: 180px; bottom: 14px; left: 18px; }
+.empty-support { position: absolute; width: 104px; right: 6px; bottom: 12px; }
+.empty-mascot .composition-ground { bottom: 1px; }
+
+.mascot-crew { display: block; position: relative; aspect-ratio: 400 / 315; }
+.mascot-crew > .mascot { position: absolute; height: auto; max-width: none; }
+.mascot-crew > .crew-scout { width: 47%; left: 0; bottom: 8%; }
+.mascot-crew > .crew-pip { width: 38%; left: 35%; bottom: 9%; }
+.mascot-crew > .crew-keeper { width: 34%; right: -2%; bottom: 8%; }
+.mascot-crew > .crew-chirp { width: 24%; top: 0; right: 13%; }
+.public-art { position: relative; isolation: isolate; background: transparent; }
+.public-art::before { background: var(--lavender); inset: 10% 0 4%; }
+.public-art .home-doodle { max-width: 440px; }
+
+.register-page { max-width: 850px; margin-block: 36px; padding: 0; }
+.login-layout .register-card { min-width: 0; border: 0; border-radius: 0 24px 24px 0; padding: 36px; }
+.login-illustration .login-chirp { width: 90%; top: -38px; }
+.auth-support { position: absolute; width: 30%; max-width: 108px; bottom: 28px; z-index: 1; }
+.auth-support-left { left: 20px; }
+.auth-support-right { right: 20px; }
+
+.account-page { max-width: 820px; }
+.account-layout { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 32px; align-items: center; }
+.profile-companion { display: block; position: relative; width: 100%; max-width: 240px; aspect-ratio: 1; top: auto; right: auto; pointer-events: none; isolation: isolate; }
+.profile-companion::before { content: ""; position: absolute; inset: 10% 0 3%; z-index: -1; background: var(--lavender); border-radius: 55% 45% 38% 62%; }
+.profile-lumi { position: absolute; width: 70%; left: 0; bottom: 5%; }
+.profile-sage { position: absolute; width: 48%; right: -2%; bottom: 4%; }
+.finder-heading { display: flow-root; }
+.finder-companions { position: relative; float: right; width: 132px; height: 106px; margin: 0 0 8px 20px; pointer-events: none; }
+.finder-companions::before { content: ""; position: absolute; inset: 20% 0 0; background: var(--sidebar-bg); border-radius: 50% 50% 35% 40%; }
+.finder-companions > .mascot { position: absolute; width: 80px; bottom: 0; }
+.finder-companions > .mascot-rover { right: 0; width: 62px; }
+
+@container owner-home-content (max-width: 620px) {
+    .home-hero-art { width: 260px; max-width: 100%; }
+}
+@media (max-width: 1100px) {
+    .account-page { max-width: 480px; }
+    .account-layout { display: block; }
+    .profile-companion { display: none; }
+}
+@media (max-width: 760px) {
+    .owner-home .home-hero-art { width: 245px; }
+    .owner-home .home-hero-art .scout-stage { width: 82%; }
+    .home-hero-companion { width: 28%; }
+    .hero-doodle { width: 35px; }
+    .owner-home .home-pip-window { width: 66px; height: 62px; }
+    .owner-home .home-pip, .owner-home .home-pip-paws { width: 66px; }
+    .owner-home .home-pip-paws { height: 17px; }
+    .empty-mascot { width: 230px; height: 155px; }
+    .empty-mascot .empty-doodle { width: 145px; left: 14px; }
+    .empty-support { width: 85px; right: 4px; }
+}
+@media (max-width: 600px) {
+    .register-page { max-width: 440px; margin-block: 16px; }
+    .login-layout .register-card { grid-row: 1; padding: 24px 20px; border-radius: 24px; }
+    .finder-companions { width: 72px; height: 68px; margin-left: 12px; }
+    .finder-companions > .mascot-snap { width: 70px; }
+    .finder-companions > .mascot-rover { display: none; }
+}
+@media (max-width: 360px) {
+    .home-hero-companion, .hero-doodle { display: none; }
+    .owner-home .home-hero-art { width: 195px; aspect-ratio: 1; }
+    .owner-home .home-hero-art .scout-stage { width: 100%; }
+    .finder-companions { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    [data-mascot-motion] > :is(.empty-support, .auth-support-right, .crew-chirp) { animation-delay: 120ms; }
 }

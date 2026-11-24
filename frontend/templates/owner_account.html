@@ -132,8 +132,8 @@
         <p>Your PrivateFind account information</p>
     </div>
 
+    <div class="account-layout">
     <div class="account-card">
-        <div class="profile-companion" aria-hidden="true">{{ mascot('keeper') }}</div>
         <div class="account-avatar" aria-hidden="true">
             {{ icon('person') }}
         </div>
@@ -155,7 +155,7 @@
         <hr class="account-divider">
 
         <a href="/owner/claims" class="account-link">
-            My Claims
+            Claims &amp; Pickup
         </a>
 
         <button
@@ -164,6 +164,13 @@
             data-signout>
             Sign out
         </button>
+    </div>
+    <div class="profile-companion" aria-hidden="true" data-mascot-motion>
+        {{ mascot('lumi', 'profile-lumi') }}{{ mascot('sage', 'profile-sage') }}
+        <svg class="composition-ground" viewBox="0 0 220 25" fill="none" focusable="false">
+            <path d="M10 19Q60 12 110 19T210 18"/>
+        </svg>
+    </div>
     </div>
 </section>
 {% endblock %}

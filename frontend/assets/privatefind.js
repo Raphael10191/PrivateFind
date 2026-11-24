@@ -11,6 +11,16 @@ window.privateFind = {
             .replaceAll("_", " ")
             .replace(/\b\w/g, letter => letter.toUpperCase());
     },
+    reportTitle(report) {
+        const brand = String(report.brand || "").trim();
+        const model = String(report.model || "").trim();
+        const category = report.category || "other";
+        const categoryLabel = category === "other" ? "" : this.humanize(category);
+        if (brand || model) return [brand, model || categoryLabel].filter(Boolean).join(" ");
+        if (categoryLabel) return [report.color ? this.humanize(report.color) : "", categoryLabel].filter(Boolean).join(" ");
+        const description = Array.from(String(report.description || "Lost item").trim() || "Lost item");
+        return description.length > 70 ? description.slice(0, 69).join("") + "…" : description.join("");
+    },
     formatExpiry(value) {
         const text = String(value ?? "");
         const date = new Date(/(?:Z|[+-]\d{2}:\d{2})$/i.test(text) ? text : text + "Z");
@@ -106,12 +116,16 @@ const aiStatus = document.getElementById("ai-status");
 if (aiStatus) {
     let statusVersion = 0;
     let simulatedReportingSeen = false;
+    let latestState = {available: false};
+    let latestError = "";
     const isOperator = document.body.classList.contains("role-admin");
     if (!isOperator && document.querySelector("[data-requires-ai]")) {
         aiStatus.hidden = false;
     }
 
     function showAIStatus({provider, available, mock_reporting_enabled}, availabilityError = "") {
+        latestState = {provider, available, mock_reporting_enabled};
+        latestError = availabilityError;
         const ready = available && ["qwen", "claude"].includes(provider);
         const simulatedReporting = provider === "mock" && mock_reporting_enabled === true;
         if (simulatedReporting) simulatedReportingSeen = true;
@@ -141,6 +155,9 @@ if (aiStatus) {
             control.inert = !((ready && !staleSimulation) ||
                 (simulatedReporting && control.dataset.aiScope === "report"));
         }
+        const recovery = document.querySelector("[data-ai-recovery]");
+        if (recovery) recovery.hidden = ![...document.querySelectorAll("[data-requires-ai]")]
+            .some(control => control.inert && !control.closest("[hidden]"));
     }
 
     async function refreshAIStatus() {
@@ -165,6 +182,21 @@ if (aiStatus) {
 
     function checkAIStatus() {
         window.privateFind.aiStatusCheck = refreshAIStatus();
+        return window.privateFind.aiStatusCheck;
+    }
+    window.privateFind.refreshAIStatus = checkAIStatus;
+
+    // Forms can appear after an async claim/locker lookup. Refresh their notice
+    // from the last service result without another request or weakening the guard.
+    if (typeof window.MutationObserver === "function") {
+        const visibility = new window.MutationObserver(() => showAIStatus(latestState, latestError));
+        const targets = new Set();
+        for (const control of document.querySelectorAll("[data-requires-ai]")) {
+            for (let element = control; element && element !== document.body; element = element.parentElement) {
+                targets.add(element);
+            }
+        }
+        for (const target of targets) visibility.observe(target, {attributes: true, attributeFilter: ["hidden"]});
     }
 
     document.addEventListener("privatefind-ai-unavailable", () => {

@@ -7,16 +7,19 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../assets/privatefind.js"), "utf8");
 const flush = async () => { for (let i = 0; i < 16; i++) await Promise.resolve(); };
 
-async function page(state, { readOnly = false, failure = false } = {}) {
+async function page(state, { readOnly = false, failure = false, hiddenForms = false } = {}) {
     const status = {hidden: true, textContent: "Checking service availability", dataset: {}};
     const controls = readOnly ? [] : ["report", "claim", "finder"].map(scope => ({
         inert: true, dataset: scope === "report" ? {aiScope: "report"} : {},
-        closest: () => null,
+        hidden: hiddenForms, closest() { return this.hidden ? this : null; },
     }));
     const requests = [], timers = [], events = {};
-    let current = state, failed = failure;
+    let current = state, failed = failure, visibilityChanged;
     const context = {
-        window: {addEventListener() {}},
+        window: {addEventListener() {}, MutationObserver: class {
+            constructor(callback) { visibilityChanged = callback; }
+            observe() {}
+        }},
         document: {
             body: {classList: {contains: () => false}}, hidden: false,
             querySelector: selector => selector === "[data-requires-ai]" ? controls[0] : null,
@@ -36,6 +39,7 @@ async function page(state, { readOnly = false, failure = false } = {}) {
     await flush();
     return {
         status, controls, requests, events, api: context.window.privateFind,
+        reveal(index) { controls[index].hidden = false; visibilityChanged(); },
         async update(next, fail = false) {
             current = next; failed = fail; timers[0](); await flush();
         },
@@ -97,6 +101,18 @@ async function runTests() {
     assert.equal(labelled.status.hidden, false);
     assert.match(labelled.status.textContent, /Simulated matching/);
     passed.push("candidate loading waits for availability so simulated results cannot precede their label");
+    const delayed = await page({provider: "mock", available: false}, {hiddenForms: true});
+    assert.equal(delayed.status.hidden, true);
+    const beforeReveal = delayed.requests.length;
+    delayed.reveal(1);
+    assert.equal(delayed.status.hidden, false);
+    assert(delayed.controls[1].inert);
+    assert.equal(delayed.requests.length, beforeReveal);
+    passed.push("an asynchronously revealed claim shows its outage reason without an extra request or unlocking submission");
+    await delayed.api.refreshAIStatus();
+    assert.equal(delayed.requests.length, beforeReveal + 1);
+    assert(delayed.controls.every(control => control.inert));
+    passed.push("manual availability recheck uses the existing status endpoint and keeps unavailable actions inert");
     assert(view.requests.every(url => url === "/api/ai/status"));
     const form = fs.readFileSync(path.join(__dirname, "../templates/owner_report_form.html"), "utf8");
     assert.match(form, /data-requires-ai data-ai-scope="report" inert/);

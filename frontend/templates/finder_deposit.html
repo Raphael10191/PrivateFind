@@ -281,19 +281,22 @@
 <section class="finder-page">
 
     <div class="finder-heading">
+        <div class="finder-companions" aria-hidden="true" data-mascot-motion>
+            {{ mascot('snap') }}{{ mascot('rover') }}
+        </div>
         <h1>Return a found item</h1>
-        <p>Add photos, get a deposit code, then place the item in the locker. No account needed.</p>
+        <p>Use this flow when you’re at a campus locker. Scan the locker’s QR code or enter its printed code below. No account needed.</p>
     </div>
 
     <form id="locker-entry" method="get" action="/found/new" class="finder-card" data-requires-ai inert hidden>
-        <h2>Choose the locker</h2>
-        <p>Scan the QR code on the locker with your phone camera or enter the printed locker code.</p>
+        <h2>Enter the locker code</h2>
+        <p>Find the code printed beside the QR code on the locker (for example, L1). Scanning that QR with your phone camera opens this step with the code already filled in.</p>
         <div class="finder-field">
             <label for="printed-code">Locker code</label>
             <input id="printed-code" name="locker" maxlength="20" pattern="[A-Za-z0-9_\-]+"
                    placeholder="Example: L1" autocapitalize="characters" autocomplete="off" required>
         </div>
-        <button class="submit-button" type="submit">Continue</button>
+        <button class="submit-button" type="submit">Check locker &amp; continue</button>
     </form>
 
     <div id="loading-locker"

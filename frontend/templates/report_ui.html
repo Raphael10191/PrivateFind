@@ -1,0 +1,13 @@
+{# Keep this display rule aligned with privateFind.reportTitle; it never changes report data. #}
+{% macro report_title(report) -%}
+    {%- set brand = report.brand | default('', true) | trim -%}
+    {%- set model = report.model | default('', true) | trim -%}
+    {%- set category = report.category | default('other', true) -%}
+    {%- if brand or model -%}
+        {{- [brand, model if model else (category | replace('_', ' ') | title) if category != 'other' else ''] | select | join(' ') -}}
+    {%- elif category != 'other' -%}
+        {{- [report.color | default('', true) | title, category | replace('_', ' ') | title] | select | join(' ') -}}
+    {%- else -%}
+        {{- (report.description | default('Lost item', true) | trim or 'Lost item') | truncate(70, true, '…', 0) -}}
+    {%- endif -%}
+{%- endmacro %}

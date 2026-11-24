@@ -211,6 +211,7 @@
                 <h2 id="matches-heading">Possible matches</h2>
                 <span id="matches-mascots" class="mascot-pair" hidden aria-hidden="true">{{ mascot('scout', 'mascot-mini') }}{{ mascot('pip', 'mascot-mini') }}</span>
             </div>
+            <p id="match-privacy" class="match-privacy">Photos and distinctive details stay private to protect the owner. Compare the item type, place, and date, then verify ownership if it could be yours.</p>
             <p id="matches-message" class="match-message" role="status" aria-live="polite"></p>
             <div id="matches-list"></div>
             <button type="button" id="more-matches" class="claim-link" hidden>Show more matches</button>
@@ -320,16 +321,7 @@
                 encodeURIComponent(reportId)
             );
 
-            const title = report.brand
-                ? [
-                    report.brand,
-                    report.model ||
-                    humanize(report.category)
-                ].filter(Boolean).join(" ")
-                : [
-                    humanize(report.color),
-                    humanize(report.category)
-                ].filter(Boolean).join(" ");
+            const title = window.privateFind.reportTitle(report);
 
             document.getElementById(
                 "report-title"
@@ -346,6 +338,7 @@
             status.textContent = report.status === "open" ? "Searching" : humanize(report.status);
             status.dataset.status = report.status;
             status.hidden = false;
+            document.getElementById("match-privacy").hidden = report.status !== "open";
 
             setField(
                 "field-category",

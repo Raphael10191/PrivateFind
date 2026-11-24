@@ -4,8 +4,11 @@
 {%- endmacro %}
 
 {% macro finding_crew() -%}
-<div class="home-doodle mascot-crew" aria-hidden="true">
-    {{ mascot('scout') }}{{ mascot('pip') }}{{ mascot('keeper') }}{{ mascot('chirp') }}
+<div class="home-doodle mascot-crew" aria-hidden="true" data-mascot-motion>
+    {{ mascot('scout', 'crew-scout') }}{{ mascot('pip', 'crew-pip') }}{{ mascot('keeper', 'crew-keeper') }}{{ mascot('chirp', 'crew-chirp') }}
+    <svg class="composition-ground" viewBox="0 0 400 30" fill="none" focusable="false">
+        <path d="M12 22Q94 13 168 21T388 20M30 20L23 10M34 20L42 12M370 20L377 9"/>
+    </svg>
 </div>
 {%- endmacro %}
 
@@ -30,5 +33,9 @@
 {% macro helping_friend(scene) -%}
 <div class="empty-mascot empty-mascot-{{ scene }}" aria-hidden="true" data-mascot-motion>
     {{ mascot('nibbles' if scene == 'reports' else 'pip', 'empty-doodle') }}
+    {{ mascot('snap' if scene == 'reports' else 'rover', 'empty-support') }}
+    <svg class="composition-ground" viewBox="0 0 260 25" fill="none" focusable="false">
+        <path d="M12 19Q70 11 126 18T248 18M23 17L18 9M27 17L33 10"/>
+    </svg>
 </div>
 {%- endmacro %}

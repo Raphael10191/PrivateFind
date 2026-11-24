@@ -1,6 +1,7 @@
 
 {% extends "base.html" %}
 {% from "doodles.html" import helping_friend %}
+{% from "report_ui.html" import report_title %}
 
 {% block title %}My Reports | PrivateFind{% endblock %}
 
@@ -182,7 +183,7 @@
     <div>
         <h1>My Reports</h1>
         <p class="subtitle">
-            Track your lost-item reports.
+            Open a report to review possible matches, then verify ownership. Track requests in Claims &amp; Pickup.
         </p>
     </div>
 
@@ -222,6 +223,16 @@
 </div>
 {% endif %}
 
+<p id="report-search-feedback" class="search-feedback" role="status" hidden></p>
+<p id="report-filter-help" class="filter-help" hidden>Completed includes resolved and closed reports. Pickup and collection status are shown in Claims &amp; Pickup.</p>
+<form class="reports-search workspace-search" action="/owner/reports" method="get" role="search">
+    <label class="sr-only" for="reports-query">Search your reports</label>
+    <input id="reports-query" name="q" type="search" maxlength="200" placeholder="Search your reports…">
+    <button type="submit" aria-label="Search reports">Search</button>
+</form>
+<div id="report-filter-actions" class="filter-actions" hidden>
+    <button type="button" class="pf-button pf-secondary" id="clear-report-filters">Clear search &amp; filters</button>
+</div>
 <div id="reports-list">
 
     {% for report in reports %}
@@ -234,26 +245,7 @@
         >
 
             <div class="report-top">
-                <h2>
-                    {% if report.brand %}
-                        {{ report.brand }}
-
-                        {% if report.model %}
-                            {{ report.model }}
-                        {% else %}
-                            {{ report.category | replace('_', ' ') | title }}
-                        {% endif %}
-
-                    {% elif report.category == 'other' %}
-                        {{ report.model or (report.description or '')[:70] or 'Lost item' }}
-                    {% else %}
-                        {% if report.color %}
-                            {{ report.color | title }}
-                        {% endif %}
-
-                        {{ report.category | replace('_', ' ') | title }}
-                    {% endif %}
-                </h2>
+                <h2>{{ report_title(report) }}</h2>
 
                 {% if is_completed %}
                     <span class="status completed" data-status="{{ report.status }}">
@@ -278,7 +270,7 @@
                 <a href="/owner/report/view?id={{ report.id }}"
                    class="view-details"
                    aria-label="View report {{ report.id }} details">
-                    View details · #{{ report.id }}
+                    {{ 'View report' if is_completed else 'View report & matches' }} · #{{ report.id }}
                 </a>
             </div>
 
@@ -301,57 +293,4 @@
 
 </div>
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-    const filterButtons = document.querySelectorAll(
-        ".filter-button"
-    );
-
-    const reportCards = document.querySelectorAll(
-        ".report-card"
-    );
-
-    const emptyMessage = document.getElementById(
-        "filter-empty"
-    );
-
-    const hasReports = reportCards.length > 0;
-
-    filterButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            const selected = button.dataset.filter;
-            let visibleCount = 0;
-
-            filterButtons.forEach(item => {
-                const isActive = item === button;
-
-                item.classList.toggle("active", isActive);
-                item.setAttribute(
-                    "aria-pressed",
-                    String(isActive)
-                );
-            });
-
-            reportCards.forEach(card => {
-                const visible =
-                    selected === "all" ||
-                    card.dataset.status === selected;
-
-                card.hidden = !visible;
-
-                if (visible) {
-                    visibleCount++;
-                }
-            });
-
-            emptyMessage.hidden = visibleCount !== 0;
-
-            emptyMessage.textContent = hasReports
-                ? "No reports in this category."
-                : "No reports yet. Use “Report a Lost Item” above to get started.";
-        });
-    });
-</script>
 {% endblock %}

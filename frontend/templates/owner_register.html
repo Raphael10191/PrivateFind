@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% from "doodles.html" import mascot %}
 
 {% block title %}Create Account | PrivateFind{% endblock %}
 
@@ -29,6 +30,12 @@
 
 {% block content %}
 <section class="register-page">
+    <div class="login-layout" data-chirp-lookout>
+    <div class="login-illustration" aria-hidden="true" data-mascot-motion>
+        {{ mascot('chirp', 'login-chirp') }}
+        {{ mascot('byte', 'auth-support auth-support-left') }}
+        {{ mascot('lumi', 'auth-support auth-support-right') }}
+    </div>
     <div class="register-card">
         <h1>Create your account</h1>
 
@@ -105,6 +112,7 @@
             Already have an account?
             <a href="/login">Sign In</a>
         </p>
+    </div>
     </div>
 </section>
 {% endblock %}

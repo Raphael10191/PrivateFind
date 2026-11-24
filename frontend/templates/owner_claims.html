@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% from "doodles.html" import helping_friend %}
 
-{% block title %}My Claims | PrivateFind{% endblock %}
+{% block title %}Claims &amp; Pickup | PrivateFind{% endblock %}
 
 {% block head %}
 <style>
@@ -156,7 +156,7 @@
 <section class="claims-page">
     <header class="claims-heading">
         <div>
-            <h1>My Claims</h1>
+            <h1>Claims &amp; Pickup</h1>
             <p>Check ownership reviews, respond to requests, and collect approved items.</p>
         </div>
 
@@ -453,15 +453,13 @@
             if (claims.length === 0) {
                 document.getElementById("claims-empty-art").hidden = false;
                 setFeedback(
-                    "No claims yet. Open a report in "
+                    "No claims yet. Open a report, choose a possible match, and verify ownership to start a claim."
                 );
                 const reportsLink = document.createElement("a");
                 reportsLink.href = "/owner/reports";
-                reportsLink.className = "claims-reports-link";
-                reportsLink.textContent = "My Reports";
-                feedback.append(reportsLink, document.createTextNode(
-                    ", then choose a possible match to check ownership."
-                ));
+                reportsLink.className = "pf-button claims-reports-link";
+                reportsLink.textContent = "View my reports & matches";
+                feedback.append(document.createElement("br"), reportsLink);
                 return;
             }
 

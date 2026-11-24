@@ -43,6 +43,14 @@ def english_date(value):
 templates.filters["english_date"] = english_date
 
 ASSETS = {
+    "/assets/privatefind-report-lost.png": ("privatefind-report-lost.png", "image/png"),
+    "/assets/privatefind-report-found.png": ("privatefind-report-found.png", "image/png"),
+    "/assets/privatefind-sidebar-cat-blink.png": ("privatefind-sidebar-cat-blink.png", "image/png"),
+    "/assets/privatefind-sidebar-cat.png": ("privatefind-sidebar-cat.png", "image/png"),
+    "/assets/privatefind-theme.css": ("privatefind-theme.css", "text/css"),
+    "/assets/privatefind-ui.js": ("privatefind-ui.js", "text/javascript"),
+    "/assets/privatefind-finding-crew.png": ("privatefind-finding-crew.png", "image/png"),
+    "/assets/privatefind-return-cat.png": ("privatefind-return-cat.png", "image/png"),
     "/assets/privatefind.css": ("privatefind.css", "text/css"),
     "/assets/privatefind.js": ("privatefind.js", "text/javascript"),
     "/assets/privatefind-mascots.png": ("privatefind-mascots.png", "image/png"),

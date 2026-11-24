@@ -1,0 +1,83 @@
+{% from "report_ui.html" import report_title %}
+<div class="dashboard-grid{% if reports %} dashboard-returning{% endif %}">
+    <div class="dashboard-main">
+        <section class="dashboard-welcome" aria-labelledby="welcome-title">
+            <div class="dashboard-welcome-copy">
+                <h1 id="welcome-title">Welcome to<br><span>PrivateFind</span></h1>
+                <p>Lost something? Or found an item?<br>Let’s get it back to its owner!</p>
+            </div>
+            <img class="dashboard-crew" src="/assets/privatefind-finding-crew.png" width="1536" height="1024" alt="" fetchpriority="high">
+        </section>
+
+        <div class="dashboard-actions">
+            <a class="report-action report-action-lost" href="/owner/report/new">
+                <span class="report-action-icon" aria-hidden="true"><img src="/assets/privatefind-report-lost.png" width="1254" height="1254" alt="" decoding="async"></span>
+                <span><strong>Report a Lost Item</strong><span>Tell us what you lost and we’ll help you find it.</span></span>
+                <span class="action-arrow">{{ icon('arrow') }}</span>
+            </a>
+            <a class="report-action report-action-found" href="/found/new">
+                <span class="report-action-icon" aria-hidden="true"><img src="/assets/privatefind-report-found.png" width="1254" height="1254" alt="" decoding="async"></span>
+                <span><strong>Report a Found Item</strong><span>Found something? Use a locker’s QR or code to return it.</span><small class="locker-prerequisite">At a campus locker</small></span>
+                <span class="action-arrow">{{ icon('arrow') }}</span>
+            </a>
+        </div>
+
+        {% if recent_open %}
+        <section id="home-next" class="home-next dashboard-next" aria-labelledby="next-title" hidden>
+            <span class="home-next-icon" aria-hidden="true">{{ icon('shield') }}</span>
+            <div class="home-next-copy"><h2 id="next-title">Check your latest report</h2><p id="next-message">See your report’s latest status and next step.</p></div>
+            <a id="next-link" class="pf-button home-next-link" href="/owner/report/view?id={{ recent_open.id }}"><span>View report</span>{{ icon('arrow') }}</a>
+        </section>
+        {% endif %}
+
+        <section class="dashboard-reports" aria-labelledby="recent-reports-title">
+            <div class="dashboard-section-heading">
+                <h2 id="recent-reports-title">Your Reports <span class="count-badge">{{ reports | length }}</span></h2>
+                {% if reports %}<a class="home-view-all" href="/owner/reports">View All {{ icon('arrow') }}</a>{% endif %}
+            </div>
+            {% if reports %}
+            <ul class="dashboard-report-list">
+                {% for report in reports[:3] %}
+                {% set complete = report.status in ['resolved', 'closed'] %}
+                <li><a class="dashboard-report" href="/owner/report/view?id={{ report.id }}" aria-label="View {{ report_title(report) }} report and matches">
+                    <span class="dashboard-item-tile" aria-hidden="true">{{ icon('box') }}<span>{{ report.category | replace('_', ' ') | title }}</span></span>
+                    <div class="dashboard-report-copy">
+                        <h3>{{ report_title(report) }}</h3>
+                        <span class="mobile-report-state">{{ report.status | replace('_', ' ') | title if complete else 'Searching' }}</span>
+                        <p>{{ icon('home') }} {{ report.location | replace('_', ' ') | title if report.location and report.location != 'other' else 'Location not specified' }}</p>
+                        <p>{{ icon('list') }} {{ report.lost_at | english_date }}</p>
+                    </div>
+                    <div class="dashboard-report-state" data-status="{{ report.status }}">
+                        <strong>{{ icon('shield' if complete else 'search') }} {{ report.status | replace('_', ' ') | title if complete else 'Searching' }}</strong>
+                        <span>{{ 'This report is complete.' if complete else 'We’re looking for your item.' }}</span>
+                    </div>
+                    <span class="pf-button pf-secondary dashboard-report-link">{{ 'View report' if complete else 'Report & matches' }} {{ icon('arrow') }}</span>
+                </a></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="dashboard-empty pf-card">
+                {{ mascot('scout', 'dashboard-empty-mascot') }}
+                <div><h3>Your search starts here.</h3><p>Tell us what’s missing. Your reports and possible matches will appear here.</p><a class="pf-button" href="/owner/report/new">Create your first report {{ icon('arrow') }}</a></div>
+            </div>
+            {% endif %}
+        </section>
+        <p class="dashboard-privacy">{{ icon('shield') }} A little peace of mind: your identifying details stay private.</p>
+    </div>
+
+    <aside class="dashboard-aside" aria-label="Help and report overview">
+        <section class="dashboard-help">
+            <div class="dashboard-help-art" aria-hidden="true">{{ mascot('scout') }}</div>
+            <h2>Need help<br>finding your item?</h2>
+            <p>Check your reports and claims, or tell us about a new item.</p>
+            <a href="/#public-guide-heading">Here’s how it works {{ icon('arrow') }}</a>
+        </section>
+        <section class="dashboard-glance pf-card" aria-labelledby="glance-title">
+            <h2 id="glance-title">{{ icon('activity') }} Items at a Glance</h2>
+            <a href="/owner/reports">{{ icon('list') }}<span>My Reports</span><strong>{{ reports | length }}</strong></a>
+            <a href="/owner/reports?status=active">{{ icon('search') }}<span>Active Reports</span><strong>{{ reports | selectattr('status', 'equalto', 'open') | list | length }}</strong></a>
+            <a href="/owner/reports?status=completed">{{ icon('shield') }}<span>Completed Reports</span><strong>{{ (reports | selectattr('status', 'equalto', 'resolved') | list | length) + (reports | selectattr('status', 'equalto', 'closed') | list | length) }}</strong></a>
+        </section>
+        <div class="dashboard-return-art"><img src="/assets/privatefind-return-cat.png" width="1024" height="1024" alt="A happy cat returning a parcel"><p>Good things find their way home.</p></div>
+    </aside>
+</div>
