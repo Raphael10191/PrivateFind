@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block background_mode %}soft{% endblock %}
 {% from "icons.html" import icon %}
 {% from "doodles.html" import finding_crew %}
 {% block title %}Campus Lost & Found | PrivateFind{% endblock %}
@@ -20,5 +21,6 @@
         <div>{{ icon('search') }}<p><strong>Lost an item?</strong><span>Sign in and describe it to check for possible matches. Identifying details stay private.</span></p></div>
         <div>{{ icon('box') }}<p><strong>Found an item?</strong><span>Scan a locker’s QR code, add photos, and follow the deposit instructions. No account needed.</span></p></div>
         <div>{{ icon('shield') }}<p><strong>Get it back safely</strong><span>Owners verify their claim before receiving a pickup code. Some claims need an operator’s review.</span></p></div>
+        <a class="pf-button pf-secondary" href="/how-it-works">View the full guide {{ icon('arrow') }}</a>
 </section>
 {% endblock %}

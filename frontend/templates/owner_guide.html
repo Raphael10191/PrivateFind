@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "icons.html" import icon %}
+{% from "page_scene.html" import page_scene %}
+{% block title %}How It Works | PrivateFind{% endblock %}
+{% block content %}
+<section class="secondary-page secondary-guide" aria-labelledby="owner-guide-title">
+    <header class="secondary-heading">
+        <div>
+            <h1 id="owner-guide-title">How It Works</h1>
+            <p>From your first report to collecting your item.</p>
+        </div>
+        {{ page_scene('claims') }}
+    </header>
+    <ol class="guide-steps">
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">1</span>
+            <div>
+                <h2>Report what you lost</h2>
+                <p>Describe your item, then open your report to review possible matches. Identifying details stay private.</p>
+                <a class="pf-button" href="/owner/report/new">Report a Lost Item {{ icon('arrow') }}</a>
+            </div>
+        </li>
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">2</span>
+            <div>
+                <h2>Verify ownership</h2>
+                <p>Choose a possible match and complete the ownership check. Follow any requests for more details in Claims &amp; Pickup.</p>
+                <a class="pf-button pf-secondary" href="/owner/reports">View reports &amp; matches {{ icon('arrow') }}</a>
+            </div>
+        </li>
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">3</span>
+            <div>
+                <h2>Collect your approved item</h2>
+                <p>Open an approved claim for pickup instructions. Collection is complete after the locker confirms pickup.</p>
+                <a class="pf-button pf-secondary" href="/owner/claims">View Claims &amp; Pickup {{ icon('arrow') }}</a>
+            </div>
+        </li>
+    </ol>
+    <aside class="guide-found pf-card" aria-labelledby="guide-found-title">
+        <h2 id="guide-found-title">Found an item?</h2>
+        <p>At a campus locker, scan its QR code or enter its printed code to start the return flow.</p>
+        <a class="pf-button pf-secondary" href="/found/new">Return a found item {{ icon('arrow') }}</a>
+    </aside>
+</section>
+{% endblock %}

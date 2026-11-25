@@ -1,6 +1,96 @@
 # PrivateFind redesign verification
 
-## Latest update: gradient typography — 2026-11-25
+## Latest update: Owner Home action glow — 2026-11-25
+
+Added a restrained purple/blue/cyan outer glow to the two report action cards using only `frontend/assets/privatefind-theme.css`. Fine-pointer hover and keyboard focus strengthen the glow; the existing focus outline remains. Touch layouts retain the static soft glow. No looping animation, layout/hit-area, text, link, JavaScript or API change. Existing reduced-motion transition overrides remain, and print/high-contrast modes remove the decorative shadows.
+
+Verified both keyboard focus states at 1246 × 678 and static card styling at 390/320 × 844, with no measured horizontal overflow. Card destinations remain `/owner/report/new` and `/found/new`. Captures: `docs/design/action-glow-2026-11-25/desktop.jpg`, `keyboard-focus.jpg`, `mobile-390.jpg`, `mobile-320.jpg`. Desktop/mobile screenshots were opened and inspected. All 38 route/state renders, four existing contrast checks and `git diff --check` pass; browser errors: none. Hover and system contrast/reduced-motion rules were inspected in CSS, not system-emulated. Work remains uncommitted.
+
+## Latest update: native floating bubbles — 2026-11-25
+
+Added a reusable pastel bubble layer to Reports, Claims, Profile, Landing, Sign In and Registration, with an extra quiet Owner Home variant. The existing backgrounds, mascots, content layouts and flows are retained. Page opt-in excludes forms, verification, Finder and Admin. Shared Pause integrates the desktop cat control and a compact public/mobile control; CSS performs movement with no new rendering loop or dependencies.
+
+All seven enabled pages checked at 1440 × 900, 900 × 900, 390 × 844 and 320 × 844, with no measured horizontal overflow. Verified desktop/public/mobile Pause/Resume and sign-in mascot focus behavior. Fixed fractional viewport rounding that could add a scrollbar on short public pages. Full file list, intensity/performance details, screenshots and verification limits: [floating bubbles report](docs/design/floating-bubbles-2026-11-25.md).
+
+All 48 frontend checks and all 38 route/state renders pass. Backend/API and safeguard logic are unchanged. All work remains local and uncommitted.
+
+## Latest update: shared secondary-page background — 2026-11-25
+
+Moved the owner atmosphere from each differently sized content section into the shared workspace. Reports, Claims, Profile and How It Works now share outer boundaries, artwork width and top anchors; content layouts and contextual mascots are retained. Removed the internal capped-width bottom strip and stabilized the scrollbar gutter. Longer pages retain bottom art at the document end.
+
+All four pages were checked at 1920 × 870, 900 × 900 and 390 × 844; populated Claims also at 320 × 844. Matching geometry, screenshots, source comparisons and limits are in [the shared-background review](docs/design/shared-backgrounds-2026-11-25.md). All 40 frontend checks, all 38 route/state renders and `git diff --check` pass. Backend/API behavior is unchanged. Work remains uncommitted.
+
+final result: passed for background consistency
+
+## Latest update: responsive background repairs — 2026-11-25
+
+Public Home and owner secondary pages checked at 320/390px phone widths, 768/900px tablet widths and 1440px desktop width. Secondary backgrounds now fill the available viewport and grow with long content; artwork retains its proportions with bounded edge sizing. Public mascot/backdrop width is fluid and bounded. Fixed the old first-child mobile rule that hid Sign in after the highlighted guest links were removed.
+
+Fresh before/after evidence and limits: [responsive background review](docs/design/responsive-backgrounds-2026-11-25.md). All 40 frontend checks, all 38 route/state renders and `git diff --check` pass. No horizontal overflow in measured views; browser errors: none. Repair is CSS only. Backend/API behavior is unchanged and work remains uncommitted.
+
+## Latest update: simplified public header — 2026-11-25
+
+Removed the two highlighted guest-header links (How it works and Found an item?), including their conditional Home variants. Sign in/Create account, the brand Home link, landing action buttons and the in-page guide remain available. Owner/operator navigation is unchanged. This supersedes the guest-header link behavior described below.
+
+Verified the live landing header contains only Sign in beside the brand. All 38 route/state renders and `git diff --check` pass. Screenshot: `docs/design/public-header-simplified-2026-11-25.jpg`. No backend/API changes, commit, push, merge or deployment.
+
+## Latest update: dedicated public guide — 2026-11-25
+
+Public **How it works** now opens `/how-it-works`, a distinct guide with lost-item, found-item and ownership/pickup instructions and the existing flow destinations. Its header shows Home and its footer provides Back to Home. The landing page keeps its short overview and adds View the full guide, also reachable on phones where the compact header hides ordinary links. Owner help retains `/owner/how-it-works` and the owner shell.
+
+Verified actual desktop header navigation to the new guide and return to Home, plus the mobile full-guide link and return path at 390 × 844. No horizontal overflow or browser console errors in the checked mobile guide. Screenshots: `docs/design/public-guide-2026-11-25.jpg` and `docs/design/public-guide-mobile-2026-11-25.jpg`. All 38 route/state renders pass. Only frontend templates and the frontend page registry changed for this fix; backend, API and authentication behavior are preserved. No commit, push, merge or deployment.
+
+final result: passed for the navigation/layout scope
+
+## Latest update: found-item header navigation — 2026-11-25
+
+Resolved the annotated self-link on `/found/new`: the guest header now shows **Home** linking to `/` on the found-item page. Public landing, sign-in and registration pages retain **Found an item?** linking to `/found/new`. Existing backend/API behavior and service safeguards are unchanged.
+
+Verified all four guest-header variants by rendering the actual templates, all 36 route/state renders, and a live browser click from the corrected Home link to the public landing page. Screenshot: `docs/design/found-navigation-2026-11-25.jpg`. `git diff --check` passed. No commit, push, merge or deployment.
+
+final result: passed
+
+## Audited secondary-page repairs — 2026-11-25
+
+User-confirmed scope: My Reports, Claims & Pickup, Profile and How It Works. Owner Home's appearance is preserved. Fresh before/after captures, findings, repairs and limits are in [the repair audit](docs/design/secondary-page-repairs-2026-11-25.md).
+
+Fixed non-uniform background scaling on tall pages, the unused Profile heading grid track, misleading editable-looking account values, empty-report search clutter, mismatched report link accessible labels, and keyboard focus loss after Claims Refresh. Owner How It Works now uses an authenticated frontend page with the existing owner shell and flow destinations, instead of sending owners to the public landing page. Public guest help remains unchanged. Home's sole template change is its help-link destination; dashboard layout/artwork are unchanged.
+
+Fresh screenshots were saved and inspected at 390 × 844, 320 × 844, 900 × 800 and 1246 × 800 CSS px. Before/after pairs were opened together. Background rasters now keep their native 1.5 aspect ratio, rather than stretching to the document height. Checked pages have no horizontal overflow. Claims Refresh retains visible keyboard focus, and help navigation retains the owner sidebar/mobile navigation. Existing fonts, color tokens and mascot artwork are retained. The new guide uses the existing design system and icon/mascot assets.
+
+All 40 frontend checks passed, including five new asynchronous focus/help-routing checks. All 36 route/state renders passed with duplicate-ID checks. `git diff --check` passed; browser error log was empty. No backend, authentication guard, API endpoint/request or hardware logic changed. The frontend registry adds only the existing background asset and the owner guide route. Earlier claim item-name enrichment remains a separate data-dependent follow-up; no new data requests were introduced to address it.
+
+final result: passed
+
+This result covers the repaired layout/navigation/focus scope. It does not certify full-app accessibility or resolve claim item-name enrichment. No commit, push, merge or deployment.
+
+## Illustrated secondary backgrounds — previous iteration, 2026-11-25
+
+Source visual truth: `C:/Users/MSI/Downloads/ui photos/PrivateFind Campus Lost & Found UI Collage.png` (1536 × 1024). Scope: its secondary-page background features and empty-state/Profile composition, retaining the existing approved UI, wording and mascots. The public landing quadrant is outside this change.
+
+The reference and current desktop screenshots were opened together in the same comparison input. Checked desktop 1246 × 800, tablet 768 × 900, and 320/390px phones in empty and populated states. Source quadrants are approximately 768 × 512; the implementation uses the existing larger app viewport. Screenshots were not stretched to claim pixel equality. Capture widths can exclude the scrollbar gutter. Full dimensions, screenshot paths, five-surface comparison and implementation details are in [the background review](docs/design/secondary-backgrounds-2026-11-25.md).
+
+Added a genuine transparent raster backdrop with blue/lavender waves, dotted accents, faint routes and small ground details. Empty Reports/Claims cards have centered approved illustrations; Profile places its larger desk scene beside the account card on desktop. Populated lists retain small anchored art and lower background opacity. No overflow or missing assets in checked layouts. No substantive P0/P1/P2 difference remains within this background scope; the earlier audit's functional/accessibility findings remain open and separate.
+
+Typography, spacing/layout, colors/tokens, image quality and copy/content were reviewed. Existing Montserrat/Nunito Sans, solid text/status colors and product copy are retained. The raster's center is transparent; sampled heading/content regions retain at least 5.65:1 contrast for the existing muted text at the strongest background opacity. Stronger edge pixels are decorative, outside text areas. Existing regression/contrast checks (35) and route/state renders (34) pass. Browser errors: none. Production preview code differs only by one static-image registration; backend, API, claim script, shared JavaScript and hardware behavior are unchanged.
+
+Comparison history: the first visual comparison passed for the scoped features, so no P0/P1/P2 repair loop was required. Print/high-contrast layout cleanup was completed before handoff; system-mode rendering was inspected in source rather than emulated.
+
+final result: passed
+
+All work remains uncommitted. No push, merge or deployment.
+
+## Secondary-page atmosphere — initial iteration, 2026-11-25
+
+Added a shared static lavender/light-blue atmosphere and one contextual composition with one supporting doodle for My Reports, Claims & Pickup and Profile. Approved mascot assets, existing gradient branding and solid text/status treatments are retained. Populated reports and claims remain compact; decorations cannot receive focus or pointer input.
+
+Desktop, tablet and 320/390px phone checks passed. All 35 existing frontend behavior/contrast checks and 34 route/state template renders passed. Claims inline application code, backend/API code and shared application JavaScript are unchanged. The read-only test fixture now supplies optional sample claims for populated layout review. Changes remain uncommitted; no push, merge or deployment.
+
+See [implementation notes and screenshots](docs/design/secondary-pages-2026-11-25.md).
+
+The subsequent [UI/UX audit](docs/design/secondary-ui-ux-audit-2026-11-25.md) found no severe layout failure, but identified three medium-priority issues (claim identification, Refresh keyboard focus, report accessible link names) and two minor refinements (read-only Profile styling and narrow Reports density). These findings remain open; this audit did not modify application code.
+
+## Gradient typography — 2026-11-25 (previous update)
 
 Visual and regression checks passed for the requested gradient refinement. The complete source comparison, screenshots, color ratios, resolved findings and test results are in [the gradient typography review](docs/design/gradient-typography-2026-11-25.md).
 

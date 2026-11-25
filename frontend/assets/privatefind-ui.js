@@ -145,6 +145,49 @@
     restoreFromURL();
 })();
 
+/* Shared decorative pause state. Bubble movement itself runs entirely in CSS. */
+(() => {
+    const layer = document.querySelector("[data-floating-bubbles]");
+    if (!layer) return;
+    const controls = [...document.querySelectorAll("[data-bubble-pause]")];
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let paused = false, visible = false, suspended = false;
+
+    function sync() {
+        layer.dataset.bubblesActive = String(visible && !paused && !reduced.matches && !document.hidden && !suspended);
+        for (const control of controls) {
+            const label = reduced.matches ? "Reduced motion on" : paused ? "Resume animation" : "Pause animation";
+            control.hidden = false;
+            control.disabled = reduced.matches;
+            control.setAttribute("aria-pressed", String(paused));
+            control.setAttribute("aria-label", label);
+            control.title = label;
+        }
+    }
+    window.privateFindMotion = {
+        get paused() { return paused; },
+        setPaused(value) {
+            paused = value === true;
+            sync();
+            document.dispatchEvent(new CustomEvent("privatefind:motionchange"));
+        }
+    };
+    controls.forEach(control => control.addEventListener("click", () => window.privateFindMotion.setPaused(!paused)));
+    if ("IntersectionObserver" in window) {
+        const observer = new window.IntersectionObserver(entries => {
+            visible = entries.some(entry => entry.isIntersecting);
+            sync();
+        });
+        observer.observe(layer);
+    }
+    // Without visibility observation or JavaScript, the layer stays static.
+    document.addEventListener("visibilitychange", sync);
+    reduced.addEventListener("change", sync);
+    window.addEventListener("pagehide", () => { suspended = true; sync(); });
+    window.addEventListener("pageshow", () => { suspended = false; sync(); });
+    sync();
+})();
+
 /* Peek interaction adapted from the supplied Peek Blob by Louis Studios.
  * Keeps the original cat and blends a localized closed-eye frame for blinks.
  * No canvas, dependencies, or API calls are needed. */
@@ -241,7 +284,14 @@
         if (!active() || elapsed - duckAt < 0.8) return;
         duckAt = elapsed;
     });
-    pause.addEventListener("click", () => { paused = !paused; sync(); });
+    pause.addEventListener("click", () => {
+        if (window.privateFindMotion) window.privateFindMotion.setPaused(!window.privateFindMotion.paused);
+        else { paused = !paused; sync(); }
+    });
+    document.addEventListener("privatefind:motionchange", () => {
+        paused = window.privateFindMotion?.paused === true;
+        sync();
+    });
     const observer = new IntersectionObserver(entries => {
         visible = entries.some(entry => entry.isIntersecting);
         refreshBounds();

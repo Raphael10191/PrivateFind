@@ -1,0 +1,29 @@
+{# Presentation only. Reuse the approved mascot atlas and existing UI icons. #}
+{% from "doodles.html" import mascot %}
+{% from "icons.html" import icon %}
+
+{% macro atmosphere() -%}
+<div class="page-atmosphere" aria-hidden="true">
+    <img class="atmosphere-art atmosphere-top" src="/assets/privatefind-secondary-atmosphere.png" width="1536" height="1024" alt="" decoding="async" draggable="false">
+    <img class="atmosphere-art atmosphere-bottom" src="/assets/privatefind-secondary-atmosphere.png" width="1536" height="1024" alt="" decoding="async" draggable="false">
+</div>
+{%- endmacro %}
+
+{% macro page_scene(scene) -%}
+<div class="page-scene page-scene-{{ scene }}" aria-hidden="true">
+    <span class="scene-halo"></span>
+    {% if scene == 'reports' %}
+        <span class="scene-route"></span>
+        {{ mascot('nibbles', 'scene-character') }}
+        <span class="scene-doodle">{{ icon('search') }}</span>
+    {% elif scene == 'claims' %}
+        <span class="scene-checklist"><i></i><i></i><i></i></span>
+        {{ mascot('pip', 'scene-character') }}
+        <span class="scene-doodle">{{ icon('shield') }}</span>
+    {% else %}
+        <span class="scene-desk"></span>
+        {{ mascot('pip-calm', 'scene-character') }}
+        {{ mascot('lumi', 'scene-doodle') }}
+    {% endif %}
+</div>
+{%- endmacro %}

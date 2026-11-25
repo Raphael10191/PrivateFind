@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block background_mode %}quiet{% endblock %}
 {% from "icons.html" import icon %}
 {% from "doodles.html" import mascot %}
 {% set recent_open = reports | selectattr('status', 'equalto', 'open') | first | default(none) %}

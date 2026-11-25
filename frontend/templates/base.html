@@ -14,6 +14,10 @@
 </head>
 {% from "icons.html" import icon %}
 {% from "doodles.html" import mascot %}
+{% from "page_scene.html" import atmosphere %}
+{% from "floating_bubbles.html" import bubble_background, motion_control %}
+{% set bubble_mode %}{% block background_mode %}{% endblock %}{% endset %}
+{% set bubble_mode = bubble_mode | trim %}
 {% set owner_nav = [
     ('home', '/owner', 'Home', 'home'),
     ('reports', '/owner/reports', 'My Reports', 'list'),
@@ -30,6 +34,7 @@
     ('admin_audit', '/admin/audit', 'Activity log', 'list')
 ] %}
 {% set role_links = admin_nav if role == 'admin' else owner_nav %}
+{% set guide_href = '/owner/how-it-works' if role == 'owner' else '/how-it-works' %}
 {% macro nav_links(entries) -%}
     {% for key, href, label, symbol in entries %}
         <a href="{{ href }}"{% if active_page == key %} aria-current="page"{% endif %}>
@@ -57,7 +62,8 @@
                     {% else %}
                     <span class="operator-label">{{ icon('shield') }} Campus lost &amp; found <span> / Operator workspace</span></span>
                     {% endif %}
-                    <a class="header-help" href="/#public-guide-heading">Help</a>
+                    <a class="header-help" href="{{ guide_href }}">Help</a>
+                    {% if bubble_mode %}{{ motion_control() }}{% endif %}
                     <details class="profile-menu" data-profile-menu>
                         <summary aria-label="Account menu">
                             <span class="profile-avatar">{{ icon('person') }}</span>
@@ -67,15 +73,14 @@
                         <div class="profile-menu-panel">
                             <span class="profile-menu-label">{{ 'Operator account' if role == 'admin' else 'Your account' }}</span>
                             {% if role == 'owner' %}<a href="/owner/account">{{ icon('person') }} View profile</a>{% endif %}
-                            <a href="/#public-guide-heading">{{ icon('shield') }} How it works</a>
+                            <a href="{{ guide_href }}">{{ icon('shield') }} How it works</a>
                             <button type="button" data-signout>{{ icon('exit') }} Sign out</button>
                         </div>
                     </details>
                 </div>
             {% else %}
                 <nav class="guest-nav" aria-label="Main navigation">
-                    <a href="/#public-guide-heading">How it works</a>
-                    <a class="guest-found" href="/found/new">Found an item?</a>
+                    {% if bubble_mode %}{{ motion_control() }}{% endif %}
                     <a class="pf-button pf-secondary header-entry" href="{{ '/register' if active_page == 'login' else '/login' }}">{{ 'Create account' if active_page == 'login' else 'Sign in' }}</a>
                 </nav>
             {% endif %}
@@ -88,7 +93,7 @@
                 <nav class="side-nav" aria-label="{{ 'Operator' if role == 'admin' else 'Owner' }} navigation">
                     {{ nav_links(role_links) }}
                     {% if role == 'admin' %}{{ nav_links(operations_nav) }}{% endif %}
-                    <a class="nav-guide" href="/#public-guide-heading">{{ icon('shield') }}<span>How It Works</span></a>
+                    <a class="nav-guide" href="{{ guide_href }}"{% if active_page == 'guide' %} aria-current="page"{% endif %}>{{ icon('shield') }}<span>How It Works</span></a>
                 </nav>
                 <div class="sidebar-companion sidebar-cat-scene" data-peek-cat>
                     <button class="sidebar-cat-play" type="button" aria-label="Play peekaboo with the detective cat" aria-describedby="sidebar-cat-hint" data-cat-play disabled>
@@ -105,6 +110,10 @@
             </aside>
         {% endif %}
         <main id="main-content" tabindex="-1">
+            {% if role == 'owner' and active_page in ('reports', 'claims', 'account', 'guide') %}
+                {{ atmosphere() }}
+            {% endif %}
+            {% if bubble_mode %}{{ bubble_background(bubble_mode) }}{% endif %}
             <p id="ai-status" class="ai-status" role="status"{% if role != 'admin' %} hidden{% endif %}>Checking service availability…</p>
             <div class="service-recovery" data-ai-recovery hidden>
                 <div class="service-recovery-actions">

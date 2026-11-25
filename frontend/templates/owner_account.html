@@ -1,8 +1,9 @@
 
 {% extends "base.html" %}
+{% block background_mode %}standard{% endblock %}
 
 {% from "icons.html" import icon %}
-{% from "doodles.html" import mascot %}
+{% from "page_scene.html" import page_scene %}
 {% block title %}Profile | PrivateFind{% endblock %}
 
 {% block head %}
@@ -52,11 +53,14 @@
         margin-bottom: 24px;
     }
 
-    .account-field label {
+    .account-details { margin: 0; }
+
+    .account-field dt {
         display: block;
         color: var(--muted);
         font-size: 13px;
         margin-bottom: 8px;
+        font-weight: 750;
     }
 
     .account-value {
@@ -126,10 +130,12 @@
 {% endblock %}
 
 {% block content %}
-<section class="account-page">
-    <div class="account-heading">
-        <h1>Profile</h1>
-        <p>Your PrivateFind account information</p>
+<section class="account-page secondary-page secondary-profile">
+    <div class="account-heading secondary-heading">
+        <div>
+            <h1>Profile</h1>
+            <p>Your PrivateFind account information</p>
+        </div>
     </div>
 
     <div class="account-layout">
@@ -138,19 +144,21 @@
             {{ icon('person') }}
         </div>
 
+        <dl class="account-details">
         <div class="account-field">
-            <label>Display name</label>
-            <div class="account-value">
+            <dt>Display name</dt>
+            <dd class="account-value">
                 {{ account.display_name or "Not provided" }}
-            </div>
+            </dd>
         </div>
 
         <div class="account-field">
-            <label>Email address</label>
-            <div class="account-value">
+            <dt>Email address</dt>
+            <dd class="account-value">
                 {{ account.email }}
-            </div>
+            </dd>
         </div>
+        </dl>
 
         <hr class="account-divider">
 
@@ -165,12 +173,7 @@
             Sign out
         </button>
     </div>
-    <div class="profile-companion" aria-hidden="true" data-mascot-motion>
-        {{ mascot('lumi', 'profile-lumi') }}{{ mascot('sage', 'profile-sage') }}
-        <svg class="composition-ground" viewBox="0 0 220 25" fill="none" focusable="false">
-            <path d="M10 19Q60 12 110 19T210 18"/>
-        </svg>
-    </div>
+    {{ page_scene('profile') }}
     </div>
 </section>
 {% endblock %}

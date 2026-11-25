@@ -1,0 +1,29 @@
+{# Native adaptation of the supplied floating-bubbles reference. Decoration only. #}
+{% from "icons.html" import icon %}
+{% macro motion_control() -%}
+<span class="bubble-motion-slot">
+    <button class="bubble-motion-control" type="button" data-bubble-pause hidden
+            aria-label="Pause animation" title="Pause animation" aria-pressed="false" aria-controls="privatefind-bubbles">
+        <span class="bubble-pause-icon">{{ icon('pause') }}</span>
+        <span class="bubble-play-icon">{{ icon('play') }}</span>
+    </button>
+</span>
+{%- endmacro %}
+{% macro bubble_background(mode) -%}
+{% set positions = [
+    (3, 12, 38, 18, -24, 29, -8), (94, 7, 58, -20, 22, 37, -19),
+    (8, 31, 24, 22, 17, 26, -14), (89, 28, 44, -16, -26, 34, -3),
+    (5, 66, 66, 20, -18, 41, -27), (93, 72, 30, -24, 20, 31, -11),
+    (18, 92, 36, -15, -22, 33, -23), (78, 94, 54, 19, -18, 39, -6),
+    (2, 47, 18, 16, 24, 25, -17), (97, 48, 72, -22, -16, 43, -31),
+    (12, 81, 28, 24, 16, 30, -9), (86, 85, 20, -17, -25, 35, -21),
+    (16, 5, 22, -18, 20, 32, -12), (84, 4, 32, 21, 16, 38, -25),
+    (4, 91, 46, 18, -21, 36, -5), (96, 93, 26, -20, -18, 28, -16)
+] %}
+{% set count = 6 if mode == 'quiet' else 12 if mode == 'soft' else 16 %}
+<div id="privatefind-bubbles" class="floating-bubbles floating-bubbles-{{ mode }}" data-floating-bubbles data-bubbles-active="false" aria-hidden="true">
+    {% for x, y, size, dx, dy, duration, delay in positions[:count] %}
+    <span class="floating-bubble bubble-color-{{ loop.index0 % 4 }}" style="--bubble-x:{{ x }}%;--bubble-y:{{ y }}%;--bubble-size:{{ size }}px;--bubble-dx:{{ dx }}px;--bubble-dy:{{ dy }}px;--bubble-duration:{{ duration }}s;--bubble-delay:{{ delay }}s"></span>
+    {% endfor %}
+</div>
+{%- endmacro %}

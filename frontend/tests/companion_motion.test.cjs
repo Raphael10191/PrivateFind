@@ -36,6 +36,7 @@ function fixture({reduced = false, fine = true, observe = true} = {}) {
         cancelAnimationFrame: id => frames.delete(id),
     });
     return {lookout, chirp, sidebar, empty, document, motion, pointer, frames,
+        pause(value) { window.privateFindMotion = {paused: value}; documentEvents['privatefind:motionchange'](); },
         visible(target, ratio = 1) { intersection([{target, isIntersecting: ratio > 0, intersectionRatio: ratio}]); },
         hide(value) { document.hidden = value; documentEvents.visibilitychange(); },
         move(x, y, pointerType = "mouse") { lookout.events.pointermove({clientX: x, clientY: y, pointerType}); },
@@ -93,6 +94,12 @@ function runTests() {
     view.hide(false);
     assert.equal(view.sidebar.dataset.mascotActive, "true");
     checks.push("offscreen and hidden-tab work pauses and resumes independently");
+
+    view.pause(true);
+    assert.equal(view.sidebar.dataset.mascotActive, 'false');
+    view.pause(false);
+    assert.equal(view.sidebar.dataset.mascotActive, 'true');
+    checks.push('shared animation controls pause and resume decorative companions');
 
     view.visible(view.chirp);
     view.motion.matches = true; view.motion.change();

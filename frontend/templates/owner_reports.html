@@ -1,6 +1,7 @@
 
 {% extends "base.html" %}
-{% from "doodles.html" import helping_friend %}
+{% block background_mode %}standard{% endblock %}
+{% from "page_scene.html" import page_scene %}
 {% from "report_ui.html" import report_title %}
 
 {% block title %}My Reports | PrivateFind{% endblock %}
@@ -178,15 +179,19 @@
 {% endblock %}
 
 {% block content %}
-
-<section class="reports-header">
+<div class="secondary-page secondary-reports{% if reports %} secondary-populated{% endif %}">
+<section class="reports-header secondary-heading">
     <div>
         <h1>My Reports</h1>
         <p class="subtitle">
+            {% if reports %}
+            Review your reports and possible matches. Track claims in Claims &amp; Pickup.
+            {% else %}
             Open a report to review possible matches, then verify ownership. Track requests in Claims &amp; Pickup.
+            {% endif %}
         </p>
     </div>
-
+    {% if reports %}{{ page_scene('reports') }}{% endif %}
     <a href="/owner/report/new" class="new-report pf-button">
         Report a Lost Item
     </a>
@@ -225,7 +230,7 @@
 
 <p id="report-search-feedback" class="search-feedback" role="status" hidden></p>
 <p id="report-filter-help" class="filter-help" hidden>Completed includes resolved and closed reports. Pickup and collection status are shown in Claims &amp; Pickup.</p>
-<form class="reports-search workspace-search" action="/owner/reports" method="get" role="search">
+<form class="reports-search workspace-search" action="/owner/reports" method="get" role="search"{% if not reports %} hidden{% endif %}>
     <label class="sr-only" for="reports-query">Search your reports</label>
     <input id="reports-query" name="q" type="search" maxlength="200" placeholder="Search your reports…">
     <button type="submit" aria-label="Search reports">Search</button>
@@ -269,7 +274,7 @@
 
                 <a href="/owner/report/view?id={{ report.id }}"
                    class="view-details"
-                   aria-label="View report {{ report.id }} details">
+                   aria-label="{{ 'View report' if is_completed else 'View report & matches' }} — {{ report_title(report) }}, report {{ report.id }}">
                     {{ 'View report' if is_completed else 'View report & matches' }} · #{{ report.id }}
                 </a>
             </div>
@@ -287,10 +292,10 @@
     {% if reports %}
         No reports in this category.
     {% else %}
-        {{ helping_friend('reports') }}
+        {{ page_scene('reports') }}
         <p>No reports yet. Use “Report a Lost Item” above to get started.</p>
     {% endif %}
 
 </div>
-
+</div>
 {% endblock %}

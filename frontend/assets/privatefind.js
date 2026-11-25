@@ -236,7 +236,7 @@ if (ownerScout) {
     }
 
     function syncEffects() {
-        const active = inView && !document.hidden && !reducedMotion.matches;
+        const active = inView && !document.hidden && !reducedMotion.matches && window.privateFindMotion?.paused !== true;
         hero.dataset.scoutActive = String(active);
         if (!active || !finePointer.matches) resetGaze();
         if (!active) button.classList.remove("is-peeking");
@@ -269,6 +269,7 @@ if (ownerScout) {
     hero.addEventListener("pointerleave", resetGaze);
     hero.addEventListener("pointercancel", resetGaze);
     document.addEventListener("visibilitychange", syncEffects);
+    document.addEventListener("privatefind:motionchange", syncEffects);
     reducedMotion.addEventListener("change", syncEffects);
     finePointer.addEventListener("change", syncEffects);
     if ("IntersectionObserver" in window) {
@@ -303,7 +304,7 @@ if (companionScenes.length) {
 
     function syncCompanions() {
         for (const scene of companionScenes) {
-            scene.dataset.mascotActive = String(visible.get(scene) === true && !document.hidden && !motion.matches);
+            scene.dataset.mascotActive = String(visible.get(scene) === true && !document.hidden && !motion.matches && window.privateFindMotion?.paused !== true);
         }
         if (chirp?.dataset.mascotActive !== "true" || !finePointer.matches) resetChirp();
     }
@@ -318,6 +319,7 @@ if (companionScenes.length) {
         companionScenes.forEach(scene => observer.observe(scene));
     }
     document.addEventListener("visibilitychange", syncCompanions);
+    document.addEventListener("privatefind:motionchange", syncCompanions);
     motion.addEventListener("change", syncCompanions);
     finePointer.addEventListener("change", syncCompanions);
 

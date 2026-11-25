@@ -1,6 +1,7 @@
 
 {% extends "base.html" %}
-{% from "doodles.html" import helping_friend %}
+{% block background_mode %}standard{% endblock %}
+{% from "page_scene.html" import page_scene %}
 
 {% block title %}Claims &amp; Pickup | PrivateFind{% endblock %}
 
@@ -153,13 +154,13 @@
 {% endblock %}
 
 {% block content %}
-<section class="claims-page">
-    <header class="claims-heading">
+<section class="claims-page secondary-page secondary-claims">
+    <header class="claims-heading secondary-heading">
         <div>
             <h1>Claims &amp; Pickup</h1>
             <p>Check ownership reviews, respond to requests, and collect approved items.</p>
         </div>
-
+        {{ page_scene('claims') }}
         <button id="refresh-claims"
                 class="secondary-button"
                 type="button">
@@ -168,7 +169,7 @@
     </header>
 
     <div class="claims-state">
-    <div id="claims-empty-art" hidden>{{ helping_friend('claims') }}</div>
+    <div id="claims-empty-art" aria-hidden="true" hidden>{{ page_scene('claims') }}</div>
     <div id="claims-feedback"
          class="feedback"
          role="status">
@@ -434,6 +435,7 @@
     }
 
     async function loadClaims() {
+        const restoreRefreshFocus = document.activeElement === refreshButton;
         refreshButton.disabled = true;
         document.getElementById("claims-empty-art").hidden = true;
         claimsList.hidden = true;
@@ -479,6 +481,9 @@
             );
         } finally {
             refreshButton.disabled = false;
+            if (restoreRefreshFocus && document.activeElement === document.body) {
+                refreshButton.focus({preventScroll: true});
+            }
         }
     }
 

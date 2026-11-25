@@ -1,4 +1,8 @@
 :root {
+    --bubble-lavender: #c7b9f1;
+    --bubble-sky: #b4defa;
+    --bubble-purple: #d5cdf9;
+    --bubble-cyan: #bce9f8;
     color-scheme: light;
     --paper: #fafaf8;
     --sky: #7cc4f8;
@@ -1380,4 +1384,64 @@ main :is(.error-box, .error-message, .form-error, .login-error, .register-error,
 }
 @media (prefers-reduced-motion: no-preference) {
     [data-mascot-motion] > :is(.empty-support, .auth-support-right, .crew-chirp) { animation-delay: 120ms; }
+}
+
+/* Floating bubbles: a bounded, opt-in layer; no layout space or pointer input. */
+/* Reserve one pixel for fractional viewport rounding, so decoration adds no scroll. */
+.role-guest .site-layout:has(> main > [data-floating-bubbles]) { display: flex; flex-direction: column; min-height: calc(100svh - var(--header-height) - 1px); }
+.role-guest main:has(> [data-floating-bubbles]) { flex: 1; }
+main:has(> [data-floating-bubbles]) { position: relative; isolation: isolate; }
+.floating-bubbles {
+    position: absolute; inset: 0; z-index: -1; overflow: hidden;
+    border-radius: inherit; pointer-events: none; user-select: none; opacity: .65;
+    background: radial-gradient(ellipse at 0% 28%, #c7b9f117, transparent 40%),
+                radial-gradient(ellipse at 100% 74%, #b4defa1c, transparent 42%);
+}
+.floating-bubbles-soft { opacity: .5; }
+.floating-bubbles-quiet { opacity: .28; }
+main:has(> .secondary-populated, > .secondary-claims #claims-list:not([hidden])) > .floating-bubbles { opacity: .35; }
+.floating-bubble {
+    position: absolute; left: var(--bubble-x); top: var(--bubble-y);
+    width: var(--bubble-size); height: var(--bubble-size); border-radius: 50%;
+    background: var(--bubble-color); opacity: .22;
+    animation: privatefind-bubble-float var(--bubble-duration) ease-in-out var(--bubble-delay) infinite alternate;
+    animation-play-state: paused;
+}
+.bubble-color-0 { --bubble-color: var(--bubble-lavender); }
+.bubble-color-1 { --bubble-color: var(--bubble-sky); }
+.bubble-color-2 { --bubble-color: var(--bubble-purple); }
+.bubble-color-3 { --bubble-color: var(--bubble-cyan); }
+[data-bubbles-active="true"] > .floating-bubble { animation-play-state: running; }
+@keyframes privatefind-bubble-float {
+    0% { transform: translate3d(0, 0, 0) scale(.96); opacity: .18; }
+    55% { opacity: .32; }
+    100% { transform: translate3d(var(--bubble-dx), var(--bubble-dy), 0) scale(1.06); opacity: .22; }
+}
+.bubble-motion-slot { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; }
+.bubble-motion-control {
+    display: grid; place-items: center; width: 44px; height: 44px; padding: 10px;
+    border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--accent); cursor: pointer;
+}
+.bubble-motion-control:hover { background: var(--sage); }
+.bubble-motion-control:disabled { cursor: default; opacity: .6; }
+.bubble-motion-control .ui-icon { display: block; width: 20px; height: 20px; }
+.bubble-play-icon, .bubble-motion-control[aria-pressed="true"] .bubble-pause-icon { display: none; }
+.bubble-motion-control[aria-pressed="true"] .bubble-play-icon { display: block; }
+@media (min-width: 761px) {
+    .workspace-topbar > .bubble-motion-slot { display: none; }
+}
+@media (max-width: 1100px) {
+    .floating-bubble:nth-child(n+11) { display: none; }
+}
+@media (max-width: 760px) {
+    .floating-bubble:nth-child(n+7), .floating-bubbles-quiet > .floating-bubble:nth-child(n+5) { display: none; }
+    .floating-bubble { width: calc(var(--bubble-size) * .7); height: calc(var(--bubble-size) * .7); }
+    .header-inner:has([data-bubble-pause]) { gap: 8px; }
+    .guest-nav:has([data-bubble-pause]) { gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .floating-bubble { animation: none !important; transform: none; opacity: .18; }
+}
+@media print, (forced-colors: active), (prefers-contrast: more) {
+    .floating-bubbles, .bubble-motion-slot { display: none; }
 }

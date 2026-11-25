@@ -1,0 +1,110 @@
+[
+  {
+    "width": 1440,
+    "label": "public",
+    "bubbles": 12,
+    "client": 1425,
+    "height": 1083,
+    "scroll": 1425,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "label": "login",
+    "bubbles": 12,
+    "client": 1440,
+    "height": 900,
+    "scroll": 1440,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "label": "register",
+    "bubbles": 12,
+    "client": 1425,
+    "height": 921,
+    "scroll": 1425,
+    "viewport": 900
+  },
+  {
+    "width": 900,
+    "label": "public",
+    "bubbles": 10,
+    "client": 885,
+    "height": 1013,
+    "scroll": 885,
+    "viewport": 900
+  },
+  {
+    "width": 900,
+    "label": "login",
+    "bubbles": 10,
+    "client": 900,
+    "height": 900,
+    "scroll": 900,
+    "viewport": 900
+  },
+  {
+    "width": 900,
+    "label": "register",
+    "bubbles": 10,
+    "client": 885,
+    "height": 931,
+    "scroll": 885,
+    "viewport": 900
+  },
+  {
+    "width": 390,
+    "label": "public",
+    "bubbles": 6,
+    "client": 375,
+    "height": 1379,
+    "scroll": 375,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "label": "login",
+    "bubbles": 6,
+    "client": 390,
+    "height": 844,
+    "scroll": 390,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "label": "register",
+    "bubbles": 6,
+    "client": 390,
+    "height": 844,
+    "scroll": 390,
+    "viewport": 844
+  },
+  {
+    "width": 320,
+    "label": "public",
+    "bubbles": 6,
+    "client": 305,
+    "height": 1494,
+    "scroll": 305,
+    "viewport": 844
+  },
+  {
+    "width": 320,
+    "label": "login",
+    "bubbles": 6,
+    "client": 320,
+    "height": 844,
+    "scroll": 320,
+    "viewport": 844
+  },
+  {
+    "width": 320,
+    "label": "register",
+    "bubbles": 6,
+    "client": 320,
+    "height": 844,
+    "scroll": 320,
+    "viewport": 844
+  }
+]

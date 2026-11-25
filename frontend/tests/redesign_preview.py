@@ -1,7 +1,8 @@
 """Read-only visual QA fixtures; never connects to the real backend.
 
 Run `python frontend/tests/redesign_preview.py`, then open http://127.0.0.1:8003/owner.
-Use ?empty=1 for an empty dashboard/report list. Production uses frontend/preview.py.
+Use ?empty=1 for an empty dashboard/report list, or ?populated=1 for sample claims.
+Production uses frontend/preview.py.
 All writes are rejected, so checking layouts cannot create claims or operate lockers.
 """
 
@@ -30,6 +31,15 @@ CANDIDATES = [dict(found_item_id=10, category="headphones", color="black", locat
                    found_date="2026-11-18")]
 LOCKER = dict(code="L1", name="Library smart locker", location="library", free_compartments=1,
               locations=["library", "cafeteria", "student_center"])
+CLAIMS = [
+    dict(id=101, lost_report_id=1, found_item_id=10, status="in_review",
+         verification_state="needs_more_evidence", next_action="another_detail",
+         message="Please add one more identifying detail so the ownership review can continue."),
+    dict(id=102, lost_report_id=2, found_item_id=11, status="approved",
+         message="Ownership review approved. Request pickup instructions when you are ready."),
+    dict(id=103, lost_report_id=3, found_item_id=12, status="collected",
+         message="This sample item has been collected."),
+]
 
 
 class VisualPreview(PreviewHandler):
@@ -49,7 +59,8 @@ class VisualPreview(PreviewHandler):
             # Uses the normal service-outage UI, without enabling any writes.
             data = dict(provider="mock", available=False, mock_reporting_enabled=False)
         elif path == "/api/claims":
-            data = []
+            referer_query = parse_qs(urlsplit(self.headers.get("Referer", "")).query)
+            data = CLAIMS if referer_query.get("populated") else []
         elif path.endswith("/candidates"):
             data = [] if urlsplit(self.headers.get("Referer", "")).path == "/owner" else CANDIDATES
         elif path.startswith("/api/lost-reports/"):
@@ -98,6 +109,8 @@ def check_templates():
             parsed.feed(html)
             assert len(parsed.ids) == len(set(parsed.ids)), f"Duplicate IDs in {page}"
             assert 'privatefind-theme.css' in html
+            bubble_pages = {'/', '/login', '/register', '/owner', '/owner/reports', '/owner/claims', '/owner/account'}
+            assert ('data-floating-bubbles' in html) == (page in bubble_pages), f"Wrong bubble scope in {page}"
             count += 1
     return count
 

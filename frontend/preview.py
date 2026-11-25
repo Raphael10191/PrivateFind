@@ -43,6 +43,7 @@ def english_date(value):
 templates.filters["english_date"] = english_date
 
 ASSETS = {
+    "/assets/privatefind-secondary-atmosphere.png": ("privatefind-secondary-atmosphere.png", "image/png"),
     "/assets/privatefind-report-lost.png": ("privatefind-report-lost.png", "image/png"),
     "/assets/privatefind-report-found.png": ("privatefind-report-found.png", "image/png"),
     "/assets/privatefind-sidebar-cat-blink.png": ("privatefind-sidebar-cat-blink.png", "image/png"),
@@ -58,6 +59,8 @@ ASSETS = {
 }
 
 PAGES = {
+    "/how-it-works": ("public_guide.html", "public_guide"),
+    "/owner/how-it-works": ("owner_guide.html", "guide"),
     "/": ("public_home.html", "public"),
     "/owner": ("owner_home.html", "home"),
     "/owner/reports": ("owner_reports.html", "reports"),

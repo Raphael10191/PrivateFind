@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../assets/privatefind-ui.js"), "utf8");
 const script = source.slice(source.indexOf("/* Peek interaction"));
-function fixture(reduce = false) {
+function fixture(reduce = false, shared = false) {
     const windowEvents = {}, documentEvents = {}, frames = new Map();
     let nextFrame = 0, now = 0, intersection, preferenceChange;
     const target = extra => ({events: {}, ...extra,
@@ -17,13 +17,16 @@ function fixture(reduce = false) {
     const media = {matches: reduce, addEventListener(_, callback) { preferenceChange = callback; }};
     const document = {hidden: false, querySelector: () => scene,
         addEventListener(name, callback) { documentEvents[name] = callback; }};
-    vm.runInNewContext(script, {document, window: {innerWidth: 1246, innerHeight: 678,
+    const sharedMotion = shared ? {paused: false, setPaused(value) {
+        this.paused = value; documentEvents['privatefind:motionchange']();
+    }} : undefined;
+    vm.runInNewContext(script, {document, window: {privateFindMotion: sharedMotion, innerWidth: 1246, innerHeight: 678,
         matchMedia: () => media, addEventListener(name, callback) { windowEvents[name] = callback; }},
         IntersectionObserver: class { constructor(callback) { intersection = callback; } observe() {} },
         requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
         cancelAnimationFrame(id) { frames.delete(id); },
         fetch() { throw new Error("The mascot must never request an API."); }});
-    return {cat, blink, hint, play, pause, frames, windowEvents,
+    return {cat, blink, hint, play, pause, frames, windowEvents, sharedMotion,
         show(value) { intersection([{isIntersecting: value}]); },
         visibility(hidden) { document.hidden = hidden; documentEvents.visibilitychange(); },
         reduce(value) { media.matches = value; preferenceChange(); },
@@ -95,3 +98,13 @@ const missing = fixture(); missing.blink.naturalWidth = 0; missing.show(true);
 for (let i = 0; i < 250; i++) missing.step();
 assert.equal(missing.blink.style.opacity, "0");
 console.log("PASS: brief blinks reopen, pause/reduced motion restore open eyes, and missing artwork fails safely");
+const shared = fixture(false, true); shared.show(true); shared.step();
+shared.click(shared.pause);
+assert.equal(shared.sharedMotion.paused, true);
+assert.equal(shared.frames.size, 0);
+shared.sharedMotion.setPaused(false);
+assert.equal(shared.frames.size, 1);
+shared.sharedMotion.setPaused(true);
+assert.equal(shared.pause.textContent, 'Resume animation');
+assert.equal(shared.frames.size, 0);
+console.log('PASS: sidebar and shared background controls pause and resume the same cat animation');

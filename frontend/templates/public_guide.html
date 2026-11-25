@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "icons.html" import icon %}
+{% from "page_scene.html" import atmosphere, page_scene %}
+{% block title %}How It Works | PrivateFind{% endblock %}
+{% block content %}
+<section class="secondary-page secondary-guide" aria-labelledby="public-guide-title">
+    {{ atmosphere() }}
+    <header class="secondary-heading">
+        <div>
+            <h1 id="public-guide-title">How It Works</h1>
+            <p>Report a lost item, return something you found, or collect your item safely.</p>
+        </div>
+        {{ page_scene('claims') }}
+    </header>
+    <ol class="guide-steps">
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">1</span>
+            <div>
+                <h2>Lost an item?</h2>
+                <p>Sign in and describe what you lost. Open your report to review possible matches. Identifying details stay private.</p>
+                <a class="pf-button" href="/owner/report/new">I lost something {{ icon('arrow') }}</a>
+            </div>
+        </li>
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">2</span>
+            <div>
+                <h2>Found an item?</h2>
+                <p>At a campus locker, scan its QR code or enter its printed code. Follow the instructions to return the item. No account needed.</p>
+                <a class="pf-button pf-secondary" href="/found/new">I found something {{ icon('arrow') }}</a>
+            </div>
+        </li>
+        <li class="guide-step pf-card">
+            <span class="guide-step-number" aria-hidden="true">3</span>
+            <div>
+                <h2>Verify ownership and collect</h2>
+                <p>Owners complete an ownership check before receiving pickup instructions. Some claims need an operator’s review. Track progress in Claims &amp; Pickup after signing in.</p>
+                <a class="pf-button pf-secondary" href="/login">Sign in to view your claims {{ icon('arrow') }}</a>
+            </div>
+        </li>
+    </ol>
+    <div class="public-actions">
+        <a class="pf-button pf-secondary" href="/">Back to Home</a>
+    </div>
+</section>
+{% endblock %}
